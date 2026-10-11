@@ -95,7 +95,7 @@ Si possono anche inviare a mano: *Actions → Notifiche → Run workflow*.
 3. Il telefono confronta il selfie con la foto di riferimento e calcola un punteggio da 0 a 100:
    - **Rossore** (40 punti): aumento del canale a* (spazio colore Lab) su guance e fronte
    - **Lucidità** (30 punti): pixel molto chiari e poco saturi su fronte e naso, con soglia relativa alla luminosità del viso
-   - **Smorfia** (30 punti): blendshape di MediaPipe (occhi strizzati, sopracciglia, bocca, occhi meno aperti)
+   - **Smorfia** (30 punti): blendshape di MediaPipe (sopracciglia abbassate, bocca tesa, occhi meno aperti)
 
 I valori della foto di riferimento stanno nelle proprietà di Apps Script (chiave `ref_<nome>`), così sopravvivono anche se si reinstalla l'app.
 

@@ -9,7 +9,7 @@ const cfg = window.APP_CONFIG;
 export const WEIGHTS = {
   redness: { points: 40, full: 8 }, // aumento del canale a* (Lab) su guance e fronte
   shine: { points: 30, full: 0.12 }, // aumento della quota di pixel lucidi su fronte e naso
-  grimace: { points: 30, full: 0.8 }, // aumento della smorfia (somma dei blendshape)
+  grimace: { points: 30, full: 0.5 }, // aumento della smorfia (somma dei blendshape)
 };
 
 export const TITLES = [
@@ -30,9 +30,7 @@ const FACE_LEFT = 234;
 const FACE_RIGHT = 454;
 
 const GRIMACE = [
-  ['eyeSquintLeft', 'eyeSquintRight'],
   ['browDownLeft', 'browDownRight'],
-  ['jawOpen'],
   ['mouthStretchLeft', 'mouthStretchRight'],
   ['eyeBlinkLeft', 'eyeBlinkRight'], // occhi meno aperti
 ];
@@ -156,9 +154,7 @@ function drawOverlay(ov, { width, height, radius, centers }) {
 }
 
 const GRIMACE_LABELS = {
-  eyeSquint: 'occhi strizzati',
   browDown: 'sopracciglia',
-  jawOpen: 'bocca aperta',
   mouthStretch: 'bocca tesa',
   eyeBlink: 'occhi chiusi',
 };
