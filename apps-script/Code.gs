@@ -114,7 +114,7 @@ function doGet(e) {
     const user = findUserByCode(p.code);
     if (!user) return json({ error: 'Codice non valido' });
     const r = checkin(user, 'automatico');
-    return json({ ...r, message: r.alreadyToday ? 'Check-in già fatto oggi' : `Check-in fatto, ${user.name} 💪` });
+    return json({ ...r, message: r.alreadyToday ? 'Check-in già fatto oggi' : `Check-in fatto, ${user.name}` });
   }
 
   if (!p.secret || p.secret !== props.getProperty('ADMIN_SECRET')) return json({ error: 'Non autorizzato' });
@@ -255,7 +255,7 @@ function buildNotifications(event, name) {
   if (event === 'test') {
     return subs.filter((s) => s.name === name).map((s) => ({
       subscription: s.sub,
-      title: 'Notifiche attive ✅',
+      title: 'Notifiche attive',
       body: `Ciao ${name}! Da ora saprai quando gli altri sono in palestra.`,
     }));
   }
@@ -263,15 +263,15 @@ function buildNotifications(event, name) {
   if (event === 'checkin') {
     const u = users.find((x) => x.name === name);
     const n = countInWeek(presenze, name, week);
-    const teases = ['E tu dove sei? 👀', 'Il divano può aspettare.', 'Qualcuno lo segua!', 'La classifica trema.'];
-    const extra = u && n === u.goal ? `Obiettivo settimanale raggiunto (${n}/${u.goal}) 🎯` : `Presenza n. ${n} della settimana. ${pick(teases)}`;
-    return toAllBut(name, `💪 ${name} è in palestra`, extra);
+    const teases = ['E tu dove sei?', 'Il divano può aspettare.', 'Qualcuno lo segua.', 'La classifica trema.'];
+    const extra = u && n === u.goal ? `Obiettivo settimanale raggiunto (${n}/${u.goal})` : `Presenza n. ${n} della settimana. ${pick(teases)}`;
+    return toAllBut(name, `${name} è in palestra`, extra);
   }
 
   if (event === 'sudometro') {
     const r = rows('sudometro').filter((x) => x.name === name).pop();
     if (!r) return [];
-    return toAllBut(name, `🍅 Sudometro di ${name}: ${r.score}`, `"${r.title}"`);
+    return toAllBut(name, `Sudometro di ${name}: ${r.score}`, `"${clean(r.title)}"`);
   }
 
   if (event === 'recap') {
@@ -280,14 +280,14 @@ function buildNotifications(event, name) {
     const min = Math.min(...counts.map((c) => c.count));
     const names = (v) => counts.filter((c) => c.count === v).map((c) => c.name).join(', ');
     const parts = [];
-    if (max > 0) parts.push(`🏆 MVP: ${names(max)} (${max})`);
-    if (min < max) parts.push(`🛋️ Divano d'oro: ${names(min)} (${min})`);
+    if (max > 0) parts.push(`MVP: ${names(max)} (${max})`);
+    if (min < max) parts.push(`Divano d'oro: ${names(min)} (${min})`);
     const sudo = rows('sudometro').filter((r) => weekKey(r.day) === week);
     if (sudo.length) {
       const top = sudo.reduce((a, b) => (b.score > a.score ? b : a));
-      parts.push(`🍅 Pomodoro della settimana: ${top.name} (${top.score})`);
+      parts.push(`Pomodoro della settimana: ${top.name} (${top.score})`);
     }
-    if (!parts.length) parts.push('Settimana tranquilla... troppo tranquilla 😴');
+    if (!parts.length) parts.push('Settimana tranquilla... troppo tranquilla.');
     return subs.map((s) => ({ subscription: s.sub, title: 'Recap della settimana', body: parts.join('\n') }));
   }
 
@@ -448,6 +448,11 @@ function json(data) {
 function randomCode(name) {
   const base = String(name).toUpperCase().replace(/[^A-Z]/g, '').slice(0, 8) || 'AMICO';
   return base + '-' + Math.floor(1000 + Math.random() * 9000);
+}
+
+/** Titoli vecchi del Sudometro potevano contenere emoji. */
+function clean(t) {
+  return String(t || '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '').trim();
 }
 
 function pick(list) {

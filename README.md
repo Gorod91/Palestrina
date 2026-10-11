@@ -1,6 +1,6 @@
 # 🏋️ Palestrina
 
-Web app per rendere più divertente la palestra tra amici: check-in con un tap, classifica settimanale, streak, timer addominali, **Sudometro** (selfie da sudato contro una foto di riferimento) e notifiche su iPhone. Costo zero, niente App Store.
+Web app (grafica in stile Apple Fitness) per rendere più divertente la palestra tra amici: check-in con un tap, classifica settimanale, streak, timer addominali, **Sudometro** (selfie da sudato contro una foto di riferimento) e notifiche su iPhone. Costo zero, niente App Store.
 
 ## Come è fatta
 
@@ -81,10 +81,10 @@ Serve iOS 16.4 o successivo. Il codice resta salvato: va reinserito solo se si c
 
 | Quando | A chi | Esempio |
 |---|---|---|
-| Check-in | tutti tranne chi l'ha fatto | 💪 Marco è in palestra. Presenza n. 2 della settimana. E tu dove sei? 👀 |
-| Sudometro | tutti tranne chi l'ha fatto | 🍅 Sudometro di Anna: 78. "Pomodoro maturo 🍅" |
-| Domenica alle 19 | tutti | 🏆 MVP: Marco (4) · 🛋️ Divano d'oro: Luca (1) · 🍅 Pomodoro della settimana: Anna (87) |
-| Attivazione | solo chi le attiva | Notifiche attive ✅ |
+| Check-in | tutti tranne chi l'ha fatto | Marco è in palestra. Presenza n. 2 della settimana. E tu dove sei? |
+| Sudometro | tutti tranne chi l'ha fatto | Sudometro di Anna: 78. "Pomodoro maturo" |
+| Domenica alle 19 | tutti | MVP: Marco (4) · Divano d'oro: Luca (1) · Pomodoro della settimana: Anna (87) |
+| Attivazione | solo chi le attiva | Notifiche attive |
 
 Si possono anche inviare a mano: *Actions → Notifiche → Run workflow*.
 
@@ -111,20 +111,20 @@ I pesi (`WEIGHTS`) e le soglie (`TITLES`) sono in `public/sudometro.js`, da tara
 **Anti-furbizia**: solo fotocamera dal vivo (niente galleria), un check-in e un Sudometro al giorno, controllati da Apps Script.
 
 ### Modalità debug
-Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il pulsante **🐞 Prova subito (debug)**, utile per provare e tarare il Sudometro:
+Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il pulsante **Prova subito (debug)**, utile per provare e tarare il Sudometro:
 - si può ripetere quante volte si vuole, anche dopo il Sudometro del giorno;
 - mostra i valori grezzi di ogni componente;
-- con la fotocamera aperta mostra i parametri **in tempo reale** (luce, rossore, lucidità, punteggio live rispetto alla foto di riferimento) e le zone del viso misurate: fronte in azzurro, guance in rosso, naso in giallo;
+- con la fotocamera aperta mostra i parametri **in tempo reale** (luce, rossore, lucidità, punteggio live rispetto alla foto di riferimento) e le zone del viso misurate: fronte in azzurro, guance in rosso, naso in verde;
 - nel foglio finisce con `sì` nella colonna *Debug*, non conta in classifica né nel recap e non avvisa nessuno.
 
 ## Timer addominali
 
-Tab **⏱️ Timer**: durata in alto (30 secondi di default, si cambia con − e + di 5 secondi o toccando il numero), poi il pulsante gigante **START**. L'ultimo tempo usato è salvato per ogni account (in Apps Script), quindi resta anche cambiando telefono.
-Il timer non suona: a fine tempo lo schermo pulsa lentamente in arancione (meno di una volta al secondo, niente flash) finché non lo tocchi, e torna il pulsante START. Toccando il cerchio mentre corre si annulla. Mentre corre, l'app chiede a iOS di tenere lo schermo acceso.
+Tab **Timer**: durata in alto (30 secondi di default, si cambia con − e + di 5 secondi o toccando il numero), poi il pulsante gigante **Inizia**. L'ultimo tempo usato è salvato per ogni account (in Apps Script), quindi resta anche cambiando telefono.
+Il timer non suona: a fine tempo lo schermo pulsa lentamente in verde (meno di una volta al secondo, niente flash) finché non lo tocchi, e torna il pulsante Inizia. Toccando il cerchio mentre corre si annulla. Mentre corre, l'app chiede a iOS di tenere lo schermo acceso.
 
 ## Check-in automatico (Comandi iOS)
 
-Nell'app, sezione **📍 Check-in automatico**: ognuno copia il proprio link personale (`…/exec?action=checkin&code=…`) e crea l'automazione in **Comandi → Automazione → + → Arrivo** → posizione della palestra → **Esegui immediatamente** → azione **Ottieni contenuto dell'URL** con il link.
+Nell'app, tab **Altro**, sezione **Check-in automatico**: ognuno copia il proprio link personale (`…/exec?action=checkin&code=…`) e crea l'automazione in **Comandi → Automazione → + → Arrivo** → posizione della palestra → **Esegui immediatamente** → azione **Ottieni contenuto dell'URL** con il link.
 Nel foglio Presenze, la colonna *Fonte* dice se il check-in è arrivato dall'app o dall'automazione.
 
 ## Sicurezza e privacy

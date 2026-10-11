@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
   <title>Palestrina</title>
-  <meta name="theme-color" content="#111827">
+  <meta name="theme-color" content="#000000">
   <link rel="manifest" href="manifest.webmanifest">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,28 +13,62 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Icone (stile SF Symbols), usate con <svg><use href="#i-..."/></svg> -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-rings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+      <circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2.5"/>
+    </symbol>
+    <symbol id="i-chart" viewBox="0 0 24 24" fill="currentColor">
+      <rect x="3" y="12" width="4.5" height="9" rx="1.2"/><rect x="9.75" y="4" width="4.5" height="17" rx="1.2"/><rect x="16.5" y="8" width="4.5" height="13" rx="1.2"/>
+    </symbol>
+    <symbol id="i-timer" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+      <circle cx="12" cy="13.5" r="8"/><path d="M12 13.5V9M9.5 2.5h5M19 6l1.5-1.5"/>
+    </symbol>
+    <symbol id="i-more" viewBox="0 0 24 24" fill="currentColor">
+      <circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/>
+    </symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>
+    </symbol>
+    <symbol id="i-camera" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round">
+      <path d="M3 8.5A1.5 1.5 0 0 1 4.5 7h3l1.5-2.5h6L16.5 7h3A1.5 1.5 0 0 1 21 8.5v9a1.5 1.5 0 0 1-1.5 1.5h-15A1.5 1.5 0 0 1 3 17.5z"/><circle cx="12" cy="13" r="3.5"/>
+    </symbol>
+    <symbol id="i-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M5 12.5l4.5 4.5L19 7.5"/>
+    </symbol>
+    <symbol id="i-share" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 3v12M8 7l4-4 4 4"/><path d="M7 11H5.5A1.5 1.5 0 0 0 4 12.5v7A1.5 1.5 0 0 0 5.5 21h13a1.5 1.5 0 0 0 1.5-1.5v-7a1.5 1.5 0 0 0-1.5-1.5H17"/>
+    </symbol>
+    <symbol id="i-location" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M3 11l18-8-8 18-2-8z"/>
+    </symbol>
+  </svg>
+
   <main>
-    <header>
-      <h1>🏋️ Palestrina</h1>
-      <span id="hello" class="muted"></span>
+    <header class="top">
+      <div>
+        <p id="today-date" class="eyebrow"></p>
+        <h1 id="page-title">Palestrina</h1>
+      </div>
+      <button id="avatar" class="avatar" hidden aria-label="Altro"></button>
     </header>
 
     <!-- Aperta in Safari: istruzioni per installarla -->
     <section id="screen-install" class="card" hidden>
       <h2>Installa l'app</h2>
-      <p>Palestrina funziona dall'icona sulla schermata Home, così può mandarti le notifiche.</p>
+      <p class="muted">Palestrina funziona dall'icona sulla schermata Home, così può mandarti le notifiche.</p>
       <ol class="steps">
-        <li>Tocca <b>Condividi</b> <span class="icon-share" aria-hidden="true">⬆︎</span> (se non lo vedi, prima tocca <b>⋯</b>)</li>
-        <li>Scegli <b>Aggiungi alla schermata Home</b> → <b>Aggiungi</b></li>
+        <li>Tocca <b>Condividi</b> <svg class="inline-icon"><use href="#i-share"/></svg> (se non lo vedi, prima tocca <b>···</b>)</li>
+        <li>Scegli <b>Aggiungi alla schermata Home</b>, poi <b>Aggiungi</b></li>
         <li>Chiudi Safari e apri <b>Palestrina</b> dalla Home</li>
       </ol>
       <button id="btn-browser" class="link">Continua nel browser</button>
     </section>
 
     <!-- Configurazione mancante -->
-    <section id="screen-config" class="card warn" hidden>
+    <section id="screen-config" class="card" hidden>
       <h2>Quasi pronta</h2>
-      <p>Manca l'indirizzo di Apps Script in <code>public/config.js</code>. Segui il README del repository.</p>
+      <p class="muted">Manca l'indirizzo di Apps Script in <code>public/config.js</code>. Segui il README del repository.</p>
     </section>
 
     <!-- Accesso con codice personale -->
@@ -43,50 +77,63 @@
       <p class="muted">Inserisci il codice personale che ti ha mandato Francesco.</p>
       <form id="form-login">
         <input id="in-code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="es. MARCO-4821" required>
-        <button type="submit">Entra</button>
+        <button type="submit" class="primary">Entra</button>
       </form>
     </section>
 
     <!-- Schermata principale, a tab -->
     <div id="screen-home" hidden>
       <div class="tab-panel" data-tab="oggi">
-        <section id="card-notify" class="card accent" hidden>
-          <h2>🔔 Attiva le notifiche</h2>
-          <p class="muted">Per sapere quando gli altri sono in palestra e per il recap della domenica.</p>
-          <button id="btn-notify">Attiva notifiche</button>
+        <section id="card-notify" class="card notify" hidden>
+          <svg class="card-icon"><use href="#i-bell"/></svg>
+          <div>
+            <h3>Attiva le notifiche</h3>
+            <p class="muted">Per sapere quando gli altri sono in palestra e per il recap della domenica.</p>
+            <button id="btn-notify" class="primary small">Attiva</button>
+          </div>
         </section>
 
-        <section class="card">
-          <button id="btn-checkin" class="big">💪 Sono in palestra</button>
-          <p id="checkin-status" class="center muted"></p>
+        <h2 class="section">Settimana</h2>
+        <section class="card week">
+          <div id="week-ring" class="week-ring"></div>
+          <div class="week-stats">
+            <p class="label">Allenamenti</p>
+            <p class="metric move"><span id="week-count">0</span><small id="week-goal">/3</small></p>
+            <p class="label">Di fila</p>
+            <p class="metric exercise"><span id="week-streak">0</span><small> sett.</small></p>
+          </div>
         </section>
+        <button id="btn-checkin" class="primary big">Sono in palestra</button>
 
+        <h2 class="section">Sudometro</h2>
         <section class="card">
-          <h2>🍅 Sudometro</h2>
           <div id="sudo-body"></div>
         </section>
       </div>
 
       <div class="tab-panel" data-tab="classifica" hidden>
-        <section class="card">
-          <h2>Classifica della settimana</h2>
+        <h2 class="section">Questa settimana</h2>
+        <section class="card list">
           <ol id="ranking" class="ranking"></ol>
-          <p id="pomodoro" class="muted"></p>
         </section>
+        <p id="pomodoro" class="footnote"></p>
 
-        <section id="card-gallery" class="card" hidden>
-          <h2>📸 Sudometro della settimana</h2>
-          <ol id="gallery" class="gallery"></ol>
-        </section>
+        <div id="card-gallery" hidden>
+          <h2 class="section">Sudometro</h2>
+          <section class="card list">
+            <ol id="gallery" class="gallery"></ol>
+          </section>
+        </div>
       </div>
 
       <div class="tab-panel timer" data-tab="timer" hidden>
+        <p class="label center">Addominali</p>
         <div class="timer-set">
           <button id="timer-minus" class="round" aria-label="Meno 5 secondi">−</button>
           <div id="timer-display" class="timer-display">0:30</div>
           <button id="timer-plus" class="round" aria-label="Più 5 secondi">+</button>
         </div>
-        <button id="timer-start" class="timer-start">START</button>
+        <button id="timer-start" class="timer-start">Inizia</button>
         <button id="timer-running" class="timer-running" hidden>
           <span id="timer-left">30</span>
           <small>tocca per annullare</small>
@@ -94,45 +141,47 @@
       </div>
 
       <div class="tab-panel" data-tab="altro" hidden>
-        <details class="card" open>
-          <summary><h2>📍 Check-in automatico</h2></summary>
+        <h2 class="section">Check-in automatico</h2>
+        <section class="card">
           <p class="muted">Con l'app <b>Comandi</b> l'iPhone fa il check-in da solo quando arrivi in palestra.</p>
           <ol class="steps">
-            <li>Copia il tuo link personale (non condividerlo: fa il check-in a nome tuo)<button id="btn-copy-link" class="secondary">Copia link</button></li>
-            <li>Apri <b>Comandi</b> → <b>Automazione</b> → <b>+</b> → <b>Arrivo</b></li>
+            <li>Copia il tuo link personale. Non condividerlo: fa il check-in a nome tuo.<button id="btn-copy-link" class="secondary small">Copia link</button></li>
+            <li>Apri <b>Comandi</b>, poi <b>Automazione</b>, <b>+</b> e <b>Arrivo</b></li>
             <li><b>Posizione</b>: cerca la palestra e tocca <b>Fine</b></li>
-            <li>Scegli <b>Esegui immediatamente</b> (non "Chiedi conferma") → <b>Avanti</b></li>
-            <li><b>Nuovo comando vuoto</b> → <b>Aggiungi azione</b> → cerca <b>Ottieni contenuto dell'URL</b></li>
+            <li>Scegli <b>Esegui immediatamente</b> (non "Chiedi conferma") e tocca <b>Avanti</b></li>
+            <li><b>Nuovo comando vuoto</b>, <b>Aggiungi azione</b>, cerca <b>Ottieni contenuto dell'URL</b></li>
             <li>Tocca <b>URL</b>, incolla il link e tocca <b>Fine</b></li>
           </ol>
           <p class="muted">Se Comandi chiede l'accesso alla posizione, scegli <b>Consenti sempre</b>. Se ci passi solo davanti conta lo stesso, ma vale al massimo un check-in al giorno.</p>
-        </details>
+        </section>
 
-        <p class="center"><button id="btn-logout" class="link">Esci</button></p>
+        <section class="card list">
+          <button id="btn-logout" class="row destructive">Esci</button>
+        </section>
       </div>
 
       <nav class="tabbar">
-        <button data-tab="oggi" class="active"><span>🏠</span>Oggi</button>
-        <button data-tab="classifica"><span>🏆</span>Classifica</button>
-        <button data-tab="timer"><span>⏱️</span>Timer</button>
-        <button data-tab="altro"><span>⚙️</span>Altro</button>
+        <button data-tab="oggi" class="active"><svg><use href="#i-rings"/></svg>Riepilogo</button>
+        <button data-tab="classifica"><svg><use href="#i-chart"/></svg>Classifica</button>
+        <button data-tab="timer"><svg><use href="#i-timer"/></svg>Timer</button>
+        <button data-tab="altro"><svg><use href="#i-more"/></svg>Altro</button>
       </nav>
     </div>
 
     <p id="toast" class="toast" hidden></p>
 
     <!-- Se l'avvio va storto, invece dello schermo nero -->
-    <section id="boot-error" class="card warn" hidden>
+    <section id="boot-error" class="card" hidden>
       <h2>Qualcosa è andato storto</h2>
       <p class="muted">Di solito succede subito dopo un aggiornamento. Ricarica l'app; se non basta, chiudila del tutto e riaprila tra qualche minuto.</p>
-      <button onclick="location.reload()">Ricarica</button>
+      <button class="primary" onclick="location.reload()">Ricarica</button>
       <pre id="boot-error-detail" class="muted"></pre>
     </section>
   </main>
 
   <!-- Fine del timer: lo schermo lampeggia finché non lo tocchi -->
   <div id="timer-alarm" class="timer-alarm" hidden>
-    <p class="alarm-title">⏱️ Tempo!</p>
+    <p class="alarm-title">Tempo!</p>
     <p>Tocca per fermare</p>
   </div>
 
@@ -152,7 +201,7 @@
     <p id="camera-hint" class="camera-hint"></p>
     <div class="camera-actions">
       <button id="btn-cancel" class="secondary">Annulla</button>
-      <button id="btn-shoot">📸 Scatta</button>
+      <button id="btn-shoot" class="shutter" aria-label="Scatta"><span></span></button>
     </div>
   </div>
 

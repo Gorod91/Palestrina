@@ -49,10 +49,39 @@ function toast(msg, ms = 3500) {
   toastTimer = setTimeout(() => ($('toast').hidden = true), ms);
 }
 
+const TAB_TITLES = { oggi: 'Riepilogo', classifica: 'Classifica', timer: 'Timer', altro: 'Altro' };
+
 function show(screen) {
   ['install', 'config', 'login', 'home'].forEach((s) => ($(`screen-${s}`).hidden = s !== screen));
-  $('hello').textContent = screen === 'home' && session ? `Ciao ${session.name}` : '';
+  if (screen !== 'home') $('page-title').textContent = 'Palestrina';
+  $('avatar').hidden = !(screen === 'home' && session && session.name);
+  if (!$('avatar').hidden) {
+    $('avatar').textContent = session.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+  }
 }
+
+/** Titoli salvati prima di questa versione potevano contenere emoji: le togliamo. */
+const clean = (t) => String(t || '').replace(/[\p{Extended_Pictographic}\u{FE0F}\u{200D}]/gu, '').trim();
+
+/** Anello in stile Fitness: `value` da 0 a 1 (oltre 1 resta pieno). */
+function ring(value, color, color2, { size = 120, width = 16 } = {}) {
+  const r = (size - width) / 2;
+  const c = 2 * Math.PI * r;
+  const v = Math.max(0, Math.min(1, value || 0));
+  const id = `g${Math.random().toString(36).slice(2, 8)}`;
+  return `<svg viewBox="0 0 ${size} ${size}">
+    <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${color}"/><stop offset="1" stop-color="${color2}"/></linearGradient></defs>
+    <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-opacity=".22" stroke-width="${width}"/>
+    ${v > 0 ? `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="url(#${id})" stroke-width="${width}" stroke-linecap="round"
+      stroke-dasharray="${c * v} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/>` : ''}
+  </svg>`;
+}
+
+const COLORS = {
+  move: ['#fa114f', '#ff4f7b'],
+  exercise: ['#a6ff00', '#d4ff4f'],
+  stand: ['#00d9ff', '#64ecff'],
+};
 
 function render() {
   if (!state) return;
@@ -61,26 +90,27 @@ function render() {
   const btn = $('btn-checkin');
   btn.disabled = me.checkedInToday;
   btn.classList.toggle('done', me.checkedInToday);
-  btn.textContent = me.checkedInToday ? '✅ Check-in fatto oggi' : '💪 Sono in palestra';
-  const mine = week.ranking.find((r) => r.name === me.name);
-  $('checkin-status').textContent = mine
-    ? `Questa settimana: ${mine.count}/${mine.goal}${mine.streak ? ` · 🔥 ${mine.streak} ${mine.streak === 1 ? 'settimana' : 'settimane'}` : ''}`
-    : '';
+  btn.innerHTML = me.checkedInToday ? '<svg><use href="#i-check"/></svg>Check-in fatto oggi' : 'Sono in palestra';
+
+  const mine = week.ranking.find((r) => r.name === me.name) || { count: 0, goal: me.goal, streak: 0 };
+  $('week-ring').innerHTML = ring(mine.count / mine.goal, ...COLORS.move, { size: 132, width: 20 });
+  $('week-count').textContent = mine.count;
+  $('week-goal').textContent = `/${mine.goal}`;
+  $('week-streak').textContent = mine.streak;
 
   $('ranking').innerHTML = '';
   week.ranking.forEach((r, i) => {
     const li = document.createElement('li');
     if (r.name === me.name) li.className = 'me';
-    const pct = Math.min(100, Math.round((r.count / r.goal) * 100));
     li.innerHTML = `
       <span class="pos">${i + 1}</span>
-      <div><span class="name"></span>${r.streak ? ` <span class="muted">🔥${r.streak}</span>` : ''}
-        <div class="bar"><span class="${pct >= 100 ? 'full' : ''}" style="width:${pct}%"></span></div></div>
-      <span class="count">${r.count}/${r.goal}</span>`;
+      <span class="ring">${ring(r.count / r.goal, ...COLORS.move, { size: 44, width: 7 })}</span>
+      <div><div class="name"></div><div class="sub">${r.streak ? `${r.streak} ${r.streak === 1 ? 'settimana' : 'settimane'} di fila` : 'Obiettivo ' + r.goal}</div></div>
+      <span class="count">${r.count}<small>/${r.goal}</small></span>`;
     li.querySelector('.name').textContent = r.name;
     $('ranking').append(li);
   });
-  $('pomodoro').textContent = week.pomodoro ? `🍅 Pomodoro della settimana: ${week.pomodoro.name} (${week.pomodoro.score})` : '';
+  $('pomodoro').textContent = week.pomodoro ? `Sudometro più alto: ${week.pomodoro.name}, ${week.pomodoro.score}` : '';
 
   renderSudometro();
   renderGallery();
@@ -108,17 +138,17 @@ function renderGallery() {
   $('card-gallery').hidden = !list.length;
   const el = $('gallery');
   el.innerHTML = '';
-  const medals = ['🥇', '🥈', '🥉'];
   list.forEach((r, i) => {
     const li = document.createElement('li');
     const day = new Date(r.day + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long' });
+    const title = clean(r.title);
     li.innerHTML = `
-      <div class="photo"><span>${r.photoId ? '…' : '📷'}</span></div>
-      <div><div><b class="name"></b> <span class="muted day"></span></div><div class="title muted"></div></div>
-      <div class="pts">${medals[i] || ''} ${r.score}</div>`;
+      <span class="pos">${i + 1}</span>
+      <div class="photo"><svg><use href="#i-camera"/></svg></div>
+      <div><div class="name"></div><div class="sub"></div></div>
+      <div class="pts">${r.score}</div>`;
     li.querySelector('.name').textContent = r.name;
-    li.querySelector('.day').textContent = day;
-    li.querySelector('.title').textContent = r.title;
+    li.querySelector('.sub').textContent = `${title} · ${day}`;
     el.append(li);
     if (r.photoId) {
       loadPhoto(r.photoId)
@@ -126,10 +156,10 @@ function renderGallery() {
           const img = new Image();
           img.alt = `Selfie di ${r.name}`;
           img.src = src;
-          img.onclick = () => openPhoto(src, `${r.name} · ${r.score} · ${r.title}`);
+          img.onclick = () => openPhoto(src, `${r.name} · ${r.score} · ${title}`);
           li.querySelector('.photo').replaceChildren(img);
         })
-        .catch(() => (li.querySelector('.photo span').textContent = '📷'));
+        .catch(() => {});
     }
   });
 }
@@ -150,36 +180,43 @@ function renderSudometro() {
     el.innerHTML = `
       <p>Il Sudometro confronta un selfie da sudato con una <b>foto di riferimento</b> da riposato, che si fa <b>una volta sola</b>.</p>
       <p class="muted">Meglio farla in palestra prima di allenarti, nel punto e con la luce dove farai i selfie da sudato. Le foto vengono salvate nel Google Drive di Palestrina; i selfie da sudato li vede tutto il gruppo nella classifica della settimana.</p>
-      <button id="btn-ref">📸 Foto di riferimento</button>`;
+      <button id="btn-ref" class="primary">Foto di riferimento</button>`;
     el.querySelector('#btn-ref').onclick = takeReference;
     return;
   }
 
   // 2) Sudometro di oggi già fatto
   if (me.sudometroToday) {
-    el.innerHTML = `<p class="score"></p><p class="score-title"></p><p class="muted center">Il Sudometro di oggi è fatto. Domani si replica!</p>`;
-    el.querySelector('.score').textContent = me.sudometroToday.score;
-    el.querySelector('.score-title').textContent = me.sudometroToday.title;
+    el.innerHTML = `
+      <div class="sudo-result">
+        <div class="ring">${ring(me.sudometroToday.score / 100, ...COLORS.stand, { size: 112, width: 16 })}</div>
+        <div>
+          <p class="metric stand">${me.sudometroToday.score}<small>/100</small></p>
+          <p class="sudo-title"></p>
+          <p class="sudo-text">Il Sudometro di oggi è fatto. Domani si replica.</p>
+        </div>
+      </div>`;
+    el.querySelector('.sudo-title').textContent = clean(me.sudometroToday.title);
   } else {
     // 3) Selfie da sudato: uno al giorno
     el.innerHTML = `
-      <p class="muted">Al momento peggiore dell'allenamento fatti un selfie da sudato, nello stesso punto della foto di riferimento. Uno al giorno: scegli bene il momento! Lo vedrà tutto il gruppo 😏</p>
-      <button id="btn-sweat">🥵 Selfie da sudato</button>`;
+      <p class="muted">Al momento peggiore dell'allenamento fatti un selfie da sudato, nello stesso punto della foto di riferimento. Uno al giorno: scegli bene il momento. Lo vedrà tutto il gruppo.</p>
+      <button id="btn-sweat" class="primary">Selfie da sudato</button>`;
     el.querySelector('#btn-sweat').onclick = () => takeSweat(false);
   }
 
   if (me.debug) {
     el.insertAdjacentHTML('beforeend', `
       <div class="debug">
-        <button id="btn-debug" class="secondary">🐞 Prova subito (debug)</button>
-        <p class="muted">Il risultato finisce nel foglio segnato come debug: non conta in classifica e non avvisa nessuno. Puoi ripeterla quante volte vuoi.</p>
+        <button id="btn-debug" class="secondary">Prova subito (debug)</button>
+        <p class="muted" style="margin-top:8px;font-size:13px">Il risultato finisce nel foglio segnato come debug: non conta in classifica e non avvisa nessuno. Puoi ripeterla quante volte vuoi.</p>
         <pre id="debug-out"></pre>
       </div>`);
     el.querySelector('#btn-debug').onclick = () => takeSweat(true);
     if (lastDebug) el.querySelector('#debug-out').textContent = lastDebug;
   }
 
-  el.insertAdjacentHTML('beforeend', '<p class="center"><button id="btn-reref" class="link">Rifai la foto di riferimento</button></p>');
+  el.insertAdjacentHTML('beforeend', '<button id="btn-reref" class="link">Rifai la foto di riferimento</button>');
   el.querySelector('#btn-reref').onclick = () => {
     if (confirm('Rifare la foto di riferimento? Quella vecchia verrà sostituita.')) takeReference();
   };
@@ -216,7 +253,7 @@ async function checkin() {
   btn.disabled = true;
   try {
     const r = await api('checkin');
-    toast(r.alreadyToday ? 'Avevi già fatto check-in oggi' : 'Check-in fatto! Gli altri lo sapranno 😏');
+    toast(r.alreadyToday ? 'Avevi già fatto check-in oggi' : 'Check-in fatto. Gli altri lo sapranno.');
   } catch (err) {
     btn.disabled = false;
     toast(`Errore: ${err.message}`);
@@ -233,7 +270,7 @@ async function takeReference() {
     toast('Analizzo…', 10000);
     const features = await sudometro.analyze(canvas);
     const r = await api('setReference', { features, photo: sudometro.toJpegBase64(canvas) });
-    toast(photoWarning(r) || 'Foto di riferimento salvata ✅ Da ora basta il selfie da sudato.', 5000);
+    toast(photoWarning(r) || 'Foto di riferimento salvata. Da ora basta il selfie da sudato.', 5000);
     refresh();
   } catch (err) {
     toast(cameraError(err));
@@ -277,7 +314,7 @@ async function takeSweat(debug) {
 
 /** Avviso per gli utenti debug se la foto non è finita su Drive (es. Drive non ancora autorizzato). */
 function photoWarning(r) {
-  return state.me.debug && r && r.photoError ? `⚠️ ${r.photoError}` : '';
+  return state.me.debug && r && r.photoError ? `Attenzione: ${r.photoError}` : '';
 }
 
 function cameraError(err) {
@@ -294,6 +331,7 @@ function selectTab(name) {
   document.querySelectorAll('.tab-panel').forEach((p) => (p.hidden = p.dataset.tab !== name));
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
   store.set('tab', name);
+  $('page-title').textContent = TAB_TITLES[name];
   window.scrollTo(0, 0);
 }
 
@@ -365,6 +403,8 @@ $('btn-checkin').addEventListener('click', checkin);
 $('btn-notify').addEventListener('click', enableNotifications);
 $('btn-logout').addEventListener('click', logout);
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
+$('avatar').addEventListener('click', () => selectTab('altro'));
+$('today-date').textContent = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
 document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
 try {
   initTimer();
@@ -375,7 +415,7 @@ $('btn-copy-link').addEventListener('click', async () => {
   const link = `${cfg.appsScriptUrl}?action=checkin&code=${encodeURIComponent(session.code)}`;
   try {
     await navigator.clipboard.writeText(link);
-    toast('Link copiato 📋 Ora incollalo in Comandi.');
+    toast('Link copiato. Ora incollalo in Comandi.');
   } catch {
     prompt('Copia questo link:', link);
   }

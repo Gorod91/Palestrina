@@ -13,11 +13,11 @@ export const WEIGHTS = {
 };
 
 export const TITLES = [
-  [85, 'Lavatrice in centrifuga 🌀'],
-  [60, 'Pomodoro maturo 🍅'],
-  [40, 'Si comincia a sudare 💦'],
-  [20, 'Appena tiepido 🙂'],
-  [0, 'Fresco come una rosa 🌹'],
+  [85, 'Lavatrice in centrifuga'],
+  [60, 'Pomodoro maturo'],
+  [40, 'Si comincia a sudare'],
+  [20, 'Appena tiepido'],
+  [0, 'Fresco come una rosa'],
 ];
 
 // Punti del volto (indici della mesh MediaPipe a 468 punti).
@@ -129,7 +129,7 @@ async function liveLoop(video, reference, isOpen) {
   }
 }
 
-const REGION_COLORS = { forehead: '#38bdf8', cheeks: '#f87171', nose: '#facc15' };
+const REGION_COLORS = { forehead: '#00d9ff', cheeks: '#fa114f', nose: '#a6ff00' };
 
 function drawOverlay(ov, { width, height, radius, centers }) {
   if (ov.width !== width || ov.height !== height) {
