@@ -39,7 +39,7 @@ Indirizzo: `https://<utente>.github.io/Palestrina/`
    Copia l'**URL dell'app web** (finisce con `/exec`).
 7. Su GitHub apri `public/config.js` (matita ✏️ per modificare), incolla l'URL al posto di `INCOLLA_QUI_URL_APPS_SCRIPT` e fai *Commit changes*. Il sito si aggiorna da solo in un minuto.
 
-> Se modifichi `Code.gs` (incollando la nuova versione dal repo), pubblica di nuovo con *Esegui il deployment → Gestisci deployment → ✏️ → Versione: Nuova versione*: l'URL resta lo stesso.
+> Se modifichi `Code.gs` a mano (incollando la nuova versione dal repo), pubblica di nuovo con *Esegui il deployment → Gestisci deployment → ✏️ → Versione: Nuova versione*: l'URL resta lo stesso.
 
 ### 3. Notifiche
 1. **Token GitHub per Apps Script**: *GitHub → Settings (del tuo profilo) → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token*.
@@ -57,6 +57,19 @@ Indirizzo: `https://<utente>.github.io/Palestrina/`
    Per una coppia di chiavi nuova: `npx web-push generate-vapid-keys`, poi metti la pubblica in `config.js` e la privata nel secret.
 
 **Prova**: apri l'app dalla Home, tocca **Attiva notifiche** e consenti. Entro circa un minuto arriva "Notifiche attive ✅". Se non arriva, guarda *Actions → Notifiche*: l'errore è scritto lì.
+
+### 4. Aggiornamento automatico di Apps Script (facoltativo)
+Con questa configurazione ogni modifica a `apps-script/` su GitHub viene caricata da sola in Apps Script e pubblicata sullo stesso URL (workflow `.github/workflows/apps-script.yml`, usa [clasp](https://github.com/google/clasp)). Niente più copia-incolla.
+
+1. Attiva l'API: **https://script.google.com/home/usersettings** → **API Google Apps Script** → **On**.
+2. Sul computer (serve [Node.js](https://nodejs.org)): da terminale esegui `npx @google/clasp@3.4.1 login`, accedi con l'account Google del foglio e consenti.
+   Viene creato il file `.clasprc.json` nella cartella utente (`~/.clasprc.json` su Mac/Linux, `C:\Users\<nome>\.clasprc.json` su Windows).
+3. Su GitHub, *Settings → Secrets and variables → Actions*, aggiungi:
+   - `CLASPRC_JSON` = tutto il contenuto di `.clasprc.json`
+   - `APPS_SCRIPT_ID` = *Apps Script → Impostazioni progetto → ID script*
+4. *Actions → Aggiorna Apps Script → Run workflow* per la prima prova.
+
+> Il file `.clasprc.json` dà accesso ai tuoi progetti Apps Script: tienilo solo nel secret. Per revocarlo: https://myaccount.google.com/permissions → clasp → Rimuovi accesso.
 
 ## Cosa fanno gli amici
 

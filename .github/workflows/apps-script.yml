@@ -1,0 +1,55 @@
+name: Aggiorna Apps Script
+
+# A ogni modifica di apps-script/ su main: carica il codice in Apps Script con clasp
+# e pubblica una nuova versione sullo stesso deployment (l'URL /exec non cambia).
+on:
+  push:
+    branches: [main]
+    paths: ['apps-script/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apps-script
+  cancel-in-progress: false
+
+env:
+  CLASP: npx -y @google/clasp@3.4.1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Credenziali clasp
+        env:
+          CLASPRC_JSON: ${{ secrets.CLASPRC_JSON }}
+          APPS_SCRIPT_ID: ${{ secrets.APPS_SCRIPT_ID }}
+        run: |
+          if [ -z "$CLASPRC_JSON" ] || [ -z "$APPS_SCRIPT_ID" ]; then
+            echo "::error::Mancano i secret CLASPRC_JSON e/o APPS_SCRIPT_ID (vedi README, sezione Aggiornamento automatico)"
+            exit 1
+          fi
+          printf '%s' "$CLASPRC_JSON" > ~/.clasprc.json
+          printf '{"scriptId":"%s","rootDir":"apps-script"}' "$(echo "$APPS_SCRIPT_ID" | tr -d '[:space:]')" > .clasp.json
+          $CLASP status
+
+      - name: Carica il codice
+        run: $CLASP push --force
+
+      - name: Pubblica nuova versione
+        env:
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+        run: |
+          DEPLOYMENT_ID=$(echo "$APPS_SCRIPT_URL" | sed -E 's#.*/macros/s/([^/]+)/exec.*#\1#')
+          if [ -z "$DEPLOYMENT_ID" ] || [ "$DEPLOYMENT_ID" = "$APPS_SCRIPT_URL" ]; then
+            echo "::error::Il secret APPS_SCRIPT_URL non sembra un URL /exec di Apps Script"
+            exit 1
+          fi
+          $CLASP redeploy "$DEPLOYMENT_ID" --description "Commit ${GITHUB_SHA::7}"
