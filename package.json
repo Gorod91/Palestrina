@@ -1,0 +1,12 @@
+{
+  "name": "palestrina",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Invio delle notifiche push di Palestrina da GitHub Actions",
+  "scripts": {
+    "send": "node scripts/send.js"
+  },
+  "dependencies": {
+    "web-push": "^3.6.7"
+  }
+}

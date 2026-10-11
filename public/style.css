@@ -1,0 +1,54 @@
+:root { color-scheme: dark; --bg: #111827; --card: #1f2937; --line: #374151; --fg: #f3f4f6; --muted: #9ca3af; --accent: #f97316; --ok: #22c55e; --warn: #f59e0b; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font: 16px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
+  -webkit-tap-highlight-color: transparent;
+}
+main { max-width: 480px; margin: 0 auto; padding: 12px 0 40px; }
+header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+h1 { font-size: 1.5rem; margin: 12px 0 16px; }
+h2 { font-size: 1.05rem; margin: 0 0 10px; }
+p { margin: 0 0 10px; }
+.muted { color: var(--muted); }
+.center { text-align: center; }
+.card { background: var(--card); border-radius: 16px; padding: 16px; margin-bottom: 14px; }
+.card.warn { border: 1px solid var(--warn); }
+.card.accent { border: 1px solid var(--accent); }
+.steps { padding-left: 20px; margin: 0 0 12px; }
+.steps li { margin-bottom: 6px; }
+button {
+  display: block; width: 100%; padding: 14px; margin: 8px 0 0; border: 0; border-radius: 12px;
+  background: var(--accent); color: #fff; font: inherit; font-weight: 600; cursor: pointer;
+}
+button.big { font-size: 1.25rem; padding: 22px; margin: 0 0 8px; }
+button.secondary { background: #4b5563; }
+button.link { background: none; color: var(--muted); text-decoration: underline; font-weight: 400; padding: 8px; }
+button:disabled { opacity: .45; }
+button.done, button.done:disabled { background: var(--ok); opacity: 1; }
+input {
+  display: block; width: 100%; padding: 14px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--fg); font: inherit; font-size: 1.1rem; letter-spacing: .05em; text-transform: uppercase;
+}
+.ranking { list-style: none; padding: 0; margin: 0 0 10px; }
+.ranking li { display: grid; grid-template-columns: 28px 1fr auto; align-items: center; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.ranking li:last-child { border-bottom: 0; }
+.ranking .pos { color: var(--muted); font-weight: 700; }
+.ranking .me .name { font-weight: 700; }
+.ranking .bar { height: 6px; background: var(--line); border-radius: 3px; margin-top: 4px; overflow: hidden; }
+.ranking .bar span { display: block; height: 100%; background: var(--accent); }
+.ranking .bar span.full { background: var(--ok); }
+.ranking .count { font-variant-numeric: tabular-nums; text-align: right; }
+.score { font-size: 3rem; font-weight: 800; text-align: center; margin: 4px 0 0; }
+.score-title { text-align: center; font-size: 1.15rem; margin-bottom: 8px; }
+.toast {
+  position: fixed; left: 16px; right: 16px; bottom: calc(16px + env(safe-area-inset-bottom));
+  max-width: 448px; margin: 0 auto; background: #000; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px;
+}
+.camera { position: fixed; inset: 0; background: #000; display: flex; flex-direction: column; z-index: 10; padding: env(safe-area-inset-top) 16px calc(16px + env(safe-area-inset-bottom)); }
+.camera video { flex: 1; min-height: 0; width: 100%; object-fit: cover; transform: scaleX(-1); border-radius: 16px; }
+.camera-hint { text-align: center; color: var(--muted); margin: 12px 0 0; }
+.camera-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
+code { font-size: .9em; }

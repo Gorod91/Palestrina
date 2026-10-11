@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Palestrina</title>
+  <meta name="theme-color" content="#111827">
+  <link rel="manifest" href="manifest.webmanifest">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Palestrina">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header>
+      <h1>🏋️ Palestrina</h1>
+      <span id="hello" class="muted"></span>
+    </header>
+
+    <!-- Aperta in Safari: istruzioni per installarla -->
+    <section id="screen-install" class="card" hidden>
+      <h2>Installa l'app</h2>
+      <p>Palestrina funziona dall'icona sulla schermata Home, così può mandarti le notifiche.</p>
+      <ol class="steps">
+        <li>Tocca <b>Condividi</b> <span class="icon-share" aria-hidden="true">⬆︎</span> (se non lo vedi, prima tocca <b>⋯</b>)</li>
+        <li>Scegli <b>Aggiungi alla schermata Home</b> → <b>Aggiungi</b></li>
+        <li>Chiudi Safari e apri <b>Palestrina</b> dalla Home</li>
+      </ol>
+      <button id="btn-browser" class="link">Continua nel browser</button>
+    </section>
+
+    <!-- Configurazione mancante -->
+    <section id="screen-config" class="card warn" hidden>
+      <h2>Quasi pronta</h2>
+      <p>Manca l'indirizzo di Apps Script in <code>public/config.js</code>. Segui il README del repository.</p>
+    </section>
+
+    <!-- Accesso con codice personale -->
+    <section id="screen-login" class="card" hidden>
+      <h2>Chi sei?</h2>
+      <p class="muted">Inserisci il codice personale che ti ha mandato Francesco.</p>
+      <form id="form-login">
+        <input id="in-code" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="es. MARCO-4821" required>
+        <button type="submit">Entra</button>
+      </form>
+    </section>
+
+    <!-- Schermata principale -->
+    <div id="screen-home" hidden>
+      <section id="card-notify" class="card accent" hidden>
+        <h2>🔔 Attiva le notifiche</h2>
+        <p class="muted">Per sapere quando gli altri sono in palestra e per il recap della domenica.</p>
+        <button id="btn-notify">Attiva notifiche</button>
+      </section>
+
+      <section class="card">
+        <button id="btn-checkin" class="big">💪 Sono in palestra</button>
+        <p id="checkin-status" class="center muted"></p>
+      </section>
+
+      <section class="card">
+        <h2>🍅 Sudometro</h2>
+        <div id="sudo-body"></div>
+      </section>
+
+      <section class="card">
+        <h2>Classifica della settimana</h2>
+        <ol id="ranking" class="ranking"></ol>
+        <p id="pomodoro" class="muted"></p>
+      </section>
+
+      <p class="center"><button id="btn-logout" class="link">Esci</button></p>
+    </div>
+
+    <p id="toast" class="toast" hidden></p>
+  </main>
+
+  <!-- Fotocamera per il Sudometro -->
+  <div id="camera" class="camera" hidden>
+    <video id="video" playsinline muted autoplay></video>
+    <p id="camera-hint" class="camera-hint"></p>
+    <div class="camera-actions">
+      <button id="btn-cancel" class="secondary">Annulla</button>
+      <button id="btn-shoot">📸 Scatta</button>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script type="module" src="app.js"></script>
+</body>
+</html>

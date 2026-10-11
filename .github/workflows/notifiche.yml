@@ -1,0 +1,38 @@
+name: Notifiche
+
+# Avviata da Apps Script (check-in, Sudometro, recap della domenica, test)
+# oppure a mano da Actions → Notifiche → Run workflow.
+on:
+  repository_dispatch:
+    types: [checkin, sudometro, recap, test]
+  workflow_dispatch:
+    inputs:
+      event:
+        description: Evento
+        type: choice
+        options: [recap, test, checkin, sudometro]
+        default: recap
+      name:
+        description: Nome (per test, checkin, sudometro)
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node scripts/send.js
+        env:
+          EVENT: ${{ github.event.action || inputs.event }}
+          NAME: ${{ github.event.client_payload.name || inputs.name }}
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+          APPS_SCRIPT_SECRET: ${{ secrets.APPS_SCRIPT_SECRET }}
+          VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
