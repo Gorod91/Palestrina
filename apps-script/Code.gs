@@ -17,6 +17,8 @@ const SHEETS = {
   iscrizioni: { name: 'Iscrizioni', header: ['Nome', 'Endpoint', 'Sottoscrizione', 'Aggiornata'] },
 };
 const DEFAULT_GOAL = 3;
+// Utenti con il pulsante di debug, oltre a quelli con "sì" nella colonna D di Utenti.
+const DEBUG_USERS = ['Francesco'];
 const TZ = Session.getScriptTimeZone();
 const props = PropertiesService.getScriptProperties();
 
@@ -339,7 +341,7 @@ function allUsers() {
       code: String(r[1]).trim(),
       goal: Number(r[2]) || DEFAULT_GOAL,
       // Colonna D: "sì", "x" o casella spuntata abilitano il pulsante di debug.
-      debug: r[3] === true || /^(s[iì]|x|true|1)$/i.test(String(r[3]).trim()),
+      debug: DEBUG_USERS.includes(String(r[0]).trim()) || r[3] === true || /^(s[iì]|x|true|1)$/i.test(String(r[3]).trim()),
     }));
 }
 
