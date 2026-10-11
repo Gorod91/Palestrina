@@ -93,9 +93,10 @@ Si possono anche inviare a mano: *Actions → Notifiche → Run workflow*.
 1. **Una volta sola**: foto di riferimento da riposato, meglio in palestra, nel punto e con la luce dove si faranno i selfie da sudato. Si può rifare quando si vuole ("Rifai la foto di riferimento").
 2. **Ogni volta**: un selfie da sudato al momento peggiore dell'allenamento, **uno al giorno**.
 3. Il telefono confronta il selfie con la foto di riferimento e calcola un punteggio da 0 a 100:
-   - **Rossore** (40 punti): aumento del canale a* (spazio colore Lab) su guance e fronte
-   - **Lucidità** (30 punti): pixel molto chiari e poco saturi su fronte e naso, con soglia relativa alla luminosità del viso
-   - **Smorfia** (30 punti): blendshape di MediaPipe (sopracciglia abbassate, bocca tesa, occhi meno aperti)
+   - **Rossore** (60 punti): aumento del canale a* (spazio colore Lab) su guance e fronte
+   - **Lucidità** (40 punti): pixel molto chiari e poco saturi su fronte e naso, con soglia relativa alla luminosità del viso
+
+   Le espressioni del viso (smorfie, occhi, bocca) non contano: si falsano troppo facilmente.
 
 I valori della foto di riferimento stanno nelle proprietà di Apps Script (chiave `ref_<nome>`), così sopravvivono anche se si reinstalla l'app.
 
@@ -113,7 +114,7 @@ I pesi (`WEIGHTS`) e le soglie (`TITLES`) sono in `public/sudometro.js`, da tara
 Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il pulsante **🐞 Prova subito (debug)**, utile per provare e tarare il Sudometro:
 - si può ripetere quante volte si vuole, anche dopo il Sudometro del giorno;
 - mostra i valori grezzi di ogni componente;
-- con la fotocamera aperta mostra i parametri **in tempo reale** (luce, rossore, lucidità, smorfia, punteggio live rispetto alla foto di riferimento) e le zone del viso misurate: fronte in azzurro, guance in rosso, naso in giallo;
+- con la fotocamera aperta mostra i parametri **in tempo reale** (luce, rossore, lucidità, punteggio live rispetto alla foto di riferimento) e le zone del viso misurate: fronte in azzurro, guance in rosso, naso in giallo;
 - nel foglio finisce con `sì` nella colonna *Debug*, non conta in classifica né nel recap e non avvisa nessuno.
 
 ## Check-in automatico (Comandi iOS)

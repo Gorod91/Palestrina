@@ -7,9 +7,9 @@ const cfg = window.APP_CONFIG;
 // Pesi del punteggio: ogni componente vale al massimo `points` punti,
 // raggiunti quando la differenza tra i due selfie arriva a `full`.
 export const WEIGHTS = {
-  redness: { points: 40, full: 8 }, // aumento del canale a* (Lab) su guance e fronte
-  shine: { points: 30, full: 0.12 }, // aumento della quota di pixel lucidi su fronte e naso
-  grimace: { points: 30, full: 0.5 }, // aumento della smorfia (somma dei blendshape)
+  // Niente espressioni del viso (smorfie, occhi, bocca): si falsano troppo facilmente.
+  redness: { points: 60, full: 8 }, // aumento del canale a* (Lab) su guance e fronte
+  shine: { points: 40, full: 0.12 }, // aumento della quota di pixel lucidi su fronte e naso
 };
 
 export const TITLES = [
@@ -29,12 +29,6 @@ const REGIONS = {
 const FACE_LEFT = 234;
 const FACE_RIGHT = 454;
 
-const GRIMACE = [
-  ['browDownLeft', 'browDownRight'],
-  ['mouthStretchLeft', 'mouthStretchRight'],
-  ['eyeBlinkLeft', 'eyeBlinkRight'], // occhi meno aperti
-];
-
 let landmarkerPromise;
 
 function loadLandmarker() {
@@ -45,7 +39,7 @@ function loadLandmarker() {
       baseOptions: { modelAssetPath: cfg.faceModelUrl, delegate: 'CPU' },
       runningMode: 'IMAGE',
       numFaces: 1,
-      outputFaceBlendshapes: true,
+      outputFaceBlendshapes: false,
     });
   })().catch((err) => {
     landmarkerPromise = null;
@@ -153,18 +147,11 @@ function drawOverlay(ov, { width, height, radius, centers }) {
   });
 }
 
-const GRIMACE_LABELS = {
-  browDown: 'sopracciglia',
-  mouthStretch: 'bocca tesa',
-  eyeBlink: 'occhi chiusi',
-};
-
 function describe(f, ref) {
   const sign = (v, d = 1) => (v >= 0 ? '+' : '') + v.toFixed(d);
   const lines = [`Viso: larghezza ${Math.round(f.faceWidthRatio * 100)}% dell'inquadratura`];
-  const grim = Object.entries(f.grimace).map(([k, v]) => `${GRIMACE_LABELS[k] || k} ${v.toFixed(2)}`).join(' · ');
   if (!ref) {
-    lines.push(`Luce L ${f.L.toFixed(1)}`, `Rossore a* ${f.redness.toFixed(1)}`, `Lucidità ${(f.shine * 100).toFixed(1)}%`, `Smorfia: ${grim}`);
+    lines.push(`Luce L ${f.L.toFixed(1)}`, `Rossore a* ${f.redness.toFixed(1)}`, `Lucidità ${(f.shine * 100).toFixed(1)}%`);
     lines.push('(nessuna foto di riferimento: niente punteggio)');
     return lines.join('\n');
   }
@@ -174,8 +161,6 @@ function describe(f, ref) {
     `Luce L ${f.L.toFixed(1)} (rif ${ref.L.toFixed(1)}, ${sign(f.L - ref.L)})`,
     `Rossore a* ${f.redness.toFixed(1)} (${sign(r.details.red)}) → ${pts('redness')}`,
     `Lucidità ${(f.shine * 100).toFixed(1)}% (${sign(r.details.shine * 100)}%) → ${pts('shine')}`,
-    `Smorfia ${sign(r.details.grimace, 2)} → ${pts('grimace')}`,
-    `  ${grim}`,
     `Punteggio live: ${r.score} · ${r.title}`,
     ...r.warnings
   );
@@ -196,8 +181,6 @@ async function analyzeDetailed(canvas) {
     throw new Error('Non vedo un viso: avvicinati e guarda la fotocamera');
   }
   const lm = res.faceLandmarks[0];
-  const blend = {};
-  (res.faceBlendshapes?.[0]?.categories || []).forEach((c) => (blend[c.categoryName] = c.score));
 
   const { width, height } = canvas;
   const data = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, width, height).data;
@@ -227,14 +210,13 @@ async function analyzeDetailed(canvas) {
     forehead: sample('forehead'),
     cheeks: sample('cheeks'),
     nose: sample('nose'),
-    blend,
     faceWidthRatio: faceWidth / width,
   });
   return { features: f, overlay: { width, height, radius, centers } };
 }
 
 /** Calcola le caratteristiche dai pixel campionati (separata per poterla testare). */
-export function features({ forehead, cheeks, nose, blend, faceWidthRatio }) {
+export function features({ forehead, cheeks, nose, faceWidthRatio }) {
   const all = [...forehead, ...cheeks, ...nose];
   if (!all.length) throw new Error('Viso fuori dall\'inquadratura');
   const mean = (arr, k) => arr.reduce((s, p) => s + p[k], 0) / arr.length;
@@ -246,12 +228,8 @@ export function features({ forehead, cheeks, nose, blend, faceWidthRatio }) {
   const shiny = [...forehead, ...nose];
   const shine = shiny.filter((p) => p.L > L + 18 && p.s < 0.2).length / shiny.length;
 
-  const grimace = {};
-  GRIMACE.forEach((keys) => {
-    grimace[keys[0].replace(/Left$/, '')] = keys.reduce((s, k) => s + (blend[k] || 0), 0) / keys.length;
-  });
 
-  return { L: round(L), redness: round(mean(red, 'a')), shine: round(shine, 4), grimace, faceWidthRatio: round(faceWidthRatio, 3) };
+  return { L: round(L), redness: round(mean(red, 'a')), shine: round(shine, 4), faceWidthRatio: round(faceWidthRatio, 3) };
 }
 
 /** Confronta i due selfie e restituisce punteggio, titolo e dettagli. */
@@ -259,14 +237,12 @@ export function score(rest, sweat) {
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
   const dRed = sweat.redness - rest.redness;
   const dShine = sweat.shine - rest.shine;
-  const dGrimace = Object.keys(sweat.grimace).reduce((s, k) => s + Math.max(0, sweat.grimace[k] - (rest.grimace[k] || 0)), 0);
 
   const parts = {
     redness: clamp01(dRed / WEIGHTS.redness.full) * WEIGHTS.redness.points,
     shine: clamp01(dShine / WEIGHTS.shine.full) * WEIGHTS.shine.points,
-    grimace: clamp01(dGrimace / WEIGHTS.grimace.full) * WEIGHTS.grimace.points,
   };
-  const total = Math.round(parts.redness + parts.shine + parts.grimace);
+  const total = Math.round(parts.redness + parts.shine);
   const title = TITLES.find(([min]) => total >= min)[1];
 
   const warnings = [];
@@ -278,7 +254,7 @@ export function score(rest, sweat) {
     title,
     warnings,
     parts,
-    details: { red: round(dRed), shine: round(dShine, 4), grimace: round(dGrimace, 3), light: round(sweat.L - rest.L) },
+    details: { red: round(dRed), shine: round(dShine, 4), light: round(sweat.L - rest.L) },
   };
 }
 

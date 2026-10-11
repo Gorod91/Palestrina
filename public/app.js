@@ -259,7 +259,7 @@ async function takeSweat(debug) {
     if (debug) {
       lastDebug = [
         `${result.score}: ${result.title}`,
-        `rossore +${result.details.red} · lucidità +${result.details.shine} · smorfia +${result.details.grimace} · luce ${result.details.light}`,
+        `rossore +${result.details.red} · lucidità +${result.details.shine} · luce ${result.details.light}`,
         ...result.warnings,
         photoWarning(r),
       ].filter(Boolean).join('\n');
