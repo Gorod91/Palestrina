@@ -22,6 +22,7 @@ const store = {
 let session = store.get('session'); // { code, name }
 let state = null;
 let registration = null;
+let lastDebug = null; // ultimo risultato di prova (solo utenti debug)
 
 // ---------- Backend ----------
 
@@ -86,46 +87,46 @@ function render() {
 function renderSudometro() {
   const el = $('sudo-body');
   const { me } = state;
-  const rest = store.get('rest');
-  const today = new Date().toDateString();
-  const restToday = rest && rest.day === today && me.sudometroStartedAt ? rest : null;
   el.innerHTML = '';
 
+  // 1) Prima volta: foto di riferimento
+  if (!me.reference) {
+    el.innerHTML = `
+      <p>Il Sudometro confronta un selfie da sudato con una <b>foto di riferimento</b> da riposato, che si fa <b>una volta sola</b>.</p>
+      <p class="muted">Meglio farla in palestra prima di allenarti, nel punto e con la luce dove farai i selfie da sudato. Le foto restano sul telefono: al foglio vanno solo i numeri.</p>
+      <button id="btn-ref">📸 Foto di riferimento</button>`;
+    el.querySelector('#btn-ref').onclick = takeReference;
+    return;
+  }
+
+  // 2) Sudometro di oggi già fatto
   if (me.sudometroToday) {
     el.innerHTML = `<p class="score"></p><p class="score-title"></p><p class="muted center">Il Sudometro di oggi è fatto. Domani si replica!</p>`;
     el.querySelector('.score').textContent = me.sudometroToday.score;
     el.querySelector('.score-title').textContent = me.sudometroToday.title;
-    return;
-  }
-
-  if (!restToday) {
+  } else {
+    // 3) Selfie da sudato: uno al giorno
     el.innerHTML = `
-      <p class="muted">Un selfie a inizio allenamento e uno al momento peggiore (almeno ${cfg.sudometroMinMinutes} minuti dopo), nello stesso punto e con la stessa luce. Le foto restano sul telefono.</p>
-      <button id="btn-rest">📸 Selfie "riposato"</button>`;
-    const b = el.querySelector('#btn-rest');
-    if (!me.checkedInToday) {
-      b.disabled = true;
-      el.insertAdjacentHTML('beforeend', '<p class="muted center">Prima fai check-in 💪</p>');
-    }
-    b.onclick = takeRest;
-    return;
+      <p class="muted">Al momento peggiore dell'allenamento fatti un selfie da sudato, nello stesso punto della foto di riferimento. Uno al giorno: scegli bene il momento!</p>
+      <button id="btn-sweat">🥵 Selfie da sudato</button>`;
+    el.querySelector('#btn-sweat').onclick = () => takeSweat(false);
   }
 
-  const elapsed = (Date.now() - restToday.at) / 60000;
-  const left = Math.ceil(cfg.sudometroMinMinutes - elapsed);
-  const at = new Date(restToday.at).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
-  el.innerHTML = `
-    <p class="muted">Selfie riposato scattato alle ${at}.</p>
-    <button id="btn-sweat">🥵 Selfie "sudato"</button>
-    <p class="muted center" id="sweat-wait"></p>
-    <button id="btn-restart" class="link">Rifai il selfie riposato</button>`;
-  const b = el.querySelector('#btn-sweat');
-  if (left > 0) {
-    b.disabled = true;
-    el.querySelector('#sweat-wait').textContent = `Disponibile tra ${left} ${left === 1 ? 'minuto' : 'minuti'}`;
+  if (me.debug) {
+    el.insertAdjacentHTML('beforeend', `
+      <div class="debug">
+        <button id="btn-debug" class="secondary">🐞 Prova subito (debug)</button>
+        <p class="muted">Il risultato finisce nel foglio segnato come debug: non conta in classifica e non avvisa nessuno. Puoi ripeterla quante volte vuoi.</p>
+        <pre id="debug-out"></pre>
+      </div>`);
+    el.querySelector('#btn-debug').onclick = () => takeSweat(true);
+    if (lastDebug) el.querySelector('#debug-out').textContent = lastDebug;
   }
-  b.onclick = () => takeSweat(restToday);
-  el.querySelector('#btn-restart').onclick = takeRest;
+
+  el.insertAdjacentHTML('beforeend', '<p class="center"><button id="btn-reref" class="link">Rifai la foto di riferimento</button></p>');
+  el.querySelector('#btn-reref').onclick = () => {
+    if (confirm('Rifare la foto di riferimento? Quella vecchia verrà sostituita.')) takeReference();
+  };
 }
 
 // ---------- Azioni ----------
@@ -166,31 +167,38 @@ async function checkin() {
   refresh();
 }
 
-async function takeRest() {
+async function takeReference() {
   try {
-    const canvas = await sudometro.takeSelfie('Selfie "riposato": viso al centro, buona luce');
+    const canvas = await sudometro.takeSelfie('Foto di riferimento: viso al centro, da riposato, buona luce');
     if (!canvas) return;
     toast('Analizzo…', 10000);
     const features = await sudometro.analyze(canvas);
-    await api('sudometroStart');
-    store.set('rest', { at: Date.now(), day: new Date().toDateString(), features });
-    toast(`Fatto! Torna tra ${cfg.sudometroMinMinutes} minuti per il selfie sudato`);
+    await api('setReference', { features });
+    toast('Foto di riferimento salvata ✅ Da ora basta il selfie da sudato.', 5000);
     refresh();
   } catch (err) {
     toast(cameraError(err));
   }
 }
 
-async function takeSweat(rest) {
+async function takeSweat(debug) {
   try {
-    const canvas = await sudometro.takeSelfie('Selfie "sudato": stesso punto, stessa luce');
+    const canvas = await sudometro.takeSelfie('Selfie da sudato: stesso punto della foto di riferimento');
     if (!canvas) return;
     toast('Analizzo…', 10000);
     const features = await sudometro.analyze(canvas);
-    const result = sudometro.score(rest.features, features);
-    await api('sudometro', { score: result.score, title: result.title, details: result.details });
-    store.set('rest', null);
-    toast(result.warnings.length ? result.warnings.join(' ') : `${result.score}: ${result.title}`, 6000);
+    const result = sudometro.score(state.me.reference.features, features);
+    await api('sudometro', { score: result.score, title: result.title, details: result.details, debug });
+    if (debug) {
+      lastDebug = [
+        `${result.score}: ${result.title}`,
+        `rossore +${result.details.red} · lucidità +${result.details.shine} · smorfia +${result.details.grimace} · luce ${result.details.light}`,
+        ...result.warnings,
+      ].join('\n');
+      toast('Prova di debug salvata');
+    } else {
+      toast(result.warnings.length ? result.warnings.join(' ') : `${result.score}: ${result.title}`, 6000);
+    }
     refresh();
   } catch (err) {
     toast(cameraError(err));
@@ -267,6 +275,15 @@ $('form-login').addEventListener('submit', (e) => {
 $('btn-checkin').addEventListener('click', checkin);
 $('btn-notify').addEventListener('click', enableNotifications);
 $('btn-logout').addEventListener('click', logout);
+$('btn-copy-link').addEventListener('click', async () => {
+  const link = `${cfg.appsScriptUrl}?action=checkin&code=${encodeURIComponent(session.code)}`;
+  try {
+    await navigator.clipboard.writeText(link);
+    toast('Link copiato 📋 Ora incollalo in Comandi.');
+  } catch {
+    prompt('Copia questo link:', link);
+  }
+});
 $('btn-browser').addEventListener('click', () => {
   sessionStorage.setItem('palestrina.browser', '1');
   start();
@@ -274,8 +291,6 @@ $('btn-browser').addEventListener('click', () => {
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && session && state) refresh();
 });
-// Aggiorna il conto alla rovescia del Sudometro.
-setInterval(() => state && !$('screen-home').hidden && $('camera').hidden && renderSudometro(), 30000);
 
 async function start() {
   if (!isStandalone && !sessionStorage.getItem('palestrina.browser')) return show('install');

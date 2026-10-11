@@ -11,13 +11,12 @@
  */
 
 const SHEETS = {
-  utenti: { name: 'Utenti', header: ['Nome', 'Codice', 'Obiettivo settimanale'] },
-  presenze: { name: 'Presenze', header: ['Data', 'Ora', 'Nome'] },
-  sudometro: { name: 'Sudometro', header: ['Data', 'Ora', 'Nome', 'Punteggio', 'Titolo', 'Dettagli'] },
+  utenti: { name: 'Utenti', header: ['Nome', 'Codice', 'Obiettivo settimanale', 'Debug'] },
+  presenze: { name: 'Presenze', header: ['Data', 'Ora', 'Nome', 'Fonte'] },
+  sudometro: { name: 'Sudometro', header: ['Data', 'Ora', 'Nome', 'Punteggio', 'Titolo', 'Dettagli', 'Debug'] },
   iscrizioni: { name: 'Iscrizioni', header: ['Nome', 'Endpoint', 'Sottoscrizione', 'Aggiornata'] },
 };
 const DEFAULT_GOAL = 3;
-const SUDOMETRO_MIN_MINUTES = 20; // tempo minimo tra selfie riposato e sudato
 const TZ = Session.getScriptTimeZone();
 const props = PropertiesService.getScriptProperties();
 
@@ -27,7 +26,7 @@ function setup() {
   const ss = SpreadsheetApp.getActive();
   Object.values(SHEETS).forEach(({ name, header }) => {
     const sh = ss.getSheetByName(name) || ss.insertSheet(name);
-    if (sh.getLastRow() === 0) sh.appendRow(header);
+    sh.getRange(1, 1, 1, header.length).setValues([header]); // aggiorna anche intestazioni vecchie
     sh.getRange('A:B').setNumberFormat('@'); // date e codici come testo
     sh.setFrozenRows(1);
   });
@@ -70,14 +69,13 @@ function doPost(e) {
 
     switch (req.action) {
       case 'login':
-        return json({ name: user.name, goal: user.goal });
+        return json({ name: user.name, goal: user.goal, debug: user.debug });
       case 'state':
         return json(buildState(user));
       case 'checkin':
-        return json(checkin(user));
-      case 'sudometroStart':
-        props.setProperty('sudoStart_' + user.name, String(Date.now()));
-        return json({ ok: true });
+        return json(checkin(user, 'app'));
+      case 'setReference':
+        return json(saveReference(user, req.features));
       case 'sudometro':
         return json(saveSudometro(user, req));
       case 'subscribe':
@@ -90,10 +88,19 @@ function doPost(e) {
   }
 }
 
-// ---------- API per la GitHub Action (GET con ADMIN_SECRET) ----------
+// ---------- API GET: check-in automatico (Comandi iOS) e GitHub Action ----------
 
 function doGet(e) {
   const p = e.parameter;
+
+  // Link personale per l'automazione "Arrivo" di Comandi: ?action=checkin&code=...
+  if (p.action === 'checkin') {
+    const user = findUserByCode(p.code);
+    if (!user) return json({ error: 'Codice non valido' });
+    const r = checkin(user, 'automatico');
+    return json({ ...r, message: r.alreadyToday ? 'Check-in già fatto oggi' : `Check-in fatto, ${user.name} 💪` });
+  }
+
   if (!p.secret || p.secret !== props.getProperty('ADMIN_SECRET')) return json({ error: 'Non autorizzato' });
   if (p.action === 'pushJob') return json({ notifications: buildNotifications(p.event, p.name) });
   if (p.action === 'removeSubscription') {
@@ -105,14 +112,14 @@ function doGet(e) {
 
 // ---------- Logica ----------
 
-function checkin(user) {
+function checkin(user, source) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
     const today = dayString(new Date());
     const already = rows('presenze').some((r) => r.day === today && r.name === user.name);
     if (already) return { ok: true, alreadyToday: true };
-    sheet('presenze').appendRow([today, Utilities.formatDate(new Date(), TZ, 'HH:mm'), user.name]);
+    sheet('presenze').appendRow([today, Utilities.formatDate(new Date(), TZ, 'HH:mm'), user.name, source]);
   } finally {
     lock.releaseLock();
   }
@@ -120,12 +127,25 @@ function checkin(user) {
   return { ok: true, alreadyToday: false };
 }
 
+/** Foto di riferimento ("riposato"): solo i valori calcolati, mai la foto. Si fa una volta. */
+function saveReference(user, features) {
+  if (!features || typeof features.redness !== 'number') return { error: 'Foto di riferimento non valida' };
+  props.setProperty('ref_' + user.name, JSON.stringify({ features, at: Date.now() }));
+  return { ok: true };
+}
+
+function getReference(user) {
+  const raw = props.getProperty('ref_' + user.name);
+  return raw ? JSON.parse(raw) : null;
+}
+
 function saveSudometro(user, req) {
-  const start = Number(props.getProperty('sudoStart_' + user.name) || 0);
-  const minutes = (Date.now() - start) / 60000;
-  if (!start || minutes > 6 * 60) return { error: 'Prima scatta il selfie "riposato"' };
-  if (minutes < SUDOMETRO_MIN_MINUTES) {
-    return { error: `Troppo presto: aspetta ancora ${Math.ceil(SUDOMETRO_MIN_MINUTES - minutes)} minuti` };
+  if (!getReference(user)) return { error: 'Prima fai la foto di riferimento' };
+  // Un Sudometro al giorno. Le prove degli utenti debug non contano, non avvisano nessuno e si possono ripetere.
+  const debug = user.debug && req.debug === true;
+  const today = dayString(new Date());
+  if (!debug && rows('sudometro').some((r) => r.day === today && r.name === user.name)) {
+    return { error: 'Il Sudometro di oggi è già fatto' };
   }
   const score = Math.max(0, Math.min(100, Math.round(Number(req.score) || 0)));
   const now = new Date();
@@ -136,10 +156,10 @@ function saveSudometro(user, req) {
     score,
     String(req.title || '').slice(0, 60),
     JSON.stringify(req.details || {}).slice(0, 500),
+    debug ? 'sì' : '',
   ]);
-  props.deleteProperty('sudoStart_' + user.name);
-  dispatch('sudometro', user.name);
-  return { ok: true, score };
+  if (!debug) dispatch('sudometro', user.name);
+  return { ok: true, score, debug };
 }
 
 function saveSubscription(user, sub) {
@@ -186,9 +206,10 @@ function buildState(user) {
     me: {
       name: user.name,
       goal: user.goal,
+      debug: user.debug,
       checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
       sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title } : null,
-      sudometroStartedAt: Number(props.getProperty('sudoStart_' + user.name) || 0) || null,
+      reference: getReference(user),
     },
     week: { start: week, ranking, pomodoro: pomodoro ? { name: pomodoro.name, score: pomodoro.score } : null },
   };
@@ -291,14 +312,21 @@ function sheet(key) {
   return sh;
 }
 
+function toTime(v) {
+  return v instanceof Date ? Utilities.formatDate(v, TZ, 'HH:mm') : String(v);
+}
+
 function toDay(v) {
   return v instanceof Date ? dayString(v) : String(v);
 }
 
 function rows(key) {
   const values = sheet(key).getDataRange().getValues().slice(1);
-  if (key === 'presenze') return values.map((r) => ({ day: toDay(r[0]), name: r[2] }));
-  if (key === 'sudometro') return values.map((r) => ({ day: toDay(r[0]), name: r[2], score: Number(r[3]), title: r[4] }));
+  if (key === 'presenze') return values.map((r) => ({ day: toDay(r[0]), time: toTime(r[1]), name: r[2] }));
+  if (key === 'sudometro') {
+    // Le prove di debug restano nel foglio ma non contano.
+    return values.filter((r) => !r[6]).map((r) => ({ day: toDay(r[0]), name: r[2], score: Number(r[3]), title: r[4] }));
+  }
   if (key === 'iscrizioni') return values.map((r) => ({ name: r[0], sub: JSON.parse(r[2]) }));
   return values;
 }
@@ -306,7 +334,13 @@ function rows(key) {
 function allUsers() {
   return rows('utenti')
     .filter((r) => r[0] && r[1])
-    .map((r) => ({ name: String(r[0]).trim(), code: String(r[1]).trim(), goal: Number(r[2]) || DEFAULT_GOAL }));
+    .map((r) => ({
+      name: String(r[0]).trim(),
+      code: String(r[1]).trim(),
+      goal: Number(r[2]) || DEFAULT_GOAL,
+      // Colonna D: "sì", "x" o casella spuntata abilitano il pulsante di debug.
+      debug: r[3] === true || /^(s[iì]|x|true|1)$/i.test(String(r[3]).trim()),
+    }));
 }
 
 function findUserByCode(code) {

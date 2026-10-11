@@ -1,6 +1,6 @@
 # 🏋️ Palestrina
 
-Web app per rendere più divertente la palestra tra amici: check-in con un tap, classifica settimanale, streak, **Sudometro** (selfie riposato contro sudato) e notifiche su iPhone. Costo zero, niente App Store.
+Web app per rendere più divertente la palestra tra amici: check-in con un tap, classifica settimanale, streak, **Sudometro** (selfie da sudato contro una foto di riferimento) e notifiche su iPhone. Costo zero, niente App Store.
 
 ## Come è fatta
 
@@ -39,7 +39,7 @@ Indirizzo: `https://<utente>.github.io/Palestrina/`
    Copia l'**URL dell'app web** (finisce con `/exec`).
 7. Su GitHub apri `public/config.js` (matita ✏️ per modificare), incolla l'URL al posto di `INCOLLA_QUI_URL_APPS_SCRIPT` e fai *Commit changes*. Il sito si aggiorna da solo in un minuto.
 
-> Se modifichi `Code.gs`, pubblica di nuovo con *Esegui il deployment → Gestisci deployment → ✏️ → Versione: Nuova versione*: l'URL resta lo stesso.
+> Se modifichi `Code.gs` (incollando la nuova versione dal repo), pubblica di nuovo con *Esegui il deployment → Gestisci deployment → ✏️ → Versione: Nuova versione*: l'URL resta lo stesso.
 
 ### 3. Notifiche
 1. **Token GitHub per Apps Script**: *GitHub → Settings (del tuo profilo) → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token*.
@@ -77,17 +77,30 @@ Si possono anche inviare a mano: *Actions → Notifiche → Run workflow*.
 
 ## Sudometro
 
-1. Dopo il check-in: selfie **"riposato"** a inizio allenamento.
-2. Almeno 20 minuti dopo: selfie **"sudato"**, nello stesso punto e con la stessa luce.
-3. Il telefono confronta i due selfie e calcola un punteggio da 0 a 100:
+1. **Una volta sola**: foto di riferimento da riposato, meglio in palestra, nel punto e con la luce dove si faranno i selfie da sudato. Si può rifare quando si vuole ("Rifai la foto di riferimento").
+2. **Ogni volta**: un selfie da sudato al momento peggiore dell'allenamento, **uno al giorno**.
+3. Il telefono confronta il selfie con la foto di riferimento e calcola un punteggio da 0 a 100:
    - **Rossore** (40 punti): aumento del canale a* (spazio colore Lab) su guance e fronte
    - **Lucidità** (30 punti): pixel molto chiari e poco saturi su fronte e naso, con soglia relativa alla luminosità del viso
    - **Smorfia** (30 punti): blendshape di MediaPipe (occhi strizzati, sopracciglia, bocca, occhi meno aperti)
 
+Della foto di riferimento si salvano solo i valori calcolati (nelle proprietà di Apps Script, chiave `ref_<nome>`), così sopravvivono anche se si reinstalla l'app.
+
 Titoli: sotto 20 "Fresco come una rosa", poi "Appena tiepido", "Si comincia a sudare", da 60 "Pomodoro maturo", da 85 "Lavatrice in centrifuga".
 I pesi (`WEIGHTS`) e le soglie (`TITLES`) sono in `public/sudometro.js`, da tarare sui primi selfie veri. Nel foglio, la colonna *Dettagli* registra i valori grezzi di ogni componente.
 
-**Anti-furbizia**: solo fotocamera dal vivo (niente galleria), selfie riposato solo dopo il check-in, intervallo minimo controllato anche da Apps Script, un check-in e un Sudometro al giorno.
+**Anti-furbizia**: solo fotocamera dal vivo (niente galleria), un check-in e un Sudometro al giorno, controllati da Apps Script.
+
+### Modalità debug
+Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il pulsante **🐞 Prova subito (debug)**, utile per provare e tarare il Sudometro:
+- si può ripetere quante volte si vuole, anche dopo il Sudometro del giorno;
+- mostra i valori grezzi di ogni componente;
+- nel foglio finisce con `sì` nella colonna *Debug*, non conta in classifica né nel recap e non avvisa nessuno.
+
+## Check-in automatico (Comandi iOS)
+
+Nell'app, sezione **📍 Check-in automatico**: ognuno copia il proprio link personale (`…/exec?action=checkin&code=…`) e crea l'automazione in **Comandi → Automazione → + → Arrivo** → posizione della palestra → **Esegui immediatamente** → azione **Ottieni contenuto dell'URL** con il link.
+Nel foglio Presenze, la colonna *Fonte* dice se il check-in è arrivato dall'app o dall'automazione.
 
 ## Sicurezza e privacy
 
@@ -99,4 +112,3 @@ I pesi (`WEIGHTS`) e le soglie (`TITLES`) sono in `public/sudometro.js`, da tara
 
 - Tarare i pesi del Sudometro dopo 1-2 settimane di selfie veri
 - Versione 2: record personali, sfida del lunedì, duelli
-- Check-in automatico con l'automazione "Arrivo" di Comandi iOS

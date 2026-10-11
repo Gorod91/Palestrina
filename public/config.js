@@ -10,7 +10,4 @@ window.APP_CONFIG = {
   // MediaPipe Face Landmarker, usato dal Sudometro.
   mediapipeBase: 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21',
   faceModelUrl: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
-
-  // Minuti minimi tra selfie "riposato" e "sudato" (lo controlla anche Apps Script).
-  sudometroMinMinutes: 20,
 };

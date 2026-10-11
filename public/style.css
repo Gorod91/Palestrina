@@ -52,3 +52,12 @@ input {
 .camera-hint { text-align: center; color: var(--muted); margin: 12px 0 0; }
 .camera-actions { display: grid; grid-template-columns: 1fr 2fr; gap: 10px; }
 code { font-size: .9em; }
+.debug { margin-top: 12px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.debug pre { white-space: pre-wrap; font-size: .8rem; color: var(--muted); margin: 0; }
+details.card summary { list-style: none; cursor: pointer; }
+details.card summary::-webkit-details-marker { display: none; }
+details.card summary h2 { display: inline; }
+details.card summary::after { content: '▾'; float: right; color: var(--muted); }
+details.card[open] summary { margin-bottom: 10px; }
+details.card[open] summary::after { content: '▴'; }
+.steps button { margin: 8px 0 4px; padding: 10px; }
