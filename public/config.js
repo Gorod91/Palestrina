@@ -2,7 +2,7 @@
 window.APP_CONFIG = {
   // URL della distribuzione "App web" di Apps Script (finisce con /exec).
   // Senza un codice personale valido non permette di fare nulla.
-  appsScriptUrl: 'INCOLLA_QUI_URL_APPS_SCRIPT',
+  appsScriptUrl: 'https://script.google.com/macros/s/AKfycbwJIfldFG42gth8Qx9Kz_zDIP0BMtUkW2i_QxSMXjIZUvzSUmy1ugBAFPkWe_0f47SajA/exec',
 
   // Chiave pubblica VAPID per le notifiche (la privata è nel secret VAPID_PRIVATE_KEY).
   vapidPublicKey: 'BJnImNZSyPwqU2Vtc2Ml07aIDMUSstrZNtan2hkZM09_3i1npYtrT14xka7Ea4SU0NNu36daUUIwJJm5pX8wlLw',
