@@ -65,6 +65,11 @@
         <div id="sudo-body"></div>
       </section>
 
+      <section id="card-gallery" class="card" hidden>
+        <h2>📸 Sudometro della settimana</h2>
+        <ol id="gallery" class="gallery"></ol>
+      </section>
+
       <section class="card">
         <h2>Classifica della settimana</h2>
         <ol id="ranking" class="ranking"></ol>
@@ -91,9 +96,19 @@
     <p id="toast" class="toast" hidden></p>
   </main>
 
+  <!-- Foto a tutto schermo -->
+  <div id="viewer" class="viewer" hidden>
+    <img id="viewer-img" alt="">
+    <p id="viewer-caption"></p>
+  </div>
+
   <!-- Fotocamera per il Sudometro -->
   <div id="camera" class="camera" hidden>
-    <video id="video" playsinline muted autoplay></video>
+    <div class="camera-view">
+      <video id="video" playsinline muted autoplay></video>
+      <canvas id="overlay"></canvas>
+      <pre id="live-panel" class="live-panel" hidden></pre>
+    </div>
     <p id="camera-hint" class="camera-hint"></p>
     <div class="camera-actions">
       <button id="btn-cancel" class="secondary">Annulla</button>

@@ -8,12 +8,13 @@
  *   ADMIN_SECRET   generato da setup(): da copiare nel secret APPS_SCRIPT_SECRET su GitHub
  *   GITHUB_TOKEN   token GitHub (fine-grained, permesso "Contents: Read and write" sul repo)
  *   GITHUB_REPO    es. "gorod91/Palestrina"
+ *   PHOTOS_FOLDER_ID  creato da autorizzaDrive(): cartella Drive con le foto del Sudometro
  */
 
 const SHEETS = {
   utenti: { name: 'Utenti', header: ['Nome', 'Codice', 'Obiettivo settimanale', 'Debug'] },
   presenze: { name: 'Presenze', header: ['Data', 'Ora', 'Nome', 'Fonte'] },
-  sudometro: { name: 'Sudometro', header: ['Data', 'Ora', 'Nome', 'Punteggio', 'Titolo', 'Dettagli', 'Debug'] },
+  sudometro: { name: 'Sudometro', header: ['Data', 'Ora', 'Nome', 'Punteggio', 'Titolo', 'Dettagli', 'Debug', 'Foto'] },
   iscrizioni: { name: 'Iscrizioni', header: ['Nome', 'Endpoint', 'Sottoscrizione', 'Aggiornata'] },
 };
 const DEFAULT_GOAL = 3;
@@ -57,6 +58,11 @@ function generaCodiciMancanti() {
   }
 }
 
+/** Da eseguire una volta dall'editor: concede l'accesso a Drive e crea la cartella delle foto. */
+function autorizzaDrive() {
+  Logger.log('Cartella foto: ' + photosRoot().getUrl());
+}
+
 function sendWeeklyRecap() {
   dispatch('recap', '');
 }
@@ -77,7 +83,9 @@ function doPost(e) {
       case 'checkin':
         return json(checkin(user, 'app'));
       case 'setReference':
-        return json(saveReference(user, req.features));
+        return json(saveReference(user, req.features, req.photo));
+      case 'photo':
+        return json(getPhoto(req.id));
       case 'sudometro':
         return json(saveSudometro(user, req));
       case 'subscribe':
@@ -130,10 +138,11 @@ function checkin(user, source) {
 }
 
 /** Foto di riferimento ("riposato"): solo i valori calcolati, mai la foto. Si fa una volta. */
-function saveReference(user, features) {
+function saveReference(user, features, photo) {
   if (!features || typeof features.redness !== 'number') return { error: 'Foto di riferimento non valida' };
-  props.setProperty('ref_' + user.name, JSON.stringify({ features, at: Date.now() }));
-  return { ok: true };
+  const saved = savePhoto(user, photo, 'riferimento');
+  props.setProperty('ref_' + user.name, JSON.stringify({ features, at: Date.now(), photoId: saved.id || '' }));
+  return { ok: true, photoError: saved.error };
 }
 
 function getReference(user) {
@@ -150,6 +159,7 @@ function saveSudometro(user, req) {
     return { error: 'Il Sudometro di oggi è già fatto' };
   }
   const score = Math.max(0, Math.min(100, Math.round(Number(req.score) || 0)));
+  const saved = savePhoto(user, req.photo, `sudato ${score}${debug ? ' debug' : ''}`);
   const now = new Date();
   sheet('sudometro').appendRow([
     dayString(now),
@@ -159,9 +169,10 @@ function saveSudometro(user, req) {
     String(req.title || '').slice(0, 60),
     JSON.stringify(req.details || {}).slice(0, 500),
     debug ? 'sì' : '',
+    saved.id || '',
   ]);
   if (!debug) dispatch('sudometro', user.name);
-  return { ok: true, score, debug };
+  return { ok: true, score, debug, photoError: saved.error };
 }
 
 function saveSubscription(user, sub) {
@@ -213,7 +224,16 @@ function buildState(user) {
       sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title } : null,
       reference: getReference(user),
     },
-    week: { start: week, ranking, pomodoro: pomodoro ? { name: pomodoro.name, score: pomodoro.score } : null },
+    week: {
+      start: week,
+      ranking,
+      pomodoro: pomodoro ? { name: pomodoro.name, score: pomodoro.score } : null,
+      // Classifica del Sudometro della settimana, con le foto (caricate a parte con l'azione "photo").
+      sudometro: sudo
+        .slice()
+        .sort((a, b) => b.score - a.score)
+        .map((r) => ({ name: r.name, day: r.day, score: r.score, title: r.title, photoId: r.photoId })),
+    },
   };
 }
 
@@ -265,6 +285,50 @@ function buildNotifications(event, name) {
   }
 
   return [];
+}
+
+// ---------- Foto su Drive ----------
+
+/** Salva un JPEG (base64) nella cartella dell'utente. Un errore non blocca il resto. */
+function savePhoto(user, base64, label) {
+  if (!base64) return {};
+  if (base64.length > 3e6) return { error: 'Foto troppo grande' };
+  try {
+    const name = `${Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH.mm')} ${user.name} ${label}.jpg`;
+    const blob = Utilities.newBlob(Utilities.base64Decode(base64), 'image/jpeg', name);
+    return { id: userFolder(user.name).createFile(blob).getId() };
+  } catch (err) {
+    console.error('Salvataggio foto fallito', err);
+    return { error: 'Foto non salvata su Drive: ' + (err.message || err) };
+  }
+}
+
+/** Restituisce una foto del Sudometro (non di debug) a chi ha un codice valido. */
+function getPhoto(id) {
+  // Solo file elencati nel foglio Sudometro: lo script non deve leggere altri file del Drive.
+  if (!id || !rows('sudometro').some((r) => r.photoId === id)) return { error: 'Foto non trovata' };
+  const blob = DriveApp.getFileById(id).getBlob();
+  return { mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
+}
+
+function photosRoot() {
+  const id = props.getProperty('PHOTOS_FOLDER_ID');
+  if (id) {
+    try {
+      return DriveApp.getFolderById(id);
+    } catch (err) {
+      // cartella cancellata: se ne crea una nuova
+    }
+  }
+  const folder = DriveApp.createFolder('Palestrina - Foto Sudometro');
+  props.setProperty('PHOTOS_FOLDER_ID', folder.getId());
+  return folder;
+}
+
+function userFolder(name) {
+  const root = photosRoot();
+  const it = root.getFoldersByName(name);
+  return it.hasNext() ? it.next() : root.createFolder(name);
 }
 
 // ---------- Calcoli ----------
@@ -327,7 +391,7 @@ function rows(key) {
   if (key === 'presenze') return values.map((r) => ({ day: toDay(r[0]), time: toTime(r[1]), name: r[2] }));
   if (key === 'sudometro') {
     // Le prove di debug restano nel foglio ma non contano.
-    return values.filter((r) => !r[6]).map((r) => ({ day: toDay(r[0]), name: r[2], score: Number(r[3]), title: r[4] }));
+    return values.filter((r) => !r[6]).map((r) => ({ day: toDay(r[0]), name: r[2], score: Number(r[3]), title: r[4], photoId: r[7] || '' }));
   }
   if (key === 'iscrizioni') return values.map((r) => ({ name: r[0], sub: JSON.parse(r[2]) }));
   return values;

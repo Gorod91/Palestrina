@@ -14,7 +14,7 @@ Google Apps Script ──► Google Sheet (Utenti, Presenze, Sudometro, Iscrizio
 GitHub Action "Notifiche" ──► Web Push (server Apple) ──► iPhone degli amici
 ```
 
-- `public/`: la web app. Le foto del Sudometro vengono analizzate sul telefono con MediaPipe e non escono mai dal dispositivo: al foglio arriva solo il punteggio.
+- `public/`: la web app. Le foto del Sudometro vengono analizzate sul telefono con MediaPipe; poi la foto (JPEG ridotto) viene salvata su Google Drive e il punteggio nel foglio.
 - `apps-script/Code.gs`: backend. Gira con l'account Google di Francesco, quindi gli amici non fanno login Google ma usano un codice personale.
 - `.github/workflows/notifiche.yml` + `scripts/send.js`: invio delle notifiche, avviato da Apps Script a ogni check-in, a ogni Sudometro e la domenica alle 19 per il recap.
 - `.github/workflows/pages.yml`: pubblicazione su GitHub Pages.
@@ -97,7 +97,12 @@ Si possono anche inviare a mano: *Actions → Notifiche → Run workflow*.
    - **Lucidità** (30 punti): pixel molto chiari e poco saturi su fronte e naso, con soglia relativa alla luminosità del viso
    - **Smorfia** (30 punti): blendshape di MediaPipe (occhi strizzati, sopracciglia, bocca, occhi meno aperti)
 
-Della foto di riferimento si salvano solo i valori calcolati (nelle proprietà di Apps Script, chiave `ref_<nome>`), così sopravvivono anche se si reinstalla l'app.
+I valori della foto di riferimento stanno nelle proprietà di Apps Script (chiave `ref_<nome>`), così sopravvivono anche se si reinstalla l'app.
+
+**Foto su Google Drive**: tutte le foto (riferimento, selfie da sudato, prove di debug) finiscono nella cartella *Palestrina - Foto Sudometro* del Drive di chi ha pubblicato lo script, con una sottocartella per ogni amico. Il foglio Sudometro tiene l'ID del file nella colonna *Foto*.
+Una volta sola, dopo l'aggiornamento: nell'editor di Apps Script esegui **`autorizzaDrive`** e consenti l'accesso a Drive (crea anche la cartella).
+
+**Sudometro della settimana**: nell'app, i selfie da sudato della settimana in ordine di punteggio, visibili a tutto il gruppo. Le foto restano private nel Drive: l'app le chiede ad Apps Script con il codice personale, e lo script restituisce solo i file elencati nel foglio Sudometro (niente foto di riferimento, niente prove di debug, nessun altro file del Drive).
 
 Titoli: sotto 20 "Fresco come una rosa", poi "Appena tiepido", "Si comincia a sudare", da 60 "Pomodoro maturo", da 85 "Lavatrice in centrifuga".
 I pesi (`WEIGHTS`) e le soglie (`TITLES`) sono in `public/sudometro.js`, da tarare sui primi selfie veri. Nel foglio, la colonna *Dettagli* registra i valori grezzi di ogni componente.
@@ -108,6 +113,7 @@ I pesi (`WEIGHTS`) e le soglie (`TITLES`) sono in `public/sudometro.js`, da tara
 Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il pulsante **🐞 Prova subito (debug)**, utile per provare e tarare il Sudometro:
 - si può ripetere quante volte si vuole, anche dopo il Sudometro del giorno;
 - mostra i valori grezzi di ogni componente;
+- con la fotocamera aperta mostra i parametri **in tempo reale** (luce, rossore, lucidità, smorfia, punteggio live rispetto alla foto di riferimento) e le zone del viso misurate: fronte in azzurro, guance in rosso, naso in giallo;
 - nel foglio finisce con `sì` nella colonna *Debug*, non conta in classifica né nel recap e non avvisa nessuno.
 
 ## Check-in automatico (Comandi iOS)
@@ -119,7 +125,7 @@ Nel foglio Presenze, la colonna *Fonte* dice se il check-in è arrivato dall'app
 
 - Il repo è pubblico (con l'account gratuito serve per GitHub Pages), ma non contiene segreti. Le chiavi stanno nei secret di GitHub e nelle proprietà di Apps Script.
 - L'URL di Apps Script è in `config.js`, ma senza un codice personale valido non permette di leggere né scrivere niente. Le funzioni per la GitHub Action richiedono l'ADMIN_SECRET.
-- Le foto non lasciano il telefono. Nessuna posizione GPS: solo eventi con data e ora.
+- Le foto stanno nel Drive di chi ha pubblicato lo script e non hanno link pubblici. I selfie da sudato li vede tutto il gruppo nell'app: va detto agli amici prima di iniziare. Nessuna posizione GPS: solo eventi con data e ora.
 
 ## Prossimi passi
 

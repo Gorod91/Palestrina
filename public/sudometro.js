@@ -66,8 +66,10 @@ export function preload() {
 /**
  * Apre la fotocamera frontale a tutto schermo e restituisce un canvas con lo scatto,
  * oppure null se l'utente annulla. Solo foto dal vivo: niente galleria.
+ * Con `live` (utenti debug) mostra i parametri del Sudometro in tempo reale,
+ * confrontati con `reference` se c'è.
  */
-export async function takeSelfie(hint) {
+export async function takeSelfie(hint, { live = false, reference = null } = {}) {
   const $ = (id) => document.getElementById(id);
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } },
@@ -77,21 +79,29 @@ export async function takeSelfie(hint) {
   video.srcObject = stream;
   $('camera-hint').textContent = hint;
   $('camera').hidden = false;
+  $('camera').classList.toggle('live', live);
+  $('live-panel').hidden = !live;
   await video.play().catch(() => {});
+
+  let open = true;
+  if (live) liveLoop(video, reference, () => open);
 
   const result = await new Promise((resolve) => {
     $('btn-shoot').onclick = () => resolve(capture(video));
     $('btn-cancel').onclick = () => resolve(null);
   });
 
+  open = false;
   stream.getTracks().forEach((t) => t.stop());
   video.srcObject = null;
   $('camera').hidden = true;
+  const ov = $('overlay');
+  ov.getContext('2d').clearRect(0, 0, ov.width, ov.height);
   return result;
 }
 
-function capture(video) {
-  const scale = Math.min(1, 640 / Math.max(video.videoWidth, video.videoHeight));
+function capture(video, max = 640) {
+  const scale = Math.min(1, max / Math.max(video.videoWidth, video.videoHeight));
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(video.videoWidth * scale);
   canvas.height = Math.round(video.videoHeight * scale);
@@ -99,10 +109,91 @@ function capture(video) {
   return canvas;
 }
 
+/** JPEG in base64 (senza prefisso data:) da salvare su Drive. */
+export function toJpegBase64(canvas, quality = 0.8) {
+  return canvas.toDataURL('image/jpeg', quality).split(',')[1];
+}
+
+/** Analizza la fotocamera di continuo e mostra parametri e zone misurate. */
+async function liveLoop(video, reference, isOpen) {
+  const panel = document.getElementById('live-panel');
+  const ov = document.getElementById('overlay');
+  panel.textContent = 'Carico il modello…';
+  while (isOpen()) {
+    const started = performance.now();
+    if (video.videoWidth) {
+      const frame = capture(video, 480);
+      try {
+        const { features: f, overlay } = await analyzeDetailed(frame);
+        drawOverlay(ov, overlay);
+        panel.textContent = describe(f, reference);
+      } catch (err) {
+        ov.getContext('2d').clearRect(0, 0, ov.width, ov.height);
+        panel.textContent = err.message;
+      }
+    }
+    // Circa 4 analisi al secondo, senza bloccare il telefono.
+    await new Promise((r) => setTimeout(r, Math.max(50, 250 - (performance.now() - started))));
+  }
+}
+
+const REGION_COLORS = { forehead: '#38bdf8', cheeks: '#f87171', nose: '#facc15' };
+
+function drawOverlay(ov, { width, height, radius, centers }) {
+  if (ov.width !== width || ov.height !== height) {
+    ov.width = width;
+    ov.height = height;
+  }
+  const g = ov.getContext('2d');
+  g.clearRect(0, 0, width, height);
+  g.lineWidth = 2;
+  centers.forEach(({ x, y, region }) => {
+    g.strokeStyle = REGION_COLORS[region];
+    g.beginPath();
+    g.arc(x, y, radius, 0, Math.PI * 2);
+    g.stroke();
+  });
+}
+
+const GRIMACE_LABELS = {
+  eyeSquint: 'occhi strizzati',
+  browDown: 'sopracciglia',
+  jawOpen: 'bocca aperta',
+  mouthStretch: 'bocca tesa',
+  eyeBlink: 'occhi chiusi',
+};
+
+function describe(f, ref) {
+  const sign = (v, d = 1) => (v >= 0 ? '+' : '') + v.toFixed(d);
+  const lines = [`Viso: larghezza ${Math.round(f.faceWidthRatio * 100)}% dell'inquadratura`];
+  const grim = Object.entries(f.grimace).map(([k, v]) => `${GRIMACE_LABELS[k] || k} ${v.toFixed(2)}`).join(' · ');
+  if (!ref) {
+    lines.push(`Luce L ${f.L.toFixed(1)}`, `Rossore a* ${f.redness.toFixed(1)}`, `Lucidità ${(f.shine * 100).toFixed(1)}%`, `Smorfia: ${grim}`);
+    lines.push('(nessuna foto di riferimento: niente punteggio)');
+    return lines.join('\n');
+  }
+  const r = score(ref, f);
+  const pts = (k) => `${Math.round(r.parts[k])}/${WEIGHTS[k].points}`;
+  lines.push(
+    `Luce L ${f.L.toFixed(1)} (rif ${ref.L.toFixed(1)}, ${sign(f.L - ref.L)})`,
+    `Rossore a* ${f.redness.toFixed(1)} (${sign(r.details.red)}) → ${pts('redness')}`,
+    `Lucidità ${(f.shine * 100).toFixed(1)}% (${sign(r.details.shine * 100)}%) → ${pts('shine')}`,
+    `Smorfia ${sign(r.details.grimace, 2)} → ${pts('grimace')}`,
+    `  ${grim}`,
+    `Punteggio live: ${r.score} · ${r.title}`,
+    ...r.warnings
+  );
+  return lines.join('\n');
+}
+
 // ---------- Analisi ----------
 
 /** Estrae le caratteristiche del viso da un canvas. Lancia un errore se non trova un viso. */
 export async function analyze(canvas) {
+  return (await analyzeDetailed(canvas)).features;
+}
+
+async function analyzeDetailed(canvas) {
   const landmarker = await loadLandmarker();
   const res = landmarker.detect(canvas);
   if (!res.faceLandmarks || !res.faceLandmarks.length) {
@@ -116,12 +207,14 @@ export async function analyze(canvas) {
   const data = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, width, height).data;
   const faceWidth = Math.hypot((lm[FACE_RIGHT].x - lm[FACE_LEFT].x) * width, (lm[FACE_RIGHT].y - lm[FACE_LEFT].y) * height);
   const radius = Math.max(3, Math.round(faceWidth * 0.05));
+  const centers = [];
 
-  const sample = (indices) => {
+  const sample = (region) => {
     const px = [];
-    indices.forEach((i) => {
+    REGIONS[region].forEach((i) => {
       const cx = Math.round(lm[i].x * width);
       const cy = Math.round(lm[i].y * height);
+      centers.push({ x: cx, y: cy, region });
       for (let y = cy - radius; y <= cy + radius; y++) {
         for (let x = cx - radius; x <= cx + radius; x++) {
           if (x < 0 || y < 0 || x >= width || y >= height) continue;
@@ -134,13 +227,14 @@ export async function analyze(canvas) {
     return px;
   };
 
-  return features({
-    forehead: sample(REGIONS.forehead),
-    cheeks: sample(REGIONS.cheeks),
-    nose: sample(REGIONS.nose),
+  const f = features({
+    forehead: sample('forehead'),
+    cheeks: sample('cheeks'),
+    nose: sample('nose'),
     blend,
     faceWidthRatio: faceWidth / width,
   });
+  return { features: f, overlay: { width, height, radius, centers } };
 }
 
 /** Calcola le caratteristiche dai pixel campionati (separata per poterla testare). */
@@ -187,6 +281,7 @@ export function score(rest, sweat) {
     score: total,
     title,
     warnings,
+    parts,
     details: { red: round(dRed), shine: round(dShine, 4), grimace: round(dGrimace, 3), light: round(sweat.L - rest.L) },
   };
 }

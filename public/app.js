@@ -82,6 +82,61 @@ function render() {
   $('pomodoro').textContent = week.pomodoro ? `🍅 Pomodoro della settimana: ${week.pomodoro.name} (${week.pomodoro.score})` : '';
 
   renderSudometro();
+  renderGallery();
+}
+
+const photoCache = new Map(); // id → Promise<dataURL>
+
+function loadPhoto(id) {
+  if (!photoCache.has(id)) {
+    photoCache.set(
+      id,
+      api('photo', { id })
+        .then((r) => `data:${r.mime};base64,${r.data}`)
+        .catch((err) => {
+          photoCache.delete(id);
+          throw err;
+        })
+    );
+  }
+  return photoCache.get(id);
+}
+
+function renderGallery() {
+  const list = state.week.sudometro || [];
+  $('card-gallery').hidden = !list.length;
+  const el = $('gallery');
+  el.innerHTML = '';
+  const medals = ['🥇', '🥈', '🥉'];
+  list.forEach((r, i) => {
+    const li = document.createElement('li');
+    const day = new Date(r.day + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long' });
+    li.innerHTML = `
+      <div class="photo"><span>${r.photoId ? '…' : '📷'}</span></div>
+      <div><div><b class="name"></b> <span class="muted day"></span></div><div class="title muted"></div></div>
+      <div class="pts">${medals[i] || ''} ${r.score}</div>`;
+    li.querySelector('.name').textContent = r.name;
+    li.querySelector('.day').textContent = day;
+    li.querySelector('.title').textContent = r.title;
+    el.append(li);
+    if (r.photoId) {
+      loadPhoto(r.photoId)
+        .then((src) => {
+          const img = new Image();
+          img.alt = `Selfie di ${r.name}`;
+          img.src = src;
+          img.onclick = () => openPhoto(src, `${r.name} · ${r.score} · ${r.title}`);
+          li.querySelector('.photo').replaceChildren(img);
+        })
+        .catch(() => (li.querySelector('.photo span').textContent = '📷'));
+    }
+  });
+}
+
+function openPhoto(src, caption) {
+  $('viewer-img').src = src;
+  $('viewer-caption').textContent = caption;
+  $('viewer').hidden = false;
 }
 
 function renderSudometro() {
@@ -93,7 +148,7 @@ function renderSudometro() {
   if (!me.reference) {
     el.innerHTML = `
       <p>Il Sudometro confronta un selfie da sudato con una <b>foto di riferimento</b> da riposato, che si fa <b>una volta sola</b>.</p>
-      <p class="muted">Meglio farla in palestra prima di allenarti, nel punto e con la luce dove farai i selfie da sudato. Le foto restano sul telefono: al foglio vanno solo i numeri.</p>
+      <p class="muted">Meglio farla in palestra prima di allenarti, nel punto e con la luce dove farai i selfie da sudato. Le foto vengono salvate nel Google Drive di Palestrina; i selfie da sudato li vede tutto il gruppo nella classifica della settimana.</p>
       <button id="btn-ref">📸 Foto di riferimento</button>`;
     el.querySelector('#btn-ref').onclick = takeReference;
     return;
@@ -107,7 +162,7 @@ function renderSudometro() {
   } else {
     // 3) Selfie da sudato: uno al giorno
     el.innerHTML = `
-      <p class="muted">Al momento peggiore dell'allenamento fatti un selfie da sudato, nello stesso punto della foto di riferimento. Uno al giorno: scegli bene il momento!</p>
+      <p class="muted">Al momento peggiore dell'allenamento fatti un selfie da sudato, nello stesso punto della foto di riferimento. Uno al giorno: scegli bene il momento! Lo vedrà tutto il gruppo 😏</p>
       <button id="btn-sweat">🥵 Selfie da sudato</button>`;
     el.querySelector('#btn-sweat').onclick = () => takeSweat(false);
   }
@@ -169,12 +224,14 @@ async function checkin() {
 
 async function takeReference() {
   try {
-    const canvas = await sudometro.takeSelfie('Foto di riferimento: viso al centro, da riposato, buona luce');
+    const canvas = await sudometro.takeSelfie('Foto di riferimento: viso al centro, da riposato, buona luce', {
+      live: state.me.debug,
+    });
     if (!canvas) return;
     toast('Analizzo…', 10000);
     const features = await sudometro.analyze(canvas);
-    await api('setReference', { features });
-    toast('Foto di riferimento salvata ✅ Da ora basta il selfie da sudato.', 5000);
+    const r = await api('setReference', { features, photo: sudometro.toJpegBase64(canvas) });
+    toast(photoWarning(r) || 'Foto di riferimento salvata ✅ Da ora basta il selfie da sudato.', 5000);
     refresh();
   } catch (err) {
     toast(cameraError(err));
@@ -183,18 +240,29 @@ async function takeReference() {
 
 async function takeSweat(debug) {
   try {
-    const canvas = await sudometro.takeSelfie('Selfie da sudato: stesso punto della foto di riferimento');
+    const reference = state.me.reference.features;
+    const canvas = await sudometro.takeSelfie('Selfie da sudato: stesso punto della foto di riferimento', {
+      live: state.me.debug,
+      reference,
+    });
     if (!canvas) return;
     toast('Analizzo…', 10000);
     const features = await sudometro.analyze(canvas);
-    const result = sudometro.score(state.me.reference.features, features);
-    await api('sudometro', { score: result.score, title: result.title, details: result.details, debug });
+    const result = sudometro.score(reference, features);
+    const r = await api('sudometro', {
+      score: result.score,
+      title: result.title,
+      details: result.details,
+      debug,
+      photo: sudometro.toJpegBase64(canvas),
+    });
     if (debug) {
       lastDebug = [
         `${result.score}: ${result.title}`,
         `rossore +${result.details.red} · lucidità +${result.details.shine} · smorfia +${result.details.grimace} · luce ${result.details.light}`,
         ...result.warnings,
-      ].join('\n');
+        photoWarning(r),
+      ].filter(Boolean).join('\n');
       toast('Prova di debug salvata');
     } else {
       toast(result.warnings.length ? result.warnings.join(' ') : `${result.score}: ${result.title}`, 6000);
@@ -203,6 +271,11 @@ async function takeSweat(debug) {
   } catch (err) {
     toast(cameraError(err));
   }
+}
+
+/** Avviso per gli utenti debug se la foto non è finita su Drive (es. Drive non ancora autorizzato). */
+function photoWarning(r) {
+  return state.me.debug && r && r.photoError ? `⚠️ ${r.photoError}` : '';
 }
 
 function cameraError(err) {
@@ -275,6 +348,7 @@ $('form-login').addEventListener('submit', (e) => {
 $('btn-checkin').addEventListener('click', checkin);
 $('btn-notify').addEventListener('click', enableNotifications);
 $('btn-logout').addEventListener('click', logout);
+$('viewer').addEventListener('click', () => ($('viewer').hidden = true));
 $('btn-copy-link').addEventListener('click', async () => {
   const link = `${cfg.appsScriptUrl}?action=checkin&code=${encodeURIComponent(session.code)}`;
   try {
