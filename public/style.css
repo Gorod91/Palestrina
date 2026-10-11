@@ -130,3 +130,4 @@ details.card[open] summary::after { content: '▴'; }
 @media (prefers-reduced-motion: reduce) {
   .timer-alarm { animation-duration: 3s; }
 }
+#boot-error pre { white-space: pre-wrap; font-size: .75rem; margin: 10px 0 0; }

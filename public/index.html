@@ -120,6 +120,14 @@
     </div>
 
     <p id="toast" class="toast" hidden></p>
+
+    <!-- Se l'avvio va storto, invece dello schermo nero -->
+    <section id="boot-error" class="card warn" hidden>
+      <h2>Qualcosa è andato storto</h2>
+      <p class="muted">Di solito succede subito dopo un aggiornamento. Ricarica l'app; se non basta, chiudila del tutto e riaprila tra qualche minuto.</p>
+      <button onclick="location.reload()">Ricarica</button>
+      <pre id="boot-error-detail" class="muted"></pre>
+    </section>
   </main>
 
   <!-- Fine del timer: lo schermo lampeggia finché non lo tocchi -->
@@ -148,6 +156,22 @@
     </div>
   </div>
 
+  <script>
+    // Mostra un errore leggibile se l'app non parte (es. file vecchi in cache).
+    (function () {
+      function fail(msg) {
+        var box = document.getElementById('boot-error');
+        if (!box || window.__palestrinaStarted) return;
+        box.hidden = false;
+        document.getElementById('boot-error-detail').textContent = msg || '';
+      }
+      window.addEventListener('error', function (e) { fail(e.message); });
+      window.addEventListener('unhandledrejection', function (e) { fail(String(e.reason && e.reason.message || e.reason)); });
+      setTimeout(function () { if (!window.__palestrinaStarted) fail('L\'app non è partita.'); }, 10000);
+      // Registrato qui (non solo in app.js) così il service worker si aggiorna anche se l'app non parte.
+      if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(function () {});
+    })();
+  </script>
   <script src="config.js"></script>
   <script type="module" src="app.js"></script>
 </body>

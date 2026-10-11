@@ -2,6 +2,17 @@
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
 
+// File dell'app: sempre verificati sul server (no-cache), così dopo un aggiornamento
+// non si mescolano file vecchi della cache di Safari con file nuovi.
+self.addEventListener('fetch', (event) => {
+  const req = event.request;
+  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  const fresh = req.mode === 'navigate'
+    ? fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+    : fetch(new Request(req, { cache: 'no-cache' }));
+  event.respondWith(fresh.catch(() => fetch(req)));
+});
+
 self.addEventListener('push', (event) => {
   let data = {};
   try {

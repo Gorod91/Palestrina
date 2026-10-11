@@ -366,7 +366,11 @@ $('btn-notify').addEventListener('click', enableNotifications);
 $('btn-logout').addEventListener('click', logout);
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
 document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
-initTimer();
+try {
+  initTimer();
+} catch (err) {
+  console.error('Timer non disponibile', err); // il resto dell'app deve funzionare comunque
+}
 $('btn-copy-link').addEventListener('click', async () => {
   const link = `${cfg.appsScriptUrl}?action=checkin&code=${encodeURIComponent(session.code)}`;
   try {
@@ -385,6 +389,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 async function start() {
+  window.__palestrinaStarted = true;
   if (!isStandalone && !sessionStorage.getItem('palestrina.browser')) return show('install');
   if (!configured) return show('config');
   if (!session) return show('login');
