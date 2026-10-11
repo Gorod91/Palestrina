@@ -1,4 +1,5 @@
 import * as sudometro from './sudometro.js';
+import { initTimer } from './timer.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -283,6 +284,18 @@ function cameraError(err) {
   return err && err.message ? err.message : 'Qualcosa è andato storto';
 }
 
+// ---------- Tab ----------
+
+const TABS = ['oggi', 'classifica', 'timer', 'altro'];
+
+function selectTab(name) {
+  if (!TABS.includes(name)) name = 'oggi';
+  document.querySelectorAll('.tab-panel').forEach((p) => (p.hidden = p.dataset.tab !== name));
+  document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  store.set('tab', name);
+  window.scrollTo(0, 0);
+}
+
 function logout() {
   session = null;
   state = null;
@@ -335,6 +348,7 @@ async function enableNotifications() {
 
 async function home() {
   show('home');
+  selectTab(store.get('tab'));
   render();
   await refresh();
   updateNotifyCard();
@@ -349,6 +363,8 @@ $('btn-checkin').addEventListener('click', checkin);
 $('btn-notify').addEventListener('click', enableNotifications);
 $('btn-logout').addEventListener('click', logout);
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
+document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
+initTimer();
 $('btn-copy-link').addEventListener('click', async () => {
   const link = `${cfg.appsScriptUrl}?action=checkin&code=${encodeURIComponent(session.code)}`;
   try {

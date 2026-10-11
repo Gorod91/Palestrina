@@ -77,3 +77,56 @@ details.card[open] summary::after { content: '▴'; }
 .viewer { position: fixed; inset: 0; z-index: 20; background: rgba(0, 0, 0, .92); display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; }
 .viewer img { max-width: 100%; max-height: 80vh; border-radius: 16px; }
 .viewer p { margin-top: 12px; text-align: center; }
+
+/* ---------- Tab ---------- */
+#screen-home { padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+.tabbar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  background: rgba(17, 24, 39, .94); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line); padding: 6px 8px calc(6px + env(safe-area-inset-bottom));
+}
+.tabbar button {
+  margin: 0; padding: 6px 0; background: none; color: var(--muted); font-size: .72rem; font-weight: 600;
+  display: flex; flex-direction: column; align-items: center; gap: 2px; border-radius: 10px;
+}
+.tabbar button span { font-size: 1.35rem; line-height: 1; filter: grayscale(1); opacity: .7; }
+.tabbar button.active { color: var(--accent); }
+.tabbar button.active span { filter: none; opacity: 1; }
+
+/* ---------- Timer addominali ---------- */
+.timer { display: flex; flex-direction: column; align-items: center; min-height: calc(100dvh - 190px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+.timer-set { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 8px; transition: opacity .2s; }
+.timer-display { font-size: 4rem; font-weight: 800; font-variant-numeric: tabular-nums; min-width: 4.2ch; text-align: center; cursor: pointer; }
+.round { width: 56px; height: 56px; margin: 0; padding: 0; border-radius: 50%; background: var(--card); font-size: 1.8rem; font-weight: 400; }
+.timer-presets { display: flex; gap: 8px; margin: 8px 0 0; transition: opacity .2s; }
+.timer-presets button { width: auto; margin: 0; padding: 8px 14px; background: var(--card); color: var(--muted); font-size: .9rem; border-radius: 999px; }
+.timer-presets button.active { background: var(--accent); color: #fff; }
+.dim { opacity: .25; pointer-events: none; }
+.timer-start, .timer-running {
+  width: min(78vw, 340px); aspect-ratio: 1; margin: auto 0; border-radius: 50%; padding: 0;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+}
+.timer-start { font-size: 3.2rem; font-weight: 900; letter-spacing: .06em; box-shadow: 0 0 0 10px rgba(249, 115, 22, .18); }
+.timer-start:active { transform: scale(.97); }
+.timer-running {
+  --p: 0;
+  background: radial-gradient(closest-side, var(--bg) 86%, transparent 87%),
+    conic-gradient(var(--accent) calc(var(--p) * 360deg), var(--card) 0);
+}
+.timer-running span { font-size: 6rem; font-weight: 900; font-variant-numeric: tabular-nums; line-height: 1; }
+.timer-running small { color: var(--muted); font-weight: 500; margin-top: 8px; }
+
+/* Lampeggio di fine tempo: pulsazione lenta e morbida (circa 0,6 al secondo), niente flash secchi. */
+.timer-alarm {
+  position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  color: #fff; text-align: center; cursor: pointer; animation: alarm-pulse 1.6s ease-in-out infinite;
+}
+.timer-alarm .alarm-title { font-size: 3.5rem; font-weight: 900; margin-bottom: 8px; }
+@keyframes alarm-pulse {
+  0%, 100% { background: #111827; }
+  50% { background: #f97316; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .timer-alarm { animation-duration: 3s; }
+}

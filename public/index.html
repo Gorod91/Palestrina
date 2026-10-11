@@ -47,54 +47,92 @@
       </form>
     </section>
 
-    <!-- Schermata principale -->
+    <!-- Schermata principale, a tab -->
     <div id="screen-home" hidden>
-      <section id="card-notify" class="card accent" hidden>
-        <h2>🔔 Attiva le notifiche</h2>
-        <p class="muted">Per sapere quando gli altri sono in palestra e per il recap della domenica.</p>
-        <button id="btn-notify">Attiva notifiche</button>
-      </section>
+      <div class="tab-panel" data-tab="oggi">
+        <section id="card-notify" class="card accent" hidden>
+          <h2>🔔 Attiva le notifiche</h2>
+          <p class="muted">Per sapere quando gli altri sono in palestra e per il recap della domenica.</p>
+          <button id="btn-notify">Attiva notifiche</button>
+        </section>
 
-      <section class="card">
-        <button id="btn-checkin" class="big">💪 Sono in palestra</button>
-        <p id="checkin-status" class="center muted"></p>
-      </section>
+        <section class="card">
+          <button id="btn-checkin" class="big">💪 Sono in palestra</button>
+          <p id="checkin-status" class="center muted"></p>
+        </section>
 
-      <section class="card">
-        <h2>🍅 Sudometro</h2>
-        <div id="sudo-body"></div>
-      </section>
+        <section class="card">
+          <h2>🍅 Sudometro</h2>
+          <div id="sudo-body"></div>
+        </section>
+      </div>
 
-      <section id="card-gallery" class="card" hidden>
-        <h2>📸 Sudometro della settimana</h2>
-        <ol id="gallery" class="gallery"></ol>
-      </section>
+      <div class="tab-panel" data-tab="classifica" hidden>
+        <section class="card">
+          <h2>Classifica della settimana</h2>
+          <ol id="ranking" class="ranking"></ol>
+          <p id="pomodoro" class="muted"></p>
+        </section>
 
-      <section class="card">
-        <h2>Classifica della settimana</h2>
-        <ol id="ranking" class="ranking"></ol>
-        <p id="pomodoro" class="muted"></p>
-      </section>
+        <section id="card-gallery" class="card" hidden>
+          <h2>📸 Sudometro della settimana</h2>
+          <ol id="gallery" class="gallery"></ol>
+        </section>
+      </div>
 
-      <details class="card">
-        <summary><h2>📍 Check-in automatico</h2></summary>
-        <p class="muted">Con l'app <b>Comandi</b> l'iPhone fa il check-in da solo quando arrivi in palestra.</p>
-        <ol class="steps">
-          <li>Copia il tuo link personale (non condividerlo: fa il check-in a nome tuo)<button id="btn-copy-link" class="secondary">Copia link</button></li>
-          <li>Apri <b>Comandi</b> → <b>Automazione</b> → <b>+</b> → <b>Arrivo</b></li>
-          <li><b>Posizione</b>: cerca la palestra e tocca <b>Fine</b></li>
-          <li>Scegli <b>Esegui immediatamente</b> (non "Chiedi conferma") → <b>Avanti</b></li>
-          <li><b>Nuovo comando vuoto</b> → <b>Aggiungi azione</b> → cerca <b>Ottieni contenuto dell'URL</b></li>
-          <li>Tocca <b>URL</b>, incolla il link e tocca <b>Fine</b></li>
-        </ol>
-        <p class="muted">Se Comandi chiede l'accesso alla posizione, scegli <b>Consenti sempre</b>. Se ci passi solo davanti conta lo stesso, ma vale al massimo un check-in al giorno.</p>
-      </details>
+      <div class="tab-panel timer" data-tab="timer" hidden>
+        <div class="timer-set">
+          <button id="timer-minus" class="round" aria-label="Meno 5 secondi">−</button>
+          <div id="timer-display" class="timer-display">0:30</div>
+          <button id="timer-plus" class="round" aria-label="Più 5 secondi">+</button>
+        </div>
+        <div class="timer-presets">
+          <button data-seconds="30">30 s</button>
+          <button data-seconds="45">45 s</button>
+          <button data-seconds="60">1 min</button>
+          <button data-seconds="90">1:30</button>
+        </div>
+        <button id="timer-start" class="timer-start">START</button>
+        <button id="timer-running" class="timer-running" hidden>
+          <span id="timer-left">30</span>
+          <small>tocca per annullare</small>
+        </button>
+      </div>
 
-      <p class="center"><button id="btn-logout" class="link">Esci</button></p>
+      <div class="tab-panel" data-tab="altro" hidden>
+        <details class="card" open>
+          <summary><h2>📍 Check-in automatico</h2></summary>
+          <p class="muted">Con l'app <b>Comandi</b> l'iPhone fa il check-in da solo quando arrivi in palestra.</p>
+          <ol class="steps">
+            <li>Copia il tuo link personale (non condividerlo: fa il check-in a nome tuo)<button id="btn-copy-link" class="secondary">Copia link</button></li>
+            <li>Apri <b>Comandi</b> → <b>Automazione</b> → <b>+</b> → <b>Arrivo</b></li>
+            <li><b>Posizione</b>: cerca la palestra e tocca <b>Fine</b></li>
+            <li>Scegli <b>Esegui immediatamente</b> (non "Chiedi conferma") → <b>Avanti</b></li>
+            <li><b>Nuovo comando vuoto</b> → <b>Aggiungi azione</b> → cerca <b>Ottieni contenuto dell'URL</b></li>
+            <li>Tocca <b>URL</b>, incolla il link e tocca <b>Fine</b></li>
+          </ol>
+          <p class="muted">Se Comandi chiede l'accesso alla posizione, scegli <b>Consenti sempre</b>. Se ci passi solo davanti conta lo stesso, ma vale al massimo un check-in al giorno.</p>
+        </details>
+
+        <p class="center"><button id="btn-logout" class="link">Esci</button></p>
+      </div>
+
+      <nav class="tabbar">
+        <button data-tab="oggi" class="active"><span>🏠</span>Oggi</button>
+        <button data-tab="classifica"><span>🏆</span>Classifica</button>
+        <button data-tab="timer"><span>⏱️</span>Timer</button>
+        <button data-tab="altro"><span>⚙️</span>Altro</button>
+      </nav>
     </div>
 
     <p id="toast" class="toast" hidden></p>
   </main>
+
+  <!-- Fine del timer: lo schermo lampeggia finché non lo tocchi -->
+  <div id="timer-alarm" class="timer-alarm" hidden>
+    <p class="alarm-title">⏱️ Tempo!</p>
+    <p>Tocca per fermare</p>
+  </div>
 
   <!-- Foto a tutto schermo -->
   <div id="viewer" class="viewer" hidden>

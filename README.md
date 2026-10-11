@@ -1,6 +1,6 @@
 # 🏋️ Palestrina
 
-Web app per rendere più divertente la palestra tra amici: check-in con un tap, classifica settimanale, streak, **Sudometro** (selfie da sudato contro una foto di riferimento) e notifiche su iPhone. Costo zero, niente App Store.
+Web app per rendere più divertente la palestra tra amici: check-in con un tap, classifica settimanale, streak, timer addominali, **Sudometro** (selfie da sudato contro una foto di riferimento) e notifiche su iPhone. Costo zero, niente App Store.
 
 ## Come è fatta
 
@@ -116,6 +116,11 @@ Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il
 - mostra i valori grezzi di ogni componente;
 - con la fotocamera aperta mostra i parametri **in tempo reale** (luce, rossore, lucidità, punteggio live rispetto alla foto di riferimento) e le zone del viso misurate: fronte in azzurro, guance in rosso, naso in giallo;
 - nel foglio finisce con `sì` nella colonna *Debug*, non conta in classifica né nel recap e non avvisa nessuno.
+
+## Timer addominali
+
+Tab **⏱️ Timer**: durata in alto (30 secondi di default, si cambia con − e +, con le scorciatoie 30 s / 45 s / 1 min / 1:30 o toccando il numero), poi il pulsante gigante **START**.
+Il timer non suona: a fine tempo lo schermo pulsa lentamente in arancione (meno di una volta al secondo, niente flash) finché non lo tocchi, e torna il pulsante START. Toccando il cerchio mentre corre si annulla. Mentre corre, l'app chiede a iOS di tenere lo schermo acceso.
 
 ## Check-in automatico (Comandi iOS)
 
