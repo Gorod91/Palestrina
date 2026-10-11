@@ -119,7 +119,7 @@ Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il
 
 ## Timer addominali
 
-Tab **⏱️ Timer**: durata in alto (30 secondi di default, si cambia con − e +, con le scorciatoie 30 s / 45 s / 1 min / 1:30 o toccando il numero), poi il pulsante gigante **START**.
+Tab **⏱️ Timer**: durata in alto (30 secondi di default, si cambia con − e + di 5 secondi o toccando il numero), poi il pulsante gigante **START**. L'ultimo tempo usato è salvato per ogni account (in Apps Script), quindi resta anche cambiando telefono.
 Il timer non suona: a fine tempo lo schermo pulsa lentamente in arancione (meno di una volta al secondo, niente flash) finché non lo tocchi, e torna il pulsante START. Toccando il cerchio mentre corre si annulla. Mentre corre, l'app chiede a iOS di tenere lo schermo acceso.
 
 ## Check-in automatico (Comandi iOS)

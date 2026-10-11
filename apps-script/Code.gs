@@ -86,6 +86,12 @@ function doPost(e) {
         return json(saveReference(user, req.features, req.photo));
       case 'photo':
         return json(getPhoto(req.id));
+      case 'setTimer': {
+        const s = Math.round(Number(req.seconds));
+        if (!(s >= 5 && s <= 600)) return json({ error: 'Durata non valida' });
+        props.setProperty('timer_' + user.name, String(s));
+        return json({ ok: true });
+      }
       case 'sudometro':
         return json(saveSudometro(user, req));
       case 'subscribe':
@@ -223,6 +229,7 @@ function buildState(user) {
       checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
       sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title } : null,
       reference: getReference(user),
+      timerSeconds: Number(props.getProperty('timer_' + user.name)) || null,
     },
     week: {
       start: week,

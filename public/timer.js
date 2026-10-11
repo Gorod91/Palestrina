@@ -1,29 +1,44 @@
 // Timer addominali: niente suoni, a fine tempo lo schermo pulsa finché non lo tocchi.
 
 const $ = (id) => document.getElementById(id);
-const KEY = 'palestrina.timer';
 const MIN = 5;
 const MAX = 600;
 const STEP = 5;
+const DEFAULT = 30;
 
-let seconds = load();
+let seconds = DEFAULT;
+let account = null; // { name, save(seconds) }: l'ultimo tempo usato è salvato per ogni account
 let deadline = null; // ms epoch di fine, null se fermo
 let frame = null;
 let wakeLock = null;
 
-function load() {
+const valid = (v) => Number.isFinite(v) && v >= MIN && v <= MAX;
+const localKey = () => `palestrina.timer.${account ? account.name : ''}`;
+
+function loadLocal() {
   try {
-    const v = Number(localStorage.getItem(KEY));
-    return v >= MIN && v <= MAX ? v : 30;
+    return Number(localStorage.getItem(localKey()));
   } catch {
-    return 30;
+    return NaN;
   }
 }
 
-function save() {
+function saveLocal() {
   try {
-    localStorage.setItem(KEY, String(seconds));
+    localStorage.setItem(localKey(), String(seconds));
   } catch { /* storage non disponibile */ }
+}
+
+/**
+ * Collega il timer all'account: usa il tempo salvato in Apps Script (`serverSeconds`),
+ * altrimenti quello del telefono, altrimenti 30 secondi.
+ */
+export function setTimerAccount(name, serverSeconds, save) {
+  if (account && account.name === name) return; // già impostato: non sovrascrive le modifiche in corso
+  account = { name, save };
+  const local = loadLocal();
+  seconds = valid(serverSeconds) ? serverSeconds : valid(local) ? local : DEFAULT;
+  if (deadline === null) render();
 }
 
 function fmt(s) {
@@ -32,20 +47,16 @@ function fmt(s) {
 
 function setSeconds(v) {
   seconds = Math.max(MIN, Math.min(MAX, Math.round(v)));
-  save();
+  saveLocal();
   render();
 }
 
 function render() {
   $('timer-display').textContent = fmt(seconds);
-  document.querySelectorAll('.timer-presets button').forEach((b) => {
-    b.classList.toggle('active', Number(b.dataset.seconds) === seconds);
-  });
   const running = deadline !== null;
   $('timer-start').hidden = running;
   $('timer-running').hidden = !running;
   document.querySelector('.timer-set').classList.toggle('dim', running);
-  document.querySelector('.timer-presets').classList.toggle('dim', running);
 }
 
 // Tiene lo schermo acceso mentre il timer corre (dove Safari lo permette).
@@ -64,6 +75,8 @@ function releaseAwake() {
 }
 
 function start() {
+  saveLocal();
+  if (account && account.save) account.save(seconds); // ultimo tempo usato, anche su altri telefoni
   deadline = Date.now() + seconds * 1000;
   render();
   keepAwake();
@@ -105,9 +118,6 @@ export function initTimer() {
     const v = prompt('Durata in secondi', String(seconds));
     if (v !== null && Number(v) > 0) setSeconds(Number(v));
   };
-  document.querySelectorAll('.timer-presets button').forEach((b) => {
-    b.onclick = () => setSeconds(Number(b.dataset.seconds));
-  });
   $('timer-start').onclick = start;
   $('timer-running').onclick = cancel;
   $('timer-alarm').onclick = stopAlarm;

@@ -1,5 +1,5 @@
 import * as sudometro from './sudometro.js';
-import { initTimer } from './timer.js';
+import { initTimer, setTimerAccount } from './timer.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -203,6 +203,7 @@ async function login(code) {
 async function refresh() {
   try {
     state = await api('state');
+    setTimerAccount(state.me.name, state.me.timerSeconds, (s) => api('setTimer', { seconds: s }).catch(() => {}));
     render();
   } catch (err) {
     if (err.message === 'Codice non valido') return logout();
@@ -297,6 +298,7 @@ function selectTab(name) {
 }
 
 function logout() {
+  setTimerAccount('', null, null);
   session = null;
   state = null;
   store.set('session', null);
