@@ -362,15 +362,24 @@ function dayLabel(day) {
 
 /** Bicipite che si flette (SVG animato via CSS): feedback mentre si aspetta Apps Script. */
 export function bicep() {
-  // Ispirato all'emoji del bicipite: braccio dal basso a sinistra, muscolo rotondo, avambraccio che sale e
-  // pugno con nocche e pollice. Avambraccio e pugno ruotano sul gomito mentre il muscolo si gonfia.
-  return `<svg class="bicep" viewBox="0 0 80 64" aria-label="Invio in corso" role="img">
-    <rect class="bicep-arm" x="3" y="43" width="42" height="14" rx="7" />
-    <path class="bicep-muscle" d="M7 47 C8 28 31 24 39 42 Z" />
-    <g class="bicep-forearm">
-      <path d="M34 54 L35 22 H47 L48 54 Z" />
-      <rect x="27" y="3" width="27" height="24" rx="11" />
-      <path class="bicep-cut" d="M28 10 H35 M28 15.5 H35 M29 21 H35.5 M33.5 25.5 C38 22.5 44 22 50 23.5" />
+  // Curl con manubrio: l'avambraccio sale ruotando sul gomito e il bicipite si gonfia.
+  // Animazione SMIL (funziona anche su Safari, che non anima "d" via CSS). Le parti hanno il colore di
+  // sfondo (--bicep-bg) per coprire le linee che passano dietro.
+  const t = 'dur="1.1s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.5;1" keySplines=".45 0 .55 1;.45 0 .55 1"';
+  return `<svg class="bicep" viewBox="-4 -14 86 82" aria-label="Invio in corso" role="img">
+    <path class="bicep-bg" d="M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 C48 46 54 50 53 56 C52 60 46 61 40 61 L0 61">
+      <animate attributeName="d" values="M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 C48 46 54 50 53 56 C52 60 46 61 40 61 L0 61;M0 47 C4 47 9 26 21 26 C32 26 36 37 41 47 C48 46 54 50 53 56 C52 60 46 61 40 61 L0 61;M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 C48 46 54 50 53 56 C52 60 46 61 40 61 L0 61" ${t} />
+    </path>
+    <g>
+      <animateTransform attributeName="transform" type="rotate" values="50 46 52;4 46 52;50 46 52" ${t} />
+      <g transform="translate(5 0)">
+        <path class="bicep-bg" d="M32 56 L35 27 L47 27 L50 56" />
+        <path d="M20 17H62" />
+        <rect class="bicep-bg" x="16" y="8" width="7" height="18" rx="2.5" />
+        <rect class="bicep-bg" x="59" y="8" width="7" height="18" rx="2.5" />
+        <rect class="bicep-bg" x="31" y="8" width="20" height="20" rx="7" />
+        <path class="bicep-finger" d="M38.5 13V23M43.5 13V23" />
+      </g>
     </g>
   </svg>`;
 }
