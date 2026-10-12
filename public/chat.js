@@ -183,10 +183,34 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     card.querySelector('.by').textContent = poll.byDisplay;
     card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice)));
     card.querySelector('#poll-time').oninput = (e) => e.target.parentNode.classList.toggle('filled', !!e.target.value);
-    // Su iPhone "change" arriva a ogni giro della rotella: salvare subito ridisegnava la casella e chiudeva
-    // la rotella. Si salva quando la rotella si chiude.
-    card.querySelector('#poll-time').onblur = (e) => {
-      if (mine.choice && e.target.value !== (mine.time || '')) answer(mine.choice); // cambia solo l'orario
+    // Su iPhone "change" arriva a ogni giro della rotella e "blur" non sempre: si salva in silenzio poco dopo
+    // l'ultima modifica, senza ridisegnare la casella mentre la rotella è aperta (si chiuderebbe).
+    // Con un orario e nessuna risposta vale "Ci sono".
+    const timeInput = card.querySelector('#poll-time');
+    let sent = mine.time || '';
+    let timer = null;
+    const saveTime = async () => {
+      clearTimeout(timer);
+      const t = timeInput.value;
+      if (t === sent || pollBusy) return;
+      sent = t;
+      try {
+        const r = await api('pollAnswer', { choice: mine.choice || 'si', time: t });
+        v = -1;
+        apply(r);
+        toast(t ? `Orario ${t} salvato` : 'Orario tolto');
+      } catch (err) {
+        sent = '';
+        toast(err.message);
+      }
+    };
+    timeInput.onchange = () => {
+      clearTimeout(timer);
+      timer = setTimeout(saveTime, 900);
+    };
+    timeInput.onblur = () => {
+      saveTime();
+      setTimeout(() => renderPoll(true), 0); // aggiorna nomi e orari rimasti indietro mentre la rotella era aperta
     };
     // Chi c'è e chi no, in chiaro e in poco spazio
     const names = card.querySelector('.poll-names');
