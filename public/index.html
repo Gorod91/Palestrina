@@ -241,7 +241,6 @@
 
     </div>
 
-    <p id="toast" class="toast" hidden></p>
 
     <!-- Se l'avvio va storto, invece dello schermo nero -->
     <section id="boot-error" class="card" hidden>
@@ -266,6 +265,9 @@
     <button data-tab="timer"><svg><use href="#i-timer"/></svg>Timer</button>
     <button data-tab="altro"><svg><use href="#i-more"/></svg>Altro</button>
   </nav>
+
+  <!-- Fuori dall'area che scorre: su iPhone lì dentro finirebbe sotto la casella dei messaggi -->
+  <p id="toast" class="toast" hidden></p>
 
 
   <!-- Fine del timer: lo schermo lampeggia finché non lo tocchi -->
