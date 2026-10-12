@@ -295,3 +295,25 @@ body.keyboard .composer { padding-bottom: 8px; }
 
 /* Misure dello schermo (solo utenti debug) */
 .viewport-debug { white-space: pre-wrap; font: 12px/1.45 ui-monospace, Menlo, monospace; color: var(--muted); margin: 0; }
+
+/* ---------- Bicipite che si flette (attesa invio) ---------- */
+.bicep { width: 22px; height: 22px; flex: none; overflow: visible; }
+.bicep path { fill: none; stroke: currentColor; stroke-width: 11; stroke-linecap: round; stroke-linejoin: round; }
+.bicep .bicep-muscle { fill: currentColor; stroke-width: 4; }
+.bicep circle { fill: currentColor; }
+/* L'avambraccio sale dal braccio disteso al pugno in alto, mentre il muscolo si gonfia. */
+.bicep .bicep-forearm { transform-box: view-box; transform-origin: 37px 49px; animation: bicep-flex .9s ease-in-out infinite alternate; }
+.bicep .bicep-muscle { transform-box: view-box; transform-origin: 23px 49px; animation: bicep-pump .9s ease-in-out infinite alternate; }
+@keyframes bicep-flex { from { transform: rotate(62deg); } to { transform: rotate(-6deg); } }
+@keyframes bicep-pump { from { transform: scale(.85, .35); } to { transform: scale(1.08, 1.15); } }
+@media (prefers-reduced-motion: reduce) { .bicep .bicep-forearm, .bicep .bicep-muscle { animation-duration: 2s; } }
+.with-bicep, .choice { display: inline-flex; align-items: center; justify-content: center; gap: 8px; }
+.primary.with-bicep { display: flex; }
+.primary:disabled.with-bicep, .choice:disabled { opacity: 1; }
+.choice:disabled:not(.selected) { opacity: .5; }
+.msg.pending .bubble { opacity: .65; }
+.msg.pending .sending { display: inline-block; margin-left: 8px; vertical-align: -5px; color: #000; }
+.msg.pending .bicep { width: 20px; height: 20px; }
+
+/* Sfondo della chat in stile WhatsApp, con disegnini a tema palestra (chat-bg.svg si ripete) */
+body.chat-mode #scroller { background: #0b0b0c url("chat-bg.svg") repeat; background-size: 400px 400px; }

@@ -16,6 +16,8 @@ export function createChat({ api, toast, loadPhoto, clean }) {
   let active = false;
   let timer = null;
   let loading = false;
+  const pending = []; // messaggi inviati ma non ancora salvati in Apps Script
+  let pollBusy = null; // 'ask' oppure la risposta in invio ('si' | 'forse' | 'no')
 
   const readKey = () => `palestrina.chatRead.${me ? me.name : ''}`;
   const getRead = () => {
@@ -58,29 +60,43 @@ export function createChat({ api, toast, loadPhoto, clean }) {
     if (!t) return;
     $('chat-input').value = '';
     autosize();
+    // Il messaggio compare subito, con il bicipite che si flette finché Apps Script non lo salva.
+    const item = { text: t };
+    pending.push(item);
+    showPending();
+    scrollToBottom();
     try {
-      apply(await api('chatSend', { text: t }));
+      const r = await api('chatSend', { text: t });
+      pending.splice(pending.indexOf(item), 1);
+      v = -1; // forza il ridisegno anche se la versione coincide
+      apply(r);
     } catch (err) {
+      pending.splice(pending.indexOf(item), 1);
+      showPending();
       $('chat-input').value = t;
       toast(err.message);
     }
   }
 
-  async function ask() {
+  async function withPollBusy(what, call) {
+    if (pollBusy) return;
+    pollBusy = what;
+    renderPoll(true);
     try {
-      apply(await api('pollAsk'));
+      const r = await call();
+      pollBusy = null;
+      v = -1;
+      apply(r);
     } catch (err) {
+      pollBusy = null;
+      renderPoll(true);
       toast(err.message);
     }
   }
 
-  async function answer(choice) {
-    try {
-      apply(await api('pollAnswer', { choice, time: $('poll-time') ? $('poll-time').value : '' }));
-    } catch (err) {
-      toast(err.message);
-    }
-  }
+  const ask = () => withPollBusy('ask', () => api('pollAsk'));
+  const answer = (choice) =>
+    withPollBusy(choice, () => api('pollAnswer', { choice, time: $('poll-time') ? $('poll-time').value : '' }));
 
   // ---------- Interfaccia ----------
 
@@ -102,25 +118,29 @@ export function createChat({ api, toast, loadPhoto, clean }) {
     requestAnimationFrame(() => (sc.scrollTop = sc.scrollHeight));
   }
 
-  function renderPoll() {
+  function renderPoll(force = false) {
     const card = $('poll-card');
-    if (document.activeElement && document.activeElement.id === 'poll-time') return; // non disturbare chi sta scrivendo l'orario
-    const poll = data.poll;
+    // non disturbare chi sta scrivendo l'orario
+    if (!force && document.activeElement && document.activeElement.id === 'poll-time') return;
+    const poll = data && data.poll;
     if (!poll) {
+      const busy = pollBusy === 'ask';
       card.innerHTML = `
         <p class="label">Oggi</p>
         <h3>Chi va in palestra oggi?</h3>
         <p class="muted">Nessuno l'ha ancora chiesto. Con un tap lo chiedi a tutti.</p>
-        <button id="poll-ask" class="primary">Chiedi a tutti</button>`;
+        <button id="poll-ask" class="primary with-bicep"${busy ? ' disabled' : ''}>${busy ? `${bicep()}Chiedo a tutti…` : 'Chiedi a tutti'}</button>`;
       card.querySelector('#poll-ask').onclick = ask;
       return;
     }
-    const mine = poll.people.find((p) => p.name === me.name) || {};
+    const answered = (poll.people.find((p) => p.name === me.name) || {});
+    // Risposta in invio: il pulsante scelto si colora subito, con il bicipite accanto.
+    const mine = pollBusy && pollBusy !== 'ask' ? { ...answered, choice: pollBusy } : answered;
     card.innerHTML = `
       <p class="label">Chiesto da <span class="by"></span> alle ${poll.clock}</p>
       <h3>Chi va in palestra oggi?</h3>
       <div class="choices">
-        ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}">${label}</button>`).join('')}
+        ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}"${pollBusy ? ' disabled' : ''}>${pollBusy === k ? bicep() : ''}${label}</button>`).join('')}
       </div>
       <label class="time-row">
         <span>Orario <span class="muted">(facoltativo)</span></span>
@@ -161,7 +181,8 @@ export function createChat({ api, toast, loadPhoto, clean }) {
       lastSender = '';
       list.append(eventRow(m));
     });
-    if (!data.messages.length) list.append(el('p', 'empty', 'Ancora nessun messaggio. Scrivi tu il primo.'));
+    if (!data.messages.length && !pending.length) list.append(el('p', 'empty', 'Ancora nessun messaggio. Scrivi tu il primo.'));
+    showPending();
   }
 
   function eventRow(m) {
@@ -207,6 +228,22 @@ export function createChat({ api, toast, loadPhoto, clean }) {
     }
     row.append(el('span', 'time', m.time));
     return row;
+  }
+
+  /** Bolle dei messaggi in invio, in fondo alla lista. */
+  function showPending() {
+    const list = $('chat-list');
+    list.querySelectorAll('.msg.pending').forEach((n) => n.remove());
+    if (pending.length) list.querySelectorAll('.empty').forEach((n) => n.remove());
+    pending.forEach((p) => {
+      const row = el('div', 'msg mine pending');
+      const bubble = el('div', 'bubble', p.text);
+      const s = el('span', 'sending');
+      s.innerHTML = bicep();
+      bubble.append(s);
+      row.append(bubble);
+      list.append(row);
+    });
   }
 
   function markRead() {
@@ -321,4 +358,13 @@ function dayLabel(day) {
   if (diff === 0) return 'Oggi';
   if (diff === 1) return 'Ieri';
   return d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
+/** Bicipite che si flette (SVG animato via CSS): feedback mentre si aspetta Apps Script. */
+export function bicep() {
+  return `<svg class="bicep" viewBox="0 0 64 64" aria-label="Invio in corso" role="img">
+    <path class="bicep-upper" d="M7 49 L37 49" />
+    <path class="bicep-muscle" d="M9 47 C12 31 32 29 37 45 Z" />
+    <g class="bicep-forearm"><path d="M37 49 L37 22" /><circle cx="37" cy="14" r="9" /></g>
+  </svg>`;
 }
