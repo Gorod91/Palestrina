@@ -229,7 +229,23 @@ body:not(.chat-mode) .composer { display: none; }
    Con "black-translucent" iOS calcolava male l'altezza dell'app installata (fascia nera o barra tagliata). */
 body.keyboard { bottom: auto; height: var(--app-h, 100%); }
 body.keyboard .tabbar { display: none; }
-.poll h3 { font-size: 20px; margin: 2px 0 12px; }
+/* Sondaggio: casella compatta fissa in cima alla chat */
+body.chat-mode #poll-card { position: sticky; top: 0; z-index: 3; margin-bottom: 4px; padding: 10px 12px; box-shadow: 0 6px 16px rgba(0, 0, 0, .45); }
+/* copre la fascia sopra la casella, dove altrimenti scorrerebbero i messaggi */
+body.chat-mode #poll-card::before { content: ''; position: absolute; left: -16px; right: -16px; bottom: 100%; height: calc(env(safe-area-inset-top) + 9px); background: #0b0b0c; }
+.poll-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 15px; }
+.poll-head .muted { font-size: 12px; white-space: nowrap; }
+.poll .choices { grid-template-columns: repeat(3, 1fr) 92px; gap: 6px; }
+.poll .choice { padding: 8px 0; font-size: 15px; border-radius: 10px; }
+.poll #poll-time { width: 100%; min-width: 0; padding: 5px 2px; font-size: 16px; border-radius: 10px; text-transform: none; letter-spacing: 0; }
+.poll #poll-ask { margin: 0; }
+.poll-summary { display: flex; align-items: center; gap: 10px; width: 100%; margin: 8px 0 0; padding: 0; border: 0; background: none; color: var(--muted); font-size: 13px; font-weight: 600; }
+.poll-summary .si { color: var(--exercise); }
+.poll-summary .forse { color: #ffd60a; }
+.poll-summary .no { color: var(--danger); }
+.poll-summary .toggle { margin-left: auto; color: var(--stand); }
+.poll .answers { max-height: 40vh; overflow-y: auto; }
+.poll .answers #poll-cancel { margin-top: 8px; }
 .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .choice { margin: 0; padding: 12px 0; border: 0; border-radius: 12px; background: var(--card-2); color: var(--fg); font-weight: 600; font-size: 16px; }
 .choice.si.selected { background: var(--exercise); color: #000; }
@@ -379,3 +395,9 @@ body.chat-mode #scroller { background: #0b0b0c url("chat-bg.svg") repeat; backgr
 
 /* Dati fittizi attivi: avviso fisso in alto */
 body.fake-data #page-title::after { content: 'DATI FITTIZI'; margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: #ff9f0a; color: #000; font-size: 11px; font-weight: 700; letter-spacing: .04em; vertical-align: middle; }
+
+/* Pulsante per tornare in fondo alla chat */
+.composer { position: relative; }
+.composer #chat-down { position: absolute; right: max(16px, calc((100% - 480px) / 2)); bottom: calc(100% + 12px); width: 40px; height: 40px; border: .5px solid var(--line); border-radius: 50%; background: var(--card-2); color: var(--fg); box-shadow: 0 4px 12px rgba(0, 0, 0, .5); }
+.composer #chat-down svg { width: 22px; height: 22px; }
+.composer #chat-down .badge { top: -6px; left: auto; right: -4px; background: var(--exercise); color: #000; }

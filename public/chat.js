@@ -17,7 +17,10 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   let timer = null;
   let loading = false;
   const pending = []; // messaggi inviati ma non ancora salvati in Apps Script
-  let pollBusy = null; // 'ask' oppure la risposta in invio ('si' | 'forse' | 'no')
+  let pollBusy = null;
+  let pollOpen = false; // risposte del sondaggio aperte
+  let unseen = 0; // messaggi arrivati mentre si legge più in alto
+  let lastCount = 0; // 'ask' oppure la risposta in invio ('si' | 'forse' | 'no')
 
   const readKey = () => `palestrina.chatRead.${me ? me.name : ''}`;
   const getRead = () => {
@@ -128,10 +131,25 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     const firstRender = !$('chat-list').dataset.rendered;
     renderPoll();
     renderList();
+    const n = data.messages.length;
+    if (!firstRender && !nearBottom && n > lastCount) unseen += n - lastCount;
+    lastCount = n;
     if (active) {
       if (nearBottom || firstRender) scrollToBottom();
       markRead();
     }
+    updateDown();
+  }
+
+  /** Pulsante "vai in fondo" come WhatsApp: compare quando si è risaliti nella chat. */
+  function updateDown() {
+    const sc = $('scroller');
+    const far = active && sc.scrollHeight - sc.scrollTop - sc.clientHeight > 300;
+    if (!far) unseen = 0;
+    $('chat-down').hidden = !far;
+    const badge = $('chat-down').querySelector('.badge');
+    badge.hidden = !unseen;
+    badge.textContent = unseen > 9 ? '9+' : String(unseen);
   }
 
   function scrollToBottom() {
@@ -144,38 +162,45 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     // non disturbare chi sta scrivendo l'orario
     if (!force && document.activeElement && document.activeElement.id === 'poll-time') return;
     const poll = data && data.poll;
+    // Casella compatta, sempre visibile in cima alla chat
     if (!poll) {
       const busy = pollBusy === 'ask';
       card.innerHTML = `
-        <p class="label">Oggi</p>
-        <h3>Chi va in palestra oggi?</h3>
-        <p class="muted">Nessuno l'ha ancora chiesto. Con un tap lo chiedi a tutti.</p>
-        <button id="poll-ask" class="primary with-bicep"${busy ? ' disabled' : ''}>${busy ? `${bicep()}Chiedo a tutti…` : 'Chiedi a tutti'}</button>`;
+        <div class="poll-head"><b>Chi va in palestra oggi?</b><span class="muted">nessuno l'ha chiesto</span></div>
+        <button id="poll-ask" class="primary small with-bicep"${busy ? ' disabled' : ''}>${busy ? `${bicep()}Chiedo a tutti…` : 'Chiedi a tutti'}</button>`;
       card.querySelector('#poll-ask').onclick = ask;
       return;
     }
     const answered = (poll.people.find((p) => p.name === me.name) || {});
     // Risposta in invio: il pulsante scelto si colora subito, con il bicipite accanto.
     const mine = pollBusy && pollBusy !== 'ask' ? { ...answered, choice: pollBusy } : answered;
+    const count = (k) => poll.people.filter((p) => p.choice === k).length;
     card.innerHTML = `
-      <p class="label">Chiesto da <span class="by"></span> alle ${poll.clock}</p>
-      <h3>Chi va in palestra oggi?</h3>
+      <div class="poll-head"><b>Chi va in palestra oggi?</b><span class="muted">da <span class="by"></span> · ${poll.clock}</span></div>
       <div class="choices">
         ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}"${pollBusy ? ' disabled' : ''}>${pollBusy === k ? bicep() : ''}${label}</button>`).join('')}
+        <input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)">
       </div>
-      <label class="time-row">
-        <span>Orario <span class="muted">(facoltativo)</span></span>
-        <input id="poll-time" type="time" value="${mine.time || ''}">
-      </label>
-      <div class="answers"></div>
-      ${isDebug() ? '<button id="poll-cancel" class="secondary small destructive">Annulla sondaggio</button>' : ''}`;
+      <button class="poll-summary" type="button" aria-expanded="${pollOpen}">
+        <span class="si">${count('si')} ci sono</span><span class="forse">${count('forse')} forse</span><span class="no">${count('no')} no</span>
+        <span class="toggle">${pollOpen ? 'Nascondi' : 'Chi?'}</span>
+      </button>
+      <div class="answers"${pollOpen ? '' : ' hidden'}></div>`;
     card.querySelector('.by').textContent = poll.byDisplay;
-    if (isDebug()) card.querySelector('#poll-cancel').onclick = () => remove(poll.id, 'Annullare il sondaggio di oggi con tutte le risposte?');
     card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice)));
     card.querySelector('#poll-time').onchange = () => {
       if (mine.choice) answer(mine.choice); // cambia solo l'orario
     };
-    card.querySelector('.answers').append(answersList(poll));
+    card.querySelector('.poll-summary').onclick = () => {
+      pollOpen = !pollOpen;
+      renderPoll(true);
+    };
+    const answers = card.querySelector('.answers');
+    answers.append(answersList(poll));
+    if (isDebug()) {
+      answers.insertAdjacentHTML('beforeend', '<button id="poll-cancel" class="secondary small destructive">Annulla sondaggio</button>');
+      answers.querySelector('#poll-cancel').onclick = () => remove(poll.id, 'Annullare il sondaggio di oggi con tutte le risposte?');
+    }
   }
 
   function renderList() {
@@ -306,6 +331,11 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     send($('chat-input').value);
   });
   $('chat-input').addEventListener('input', autosize);
+  $('scroller').addEventListener('scroll', () => active && updateDown(), { passive: true });
+  $('chat-down').addEventListener('click', () => {
+    const sc = $('scroller');
+    sc.scrollTo({ top: sc.scrollHeight, behavior: 'smooth' });
+  });
 
   return {
     redraw() {
@@ -325,7 +355,10 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     setActive(on) {
       active = on;
       clearInterval(timer);
-      if (!on) return;
+      if (!on) {
+        $('chat-down').hidden = true;
+        return;
+      }
       if (data) {
         render();
         scrollToBottom();
