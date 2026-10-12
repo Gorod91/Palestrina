@@ -367,13 +367,13 @@ export function bicep() {
   // sfondo (--bicep-bg) per coprire le linee che passano dietro.
   const t = 'dur="1.1s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.5;1" keySplines=".45 0 .55 1;.45 0 .55 1"';
   return `<svg class="bicep" viewBox="-4 -14 86 82" aria-label="Invio in corso" role="img">
-    <path class="bicep-bg" d="M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 C48 46 54 50 53 56 C52 60 46 61 40 61 L0 61">
-      <animate attributeName="d" values="M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 C48 46 54 50 53 56 C52 60 46 61 40 61 L0 61;M0 47 C4 47 9 26 21 26 C32 26 36 37 41 47 C48 46 54 50 53 56 C52 60 46 61 40 61 L0 61;M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 C48 46 54 50 53 56 C52 60 46 61 40 61 L0 61" ${t} />
+    <path class="bicep-bg" d="M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 L46 56 V61 L0 61">
+      <animate attributeName="d" values="M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 L46 56 V61 L0 61;M0 47 C4 47 9 26 21 26 C32 26 36 37 41 47 L46 56 V61 L0 61;M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 L46 56 V61 L0 61" ${t} />
     </path>
     <g>
       <animateTransform attributeName="transform" type="rotate" values="50 46 52;4 46 52;50 46 52" ${t} />
       <g transform="translate(5 0)">
-        <path class="bicep-bg" d="M32 56 L35 27 L47 27 L50 56" />
+        <path class="bicep-bg" d="M32 52 L35 27 L47 27 L50 52 A9 9 0 0 1 32 52" />
         <path d="M20 17H62" />
         <rect class="bicep-bg" x="16" y="8" width="7" height="18" rx="2.5" />
         <rect class="bicep-bg" x="59" y="8" width="7" height="18" rx="2.5" />
