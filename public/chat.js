@@ -4,7 +4,6 @@
 const $ = (id) => document.getElementById(id);
 const POLL_EVERY = 5000;
 const WEEKDAYS = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
-const WEEKDAYS_LONG = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
 const CHOICES = [
   ['si', 'Ci sono'],
   ['forse', 'Forse'],
@@ -194,17 +193,13 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         return `<button class="pday${d.day === day ? ' on' : ''}${mineDay.choice ? ' ' + mineDay.choice : ''}" data-day="${d.day}">${i ? WEEKDAYS[date.getDay()] : 'Oggi'}<b>${date.getDate()}</b><i>${n || '·'}</i></button>`;
       })
       .join('');
-    const title = isToday ? 'Chi va in palestra oggi?' : `Chi va in palestra ${WEEKDAYS_LONG[new Date(day + 'T12:00:00').getDay()]} ${new Date(day + 'T12:00:00').getDate()}?`;
     card.innerHTML = `
       ${strip ? `<div class="pdays">${strip}</div>` : ''}
-      <div class="poll-head"><b>${title}</b>${side}</div>
       <div class="choices">
         ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}"${pollBusy ? ' disabled' : ''}>${pollBusy === k ? bicep() : ''}${label}</button>`).join('')}
         <label class="time-wrap${mine.time ? ' filled' : ''}${timeSaving !== null ? ' busy' : ''}"><input id="poll-time" type="time" value="${timeSaving !== null ? timeSaving : mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span>${timeSaving !== null ? bicep() : ''}</label>
       </div>
       <p class="poll-names"></p>`;
-    if (poll && isToday) card.querySelector('.by').textContent = poll.byDisplay;
-    if (card.querySelector('#poll-ask')) card.querySelector('#poll-ask').onclick = ask;
     card.querySelectorAll('[data-day]').forEach((b) => {
       b.onclick = () => {
         selDay = b.dataset.day;
@@ -276,6 +271,12 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     });
     const missing = plan.people.filter((p) => !p.choice).length;
     if (missing) names.append(el('span', 'part none', `${missing} senza risposta`));
+    // Per oggi: chi ha fatto la domanda, oppure "Chiedi a tutti"
+    if (side) {
+      names.insertAdjacentHTML('beforeend', `<span class="poll-side">${side}</span>`);
+      if (poll) names.querySelector('.by').textContent = poll.byDisplay;
+      if (names.querySelector('#poll-ask')) names.querySelector('#poll-ask').onclick = ask;
+    }
     if (isDebug() && poll && isToday) {
       const cancel = el('button', 'poll-cancel', 'Annulla');
       cancel.type = 'button';

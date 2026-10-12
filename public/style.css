@@ -453,3 +453,6 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 .pcell .bicep { width: 22px; height: 21px; color: var(--exercise); --bicep-bg: var(--card-2); }
 .pcell.si .bicep { color: #000; --bicep-bg: var(--exercise); }
 .plan-note { margin: 6px 0 0; }
+
+.poll-names .poll-side { margin-left: 8px; font-size: 12px; }
+.poll-names .poll-side .ask-link { vertical-align: baseline; }
