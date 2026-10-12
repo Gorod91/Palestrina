@@ -236,7 +236,7 @@ export function createChat({ api, toast, loadPhoto, openPhoto, clean, isDebug })
             const img = new Image();
             img.src = src;
             img.alt = `Selfie di ${name}`;
-            img.onclick = () => openPhoto(src, `${name} · ${d.score} · ${clean(d.title)}`, d.photoId);
+            img.onclick = () => openPhoto(src, `${name} · ${d.score} · ${clean(d.title)}`);
             photo.replaceChildren(img);
           })
           .catch(() => {});

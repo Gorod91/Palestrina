@@ -209,7 +209,7 @@ function renderGallery() {
           const img = new Image();
           img.alt = `Selfie di ${who}`;
           img.src = src;
-          img.onclick = () => openPhoto(src, `${who} · ${r.score} · ${title}`, r.photoId);
+          img.onclick = () => openPhoto(src, `${who} · ${r.score} · ${title}`);
           li.querySelector('.photo').replaceChildren(img);
         })
         .catch(() => {});
@@ -217,30 +217,10 @@ function renderGallery() {
   });
 }
 
-let viewerPhotoId = '';
-
-function openPhoto(src, caption, id = '') {
-  viewerPhotoId = id;
+function openPhoto(src, caption) {
   $('viewer-img').src = src;
   $('viewer-caption').textContent = caption;
-  $('viewer-delete').hidden = !(id && debugOn());
   $('viewer').hidden = false;
-}
-
-/** Modalità debug: toglie la foto da galleria e chat (il punteggio resta). */
-async function deletePhoto() {
-  const id = viewerPhotoId;
-  if (!id || !confirm('Eliminare questa foto per tutti? Il punteggio resta.')) return;
-  try {
-    await api('photoDelete', { id });
-    photoCache.delete(id);
-    $('viewer').hidden = true;
-    toast('Foto eliminata');
-    refresh();
-    chat.reload();
-  } catch (err) {
-    toast(err.message);
-  }
 }
 
 function renderSudometro() {
@@ -270,6 +250,10 @@ function renderSudometro() {
         </div>
       </div>`;
     el.querySelector('.sudo-title').textContent = clean(me.sudometroToday.title);
+    if (debugOn()) {
+      el.insertAdjacentHTML('beforeend', '<button id="btn-redo" class="secondary" style="margin-top:14px">Rifai e sovrascrivi (debug)</button>');
+      el.querySelector('#btn-redo').onclick = () => takeSweat(false, true);
+    }
   } else {
     // 3) Selfie da sudato: uno al giorno
     el.innerHTML = `
@@ -352,7 +336,7 @@ async function takeReference() {
   }
 }
 
-async function takeSweat(debug) {
+async function takeSweat(debug, overwrite = false) {
   try {
     const reference = state.me.reference.features;
     const canvas = await sudometro.takeSelfie('Selfie da sudato: stesso punto della foto di riferimento', {
@@ -368,6 +352,7 @@ async function takeSweat(debug) {
       title: result.title,
       details: result.details,
       debug,
+      overwrite,
       photo: sudometro.toJpegBase64(canvas),
     });
     if (debug) {
@@ -520,10 +505,6 @@ $('form-name').addEventListener('submit', (e) => {
   saveAlias($('in-name').value);
 });
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
-$('viewer-delete').addEventListener('click', (e) => {
-  e.stopPropagation();
-  deletePhoto();
-});
 $('today-open').addEventListener('click', () => selectTab('chat'));
 $('debug-mode').addEventListener('change', (e) => {
   store.set('debugOff', !e.target.checked);
