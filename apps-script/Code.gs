@@ -127,7 +127,10 @@ function sendWeeklyRecap() {
 
 function sendMonthlyRecap() {
   const m = previousMonth();
-  addChatEvent('', { kind: 'monthly', month: m.label, ...computeRecap(m.from, m.to) });
+  const points = computePoints(m.from.slice(0, 7)).filter((t) => t.total > 0);
+  const best = points.length ? points[0].total : 0;
+  const king = best ? { names: points.filter((t) => t.total === best).map((t) => t.name), total: best } : null;
+  addChatEvent('', { kind: 'monthly', month: m.label, ...computeRecap(m.from, m.to), king });
   dispatch('monthly', '');
 }
 
@@ -228,6 +231,7 @@ function checkin(user, source) {
   }
   const count = countInWeek(rows('presenze'), user.name, weekKey(dayString(new Date())));
   addChatEvent(user.name, { kind: 'checkin', count, goal: user.goal, auto: source === 'automatico' });
+  announceAchievements(user);
   dispatch('checkin', user.name);
   return { ok: true, alreadyToday: false };
 }
@@ -419,6 +423,7 @@ function buildState(user) {
     },
     poll: pollSummary(today, presenze, dn),
     refPhotos: refPhotoIds(),
+    points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Per il pallino dei messaggi non letti: orario e autore dei messaggi recenti.
     chatMeta: chatRows()
       .filter((r) => r.type === 'msg' || r.type === 'poll' || r.type === 'event')
@@ -496,7 +501,13 @@ function buildNotifications(event, name) {
 
   if (event === 'monthly') {
     const m = previousMonth();
-    const body = recapText(computeRecap(m.from, m.to), 'del mese');
+    let body = recapText(computeRecap(m.from, m.to), 'del mese');
+    const points = computePoints(m.from.slice(0, 7)).filter((t) => t.total > 0);
+    if (points.length) {
+      const dn = displayNames();
+      const kings = points.filter((t) => t.total === points[0].total).map((t) => dn(t.name)).join(', ');
+      body = `Re del mese: ${kings} (${points[0].total} punti)\n${body}`;
+    }
     return subs.map((s) => ({ subscription: s.sub, title: `Premiazioni di ${m.label}`, body, tab: 'chat' }));
   }
 
@@ -774,6 +785,119 @@ function userFolder(name) {
 }
 
 // ---------- Calcoli ----------
+
+// Punti del mese. Si ricalcolano sempre da presenze e Sudometro: un check-in annullato toglie anche i punti.
+const POINTS = {
+  presenza: 10, // una al giorno
+  rientroDopoGiorni: 10, // dopo più di 10 giorni senza palestra la presenza vale doppio
+  amiciMinuti: 60, // check-in a meno di un'ora da un amico
+  amici: 3,
+  seriePerSettimana: 5, // per ogni settimana consecutiva con l'obiettivo, oltre la prima
+  serieMax: 20,
+  mattinieroPrima: '09:00',
+  mattinieroVolte: 4,
+  brancoVolte: 5,
+  maiSaltato: 20,
+  mattiniero: 10,
+  branco: 10,
+  pomodoro: 10,
+};
+
+/** Classifica a punti di un mese ("yyyy-MM"), con il dettaglio di ciascuno. */
+function computePoints(month) {
+  const P = POINTS;
+  const users = allUsers();
+  const inMonth = (day) => day.slice(0, 7) === month;
+  const minutes = (t) => {
+    const [h, m] = String(t).split(':').map(Number);
+    return h * 60 + (m || 0);
+  };
+  // Una presenza per persona al giorno (la prima dell'orario)
+  const first = {};
+  rows('presenze').forEach((r) => {
+    const k = r.name + '|' + r.day;
+    if (!first[k] || r.time < first[k].time) first[k] = r;
+  });
+  const pres = Object.keys(first).map((k) => first[k]);
+  const sudo = rows('sudometro').filter((r) => inMonth(r.day));
+  const monthStart = month + '-01';
+  const mondays = [];
+  for (let d = monthStart; inMonth(d); d = addDays(d, 1)) if (weekKey(d) === d) mondays.push(d);
+
+  const table = users.map((u) => {
+    const items = [];
+    const add = (key, label, pts, achievement) => items.push({ key, label, pts, achievement: !!achievement });
+    const mine = pres.filter((r) => r.name === u.name).sort((a, b) => (a.day < b.day ? -1 : 1));
+    let friends = 0;
+    let early = 0;
+    mine.forEach((r, i) => {
+      if (!inMonth(r.day)) return;
+      add('presenza', 'Presenze', P.presenza);
+      const prev = mine[i - 1];
+      if (prev && (parseDay(r.day) - parseDay(prev.day)) / 86400000 > P.rientroDopoGiorni) add('rientro', 'Rientro (vale doppio)', P.presenza);
+      if (pres.some((o) => o.name !== u.name && o.day === r.day && Math.abs(minutes(o.time) - minutes(r.time)) <= P.amiciMinuti)) {
+        add('amici', 'Bonus amici', P.amici);
+        friends++;
+      }
+      if (r.time && r.time < P.mattinieroPrima) early++;
+    });
+    sudo.filter((r) => r.name === u.name).forEach((r) => add('sudometro', 'Sudometro', r.score > 66 ? 3 : r.score > 33 ? 2 : 1));
+    // Settimane di fila: il bonus arriva nel giorno in cui si raggiunge l'obiettivo
+    for (let w = weekKey(monthStart); w <= addDays(monthStart, 31); w = addDays(w, 7)) {
+      const days = mine.filter((r) => weekKey(r.day) === w).map((r) => r.day);
+      if (days.length < u.goal || !inMonth(days[u.goal - 1])) continue;
+      let n = 1;
+      while (countInWeek(pres, u.name, addDays(w, -7 * n)) >= u.goal) n++;
+      if (n > 1) add('serie', 'Settimane di fila', Math.min(P.seriePerSettimana * (n - 1), P.serieMax));
+    }
+    if (early >= P.mattinieroVolte) add('mattiniero', 'Mattiniero', P.mattiniero, true);
+    if (friends >= P.brancoVolte) add('branco', 'Branco', P.branco, true);
+    if (mondays.length && mondays.every((w) => countInWeek(pres, u.name, w) >= u.goal)) add('maiSaltato', 'Mai saltato', P.maiSaltato, true);
+    return { name: u.name, display: u.display, items };
+  });
+
+  const top = sudo.reduce((m, r) => Math.max(m, r.score), -1);
+  if (top >= 0) {
+    table.forEach((t) => {
+      if (sudo.some((r) => r.name === t.name && r.score === top)) t.items.push({ key: 'pomodoro', label: 'Pomodoro del mese', pts: POINTS.pomodoro, achievement: true });
+    });
+  }
+
+  return table
+    .map((t) => {
+      // Dettaglio raggruppato: "Presenze 8 × 10 = 80"
+      const groups = {};
+      t.items.forEach((it) => {
+        const g = groups[it.key] || (groups[it.key] = { key: it.key, label: it.label, count: 0, pts: 0, achievement: it.achievement });
+        g.count++;
+        g.pts += it.pts;
+      });
+      const detail = Object.keys(groups).map((k) => groups[k]);
+      return { name: t.name, display: t.display, total: detail.reduce((a, g) => a + g.pts, 0), detail };
+    })
+    .sort((a, b) => b.total - a.total || a.display.localeCompare(b.display));
+}
+
+/** Annuncia in chat gli achievement appena sbloccati (il Pomodoro del mese si festeggia nel riepilogo mensile). */
+function announceAchievements(user) {
+  try {
+    const month = dayString(new Date()).slice(0, 7);
+    const mine = computePoints(month).find((t) => t.name === user.name);
+    if (!mine) return;
+    const key = `ach_${month}_${user.name}`;
+    const done = safeJson(props.getProperty(key) || '[]');
+    const list = Array.isArray(done) ? done : [];
+    mine.detail
+      .filter((g) => g.achievement && g.key !== 'pomodoro' && list.indexOf(g.key) < 0)
+      .forEach((g) => {
+        list.push(g.key);
+        addChatEvent(user.name, { kind: 'achievement', title: g.label, pts: g.pts });
+      });
+    props.setProperty(key, JSON.stringify(list));
+  } catch (err) {
+    console.error('Achievement non annunciati', err);
+  }
+}
 
 function countInWeek(presenze, name, week) {
   return new Set(presenze.filter((r) => r.name === name && weekKey(r.day) === week).map((r) => r.day)).size;

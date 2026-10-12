@@ -346,3 +346,12 @@ body.chat-mode #scroller { background: #0b0b0c url("chat-bg.svg") repeat; backgr
 .ph-loading .bicep { width: 64px; height: 62px; color: var(--exercise); --bicep-bg: #000; }
 .viewer-pair img:not([src]) { display: none; }
 .viewer-pair img[src] ~ .ph-loading, .viewer-pair figure:has(img[src]) .ph-loading { display: none; }
+
+/* Classifica a punti */
+.points li { grid-template-columns: 22px 1fr auto; cursor: pointer; }
+.points .total { font-size: 22px; font-weight: 700; color: var(--exercise); font-variant-numeric: tabular-nums; }
+.points .total small { font-size: 13px; color: var(--muted); font-weight: 600; }
+.points .detail { display: none; grid-column: 2 / -1; font-size: 14px; color: var(--muted); }
+.points li.open .detail { display: block; }
+.points .detail-row { display: flex; justify-content: space-between; padding: 3px 0; }
+.points .detail-row b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }

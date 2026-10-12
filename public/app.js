@@ -141,6 +141,7 @@ function render() {
     li.querySelector('.name').textContent = r.display || r.name;
     $('ranking').append(li);
   });
+  renderPoints();
   if (document.activeElement !== $('in-name')) $('in-name').value = me.alias || '';
   $('in-name').placeholder = me.name;
   $('name-hint').textContent = `È il nome che vedono gli altri in classifica e nelle notifiche. Lascia vuoto per usare il nome originale (${me.name}).`;
@@ -184,6 +185,43 @@ function renderViewportDebug() {
 }
 
 /** Tab Oggi: chi ha detto che va in palestra oggi. */
+const openPoints = new Set(); // dettagli aperti nella classifica a punti
+
+function renderPoints() {
+  const pts = state.points;
+  if (!pts) return;
+  $('points-title').textContent = `Punti di ${pts.month}`;
+  $('points').innerHTML = '';
+  pts.ranking.forEach((r, i) => {
+    const li = document.createElement('li');
+    li.className = `${r.name === state.me.name ? 'me ' : ''}${openPoints.has(r.name) ? 'open' : ''}`;
+    const ach = r.detail.filter((g) => g.achievement);
+    li.innerHTML = `
+      <span class="pos">${i + 1}</span>
+      <div><div class="name"></div><div class="sub"></div></div>
+      <span class="total">${r.total}<small> pt</small></span>
+      <div class="detail"></div>`;
+    li.querySelector('.name').textContent = r.display || r.name;
+    li.querySelector('.sub').textContent = ach.length ? ach.map((g) => g.label).join(' · ') : 'Nessun achievement';
+    const detail = li.querySelector('.detail');
+    if (!r.detail.length) detail.textContent = 'Ancora nessun punto questo mese.';
+    r.detail.forEach((g) => {
+      const row = document.createElement('div');
+      row.className = 'detail-row';
+      row.innerHTML = '<span></span><b></b>';
+      row.querySelector('span').textContent = g.achievement ? `Achievement: ${g.label}` : g.count > 1 ? `${g.label} × ${g.count}` : g.label;
+      row.querySelector('b').textContent = `+${g.pts}`;
+      detail.append(row);
+    });
+    li.onclick = () => {
+      if (openPoints.has(r.name)) openPoints.delete(r.name);
+      else openPoints.add(r.name);
+      li.classList.toggle('open');
+    };
+    $('points').append(li);
+  });
+}
+
 function renderToday(poll) {
   $('today-card').hidden = !poll;
   if (!poll) return;

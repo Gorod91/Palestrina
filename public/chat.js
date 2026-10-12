@@ -229,11 +229,16 @@ export function createChat({ api, toast, photoPair, clean, isDebug }) {
       if (d.photoId) box.append(photoPair(d.photoId, (data.refPhotos || {})[m.name], `${name} · ${d.score} · ${clean(d.title)}`));
       box.append(text);
       row.append(box);
+    } else if (d.kind === 'achievement') {
+      row.classList.add('award');
+      row.append(el('p', 'event-title', 'Achievement sbloccato'));
+      row.append(el('p', 'event-text', `${name}: ${d.title} (+${d.pts} punti)`));
     } else if (d.kind === 'weekly' || d.kind === 'monthly') {
       row.classList.add('award');
       row.append(el('p', 'event-title', d.kind === 'weekly' ? 'Premiazioni della settimana' : `Premiazioni di ${d.month}`));
       const period = d.kind === 'weekly' ? 'della settimana' : 'del mese';
       const lines = [];
+      if (d.king) lines.push(`Re del mese: ${d.king.names.map(who).join(', ')} (${d.king.total} punti)`);
       if (d.mvp) lines.push(`MVP: ${d.mvp.names.map(who).join(', ')} (${d.mvp.count})`);
       if (d.divano) lines.push(`Divano d'oro: ${d.divano.names.map(who).join(', ')} (${d.divano.count})`);
       if (d.pomodoro) lines.push(`Pomodoro ${period}: ${who(d.pomodoro.name)} (${d.pomodoro.score})`);
