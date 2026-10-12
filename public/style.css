@@ -225,7 +225,14 @@ body.chat-mode #screen-home { flex: 1 0 auto; display: flex; flex-direction: col
 .tab-panel.chat { flex: 1 0 auto; display: flex; flex-direction: column; }
 .chat-list { margin-top: auto; } /* pochi messaggi: stanno in basso, vicino alla casella */
 body:not(.chat-mode) .composer { display: none; }
-body.keyboard { bottom: auto; height: var(--app-h, 100%); }
+/* App sulla Home con barra di stato trasparente (black-translucent): iOS calcola innerHeight, 100dvh e
+   position: fixed; inset: 0 senza la barra di stato, quindi finiscono ~59pt prima del fondo e resta una
+   fascia nera. 100vh/100lvh invece sono l'altezza vera dello schermo. Solo per l'app installata. */
+@media (display-mode: standalone) {
+  body { bottom: auto; height: 100vh; height: 100lvh; }
+}
+html.standalone body { bottom: auto; height: 100vh; height: 100lvh; }
+body.keyboard, html.standalone body.keyboard { bottom: auto; height: var(--app-h, 100%); }
 body.keyboard .tabbar { display: none; }
 .poll h3 { font-size: 20px; margin: 2px 0 12px; }
 .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -285,3 +292,6 @@ body.keyboard .composer { padding-bottom: 8px; }
 .switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 27px; height: 27px; border-radius: 50%; background: #fff; transition: transform .2s; box-shadow: 0 2px 4px rgba(0, 0, 0, .3); }
 .switch:checked { background: var(--ok); }
 .switch:checked::after { transform: translateX(20px); }
+
+/* Misure dello schermo (solo utenti debug) */
+.viewport-debug { white-space: pre-wrap; font: 12px/1.45 ui-monospace, Menlo, monospace; color: var(--muted); margin: 0; }

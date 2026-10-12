@@ -11,6 +11,10 @@
   <meta name="apple-mobile-web-app-title" content="Palestrina">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="style.css">
+  <script>
+    // App aperta dalla Home: serve allo stile per usare l'altezza vera dello schermo.
+    if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
+  </script>
 </head>
 <body>
   <!-- Icone (stile SF Symbols), usate con <svg><use href="#i-..."/></svg> -->
@@ -191,6 +195,11 @@
           </label>
         </section>
         <p class="footnote">La domanda "chi va in palestra oggi?" arriva comunque a tutti.</p>
+
+        <div id="viewport-card" hidden>
+          <h2 class="section">Schermo (debug)</h2>
+          <section class="card"><pre id="viewport-debug" class="viewport-debug"></pre></section>
+        </div>
 
         <section class="card list" style="margin-top:20px">
           <button id="btn-logout" class="row destructive">Esci</button>

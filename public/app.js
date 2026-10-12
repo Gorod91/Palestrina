@@ -127,9 +127,31 @@ function render() {
   renderSudometro();
   renderGallery();
   renderToday(state.poll);
+  $('viewport-card').hidden = !me.debug;
+  if (me.debug) renderViewportDebug();
   $('chat-notify').checked = !me.chatMuted;
   chat.setUser({ name: me.name, display: me.display });
   chat.updateBadge(state.chatMeta);
+}
+
+/** Misure dello schermo per capire eventuali fasce vuote su iPhone (solo utenti debug). */
+function renderViewportDebug() {
+  const probe = (h) => {
+    const d = document.createElement('div');
+    d.style.cssText = `position:absolute;visibility:hidden;height:${h}`;
+    document.body.append(d);
+    const v = d.getBoundingClientRect().height;
+    d.remove();
+    return Math.round(v);
+  };
+  const safe = (side) => probe(`env(safe-area-inset-${side})`);
+  $('viewport-debug').textContent = [
+    `schermo ${screen.width}×${screen.height}`,
+    `innerHeight ${innerHeight} · visualViewport ${window.visualViewport ? Math.round(visualViewport.height) : '-'}`,
+    `100vh ${probe('100vh')} · 100lvh ${probe('100lvh')} · 100dvh ${probe('100dvh')} · 100svh ${probe('100svh')}`,
+    `app (body) ${Math.round(document.body.getBoundingClientRect().height)} · standalone ${document.documentElement.classList.contains('standalone')}`,
+    `safe area alto ${safe('top')} · basso ${safe('bottom')}`,
+  ].join('\n');
 }
 
 /** Tab Oggi: chi ha detto che va in palestra oggi. */
@@ -447,6 +469,11 @@ async function home() {
   // Mostra subito l'ultimo stato salvato sul telefono, poi lo aggiorna da Apps Script.
   const cached = store.get('state');
   if (!state && cached && cached.day === new Date().toDateString() && cached.data.me.name === session.name) state = cached.data;
+  if (!state) {
+    // Primo avvio senza dati salvati: anello vuoto e "Caricamento" invece di card vuote.
+    $('week-ring').innerHTML = ring(0, ...COLORS.move, { size: 132, width: 20 });
+    $('sudo-body').innerHTML = '<p class="muted">Caricamento…</p>';
+  }
   render();
   selectTab(fromUrl || store.get('tab'));
   await refresh();
