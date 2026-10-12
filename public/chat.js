@@ -183,8 +183,10 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     card.querySelector('.by').textContent = poll.byDisplay;
     card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice)));
     card.querySelector('#poll-time').oninput = (e) => e.target.parentNode.classList.toggle('filled', !!e.target.value);
-    card.querySelector('#poll-time').onchange = () => {
-      if (mine.choice) answer(mine.choice); // cambia solo l'orario
+    // Su iPhone "change" arriva a ogni giro della rotella: salvare subito ridisegnava la casella e chiudeva
+    // la rotella. Si salva quando la rotella si chiude.
+    card.querySelector('#poll-time').onblur = (e) => {
+      if (mine.choice && e.target.value !== (mine.time || '')) answer(mine.choice); // cambia solo l'orario
     };
     // Chi c'è e chi no, in chiaro e in poco spazio
     const names = card.querySelector('.poll-names');
