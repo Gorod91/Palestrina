@@ -163,6 +163,8 @@ function doPost(e) {
         return json(pollAsk(user));
       case 'pollAnswer':
         return json(pollAnswer(user, req.choice, req.time));
+      case 'chatDelete':
+        return json(chatDelete(user, req.id));
       case 'chatMute':
         if (req.muted) props.setProperty('mute_' + user.name, '1');
         else props.deleteProperty('mute_' + user.name);
@@ -584,6 +586,29 @@ function pollAnswer(user, choice, time) {
     lock.releaseLock();
   }
   if (notify) dispatch('answer', user.name);
+  return chatState(user, -1);
+}
+
+/** Solo utenti debug: cancella un messaggio o un evento. Se è la domanda di oggi, la annulla con tutte le risposte. */
+function chatDelete(user, id) {
+  if (!user.debug) return { error: 'Solo per gli utenti debug' };
+  const target = String(id || '');
+  if (!target) return { error: 'Messaggio non indicato' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = sheet('chat');
+    const values = sh.getDataRange().getValues();
+    const remove = [];
+    values.forEach((r, i) => {
+      if (i > 0 && (String(r[0]) === target || (String(r[4]) === 'answer' && String(r[6]) === target))) remove.push(i + 1);
+    });
+    if (!remove.length) return { error: 'Messaggio non trovato' };
+    remove.reverse().forEach((row) => sh.deleteRow(row)); // dal fondo, così gli indici restano validi
+    bumpChat();
+  } finally {
+    lock.releaseLock();
+  }
   return chatState(user, -1);
 }
 

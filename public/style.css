@@ -310,3 +310,9 @@ body.keyboard .composer { padding-bottom: 8px; }
 
 /* Sfondo della chat in stile WhatsApp, con disegnini a tema palestra (chat-bg.svg si ripete) */
 body.chat-mode #scroller { background: #0b0b0c url("chat-bg.svg") repeat; background-size: 400px 400px; }
+
+/* Modalità debug: cancellare messaggi e annullare il sondaggio */
+.del { margin-left: 8px; padding: 0; width: 22px; height: 22px; border: 0; border-radius: 50%; background: rgba(255, 69, 58, .2); color: var(--danger); font-size: 16px; line-height: 22px; text-align: center; vertical-align: middle; flex: none; }
+.msg.mine .del { background: rgba(0, 0, 0, .15); color: #000; }
+.event .del { margin: 6px auto 0; display: block; }
+#poll-cancel { display: block; margin: 14px auto 0; color: var(--danger); }

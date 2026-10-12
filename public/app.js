@@ -87,6 +87,11 @@ const COLORS = {
   stand: ['#00d9ff', '#64ecff'],
 };
 
+/** Gli utenti debug possono spegnere la modalità dalle impostazioni e vedere l'app come gli altri. */
+function debugOn() {
+  return !!(state && state.me && state.me.debug) && store.get('debugOff') !== true;
+}
+
 function render() {
   if (!state) return;
   const { me, week } = state;
@@ -127,8 +132,10 @@ function render() {
   renderSudometro();
   renderGallery();
   renderToday(state.poll);
-  $('viewport-card').hidden = !me.debug;
-  if (me.debug) renderViewportDebug();
+  $('debug-mode-card').hidden = !me.debug;
+  $('debug-mode').checked = debugOn();
+  $('viewport-card').hidden = !debugOn();
+  if (debugOn()) renderViewportDebug();
   $('chat-notify').checked = !me.chatMuted;
   chat.setUser({ name: me.name, display: me.display });
   chat.updateBadge(state.chatMeta);
@@ -251,7 +258,7 @@ function renderSudometro() {
     el.querySelector('#btn-sweat').onclick = () => takeSweat(false);
   }
 
-  if (me.debug) {
+  if (debugOn()) {
     el.insertAdjacentHTML('beforeend', `
       <div class="debug">
         <button id="btn-debug" class="secondary">Prova subito (debug)</button>
@@ -312,7 +319,7 @@ async function checkin() {
 async function takeReference() {
   try {
     const canvas = await sudometro.takeSelfie('Foto di riferimento: viso al centro, da riposato, buona luce', {
-      live: state.me.debug,
+      live: debugOn(),
     });
     if (!canvas) return;
     toast('Analizzo…', 10000);
@@ -329,7 +336,7 @@ async function takeSweat(debug) {
   try {
     const reference = state.me.reference.features;
     const canvas = await sudometro.takeSelfie('Selfie da sudato: stesso punto della foto di riferimento', {
-      live: state.me.debug,
+      live: debugOn(),
       reference,
     });
     if (!canvas) return;
@@ -362,7 +369,7 @@ async function takeSweat(debug) {
 
 /** Avviso per gli utenti debug se la foto non è finita su Drive (es. Drive non ancora autorizzato). */
 function photoWarning(r) {
-  return state.me.debug && r && r.photoError ? `Attenzione: ${r.photoError}` : '';
+  return debugOn() && r && r.photoError ? `Attenzione: ${r.photoError}` : '';
 }
 
 function cameraError(err) {
@@ -372,7 +379,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
-const chat = createChat({ api, toast, loadPhoto, openPhoto, clean });
+const chat = createChat({ api, toast, loadPhoto, openPhoto, clean, isDebug: () => debugOn() });
 
 // ---------- Tab ----------
 
@@ -494,6 +501,12 @@ $('form-name').addEventListener('submit', (e) => {
 });
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
 $('today-open').addEventListener('click', () => selectTab('chat'));
+$('debug-mode').addEventListener('change', (e) => {
+  store.set('debugOff', !e.target.checked);
+  render();
+  chat.redraw();
+});
+
 $('chat-notify').addEventListener('change', async (e) => {
   try {
     await api('chatMute', { muted: !e.target.checked });

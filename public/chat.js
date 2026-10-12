@@ -9,7 +9,7 @@ const CHOICES = [
   ['no', 'No'],
 ];
 
-export function createChat({ api, toast, loadPhoto, openPhoto, clean }) {
+export function createChat({ api, toast, loadPhoto, openPhoto, clean, isDebug }) {
   let me = null; // { name, display }
   let v = 0; // versione dei dati in Apps Script
   let data = null; // { messages, poll, names }
@@ -94,6 +94,27 @@ export function createChat({ api, toast, loadPhoto, openPhoto, clean }) {
     }
   }
 
+  // Modalità debug: cancella un messaggio o annulla la domanda di oggi.
+  async function remove(id, question) {
+    if (!confirm(question)) return;
+    try {
+      const r = await api('chatDelete', { id });
+      v = -1;
+      apply(r);
+      toast('Cancellato');
+    } catch (err) {
+      toast(err.message);
+    }
+  }
+
+  function delButton(id) {
+    const b = el('button', 'del', '×');
+    b.type = 'button';
+    b.setAttribute('aria-label', 'Cancella');
+    b.onclick = () => remove(id, 'Cancellare questo messaggio per tutti?');
+    return b;
+  }
+
   const ask = () => withPollBusy('ask', () => api('pollAsk'));
   const answer = (choice) =>
     withPollBusy(choice, () => api('pollAnswer', { choice, time: $('poll-time') ? $('poll-time').value : '' }));
@@ -146,8 +167,10 @@ export function createChat({ api, toast, loadPhoto, openPhoto, clean }) {
         <span>Orario <span class="muted">(facoltativo)</span></span>
         <input id="poll-time" type="time" value="${mine.time || ''}">
       </label>
-      <div class="answers"></div>`;
+      <div class="answers"></div>
+      ${isDebug() ? '<button id="poll-cancel" class="secondary small destructive">Annulla sondaggio</button>' : ''}`;
     card.querySelector('.by').textContent = poll.byDisplay;
+    if (isDebug()) card.querySelector('#poll-cancel').onclick = () => remove(poll.id, 'Annullare il sondaggio di oggi con tutte le risposte?');
     card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice)));
     card.querySelector('#poll-time').onchange = () => {
       if (mine.choice) answer(mine.choice); // cambia solo l'orario
@@ -173,13 +196,16 @@ export function createChat({ api, toast, loadPhoto, openPhoto, clean }) {
         if (!mine && lastSender !== m.name) row.append(el('div', 'sender', m.display));
         const bubble = el('div', 'bubble', m.text);
         bubble.append(el('span', 'time', m.time));
+        if (isDebug()) bubble.append(delButton(m.id));
         row.append(bubble);
         list.append(row);
         lastSender = m.name;
         return;
       }
       lastSender = '';
-      list.append(eventRow(m));
+      const ev = eventRow(m);
+      if (isDebug() && ev.classList.contains('event')) ev.append(delButton(m.id));
+      list.append(ev);
     });
     if (!data.messages.length && !pending.length) list.append(el('p', 'empty', 'Ancora nessun messaggio. Scrivi tu il primo.'));
     showPending();
@@ -284,6 +310,9 @@ export function createChat({ api, toast, loadPhoto, openPhoto, clean }) {
   $('chat-input').addEventListener('input', autosize);
 
   return {
+    redraw() {
+      if (data) render();
+    },
     setUser(user) {
       if (me && me.name === user.name) return;
       me = user;
