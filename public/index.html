@@ -14,6 +14,7 @@
   <script>
     // App aperta dalla Home: serve allo stile per usare l'altezza vera dello schermo.
     if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
+    if ('standalone' in navigator) document.documentElement.classList.add('ios');
   </script>
 </head>
 <body>

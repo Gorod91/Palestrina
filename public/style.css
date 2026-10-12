@@ -401,3 +401,14 @@ body.fake-data #page-title::after { content: 'DATI FITTIZI'; margin-left: 10px; 
 .composer #chat-down { position: absolute; right: max(16px, calc((100% - 480px) / 2)); bottom: calc(100% + 12px); width: 40px; height: 40px; border: .5px solid var(--line); border-radius: 50%; background: var(--card-2); color: var(--fg); box-shadow: 0 4px 12px rgba(0, 0, 0, .5); }
 .composer #chat-down svg { width: 22px; height: 22px; }
 .composer #chat-down .badge { top: -6px; left: auto; right: -4px; background: var(--exercise); color: #000; }
+
+/* iOS 26 sfoca la parte alta delle app installate (circa 40 punti sotto la barra di stato) e nessuna
+   impostazione lo spegne: lasciamo lì una fascia vuota, così la sfocatura non copre titoli e sondaggio. */
+html.ios.standalone body { padding-top: 2.5rem; }
+html.ios.standalone .sheet, html.ios.standalone .viewer { top: 2.5rem; }
+
+/* Orario del sondaggio: su iPhone il campo vuoto non mostra nulla, quindi una scritta al suo posto */
+.time-wrap { position: relative; display: block; min-width: 0; }
+.time-wrap span { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 15px; pointer-events: none; }
+.time-wrap.filled span { display: none; }
+.time-wrap:not(.filled) input { color: transparent; }

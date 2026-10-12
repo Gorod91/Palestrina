@@ -179,7 +179,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       <div class="poll-head"><b>Chi va in palestra oggi?</b><span class="muted">da <span class="by"></span> · ${poll.clock}</span></div>
       <div class="choices">
         ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}"${pollBusy ? ' disabled' : ''}>${pollBusy === k ? bicep() : ''}${label}</button>`).join('')}
-        <input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)">
+        <label class="time-wrap${mine.time ? ' filled' : ''}"><input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span></label>
       </div>
       <button class="poll-summary" type="button" aria-expanded="${pollOpen}">
         <span class="si">${count('si')} ci sono</span><span class="forse">${count('forse')} forse</span><span class="no">${count('no')} no</span>
@@ -188,6 +188,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       <div class="answers"${pollOpen ? '' : ' hidden'}></div>`;
     card.querySelector('.by').textContent = poll.byDisplay;
     card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice)));
+    card.querySelector('#poll-time').oninput = (e) => e.target.parentNode.classList.toggle('filled', !!e.target.value);
     card.querySelector('#poll-time').onchange = () => {
       if (mine.choice) answer(mine.choice); // cambia solo l'orario
     };
