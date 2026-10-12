@@ -1,6 +1,7 @@
 import * as sudometro from './sudometro.js';
 import { initTimer, setTimerAccount } from './timer.js';
 import { createChat, answersList, bicep } from './chat.js';
+import { fakeState, fakeChat, fakePhoto } from './fake.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -28,7 +29,27 @@ let lastDebug = null; // ultimo risultato di prova (solo utenti debug)
 
 // ---------- Backend ----------
 
+/** Dati fittizi (solo utenti debug): letture finte, scritture bloccate. */
+function fakeOn() {
+  return store.get('fakeData') === true && !!(state && state.me && state.me.debug);
+}
+
 async function api(action, data = {}) {
+  if (store.get('fakeData') === true && action !== 'login') {
+    if (action === 'state') {
+      const real = await realApi('state');
+      return real.me.debug ? fakeState(real) : real;
+    }
+    if (fakeOn()) {
+      if (action === 'chat') return data.v === 1 ? { v: 1, same: true } : fakeChat(state.me);
+      if (action === 'photo' && String(data.id).startsWith('fake-')) return fakePhoto(String(data.id));
+      if (action !== 'photo') throw new Error('Dati fittizi attivi: spegnili in Altro per usare l\'app davvero');
+    }
+  }
+  return realApi(action, data);
+}
+
+async function realApi(action, data = {}) {
   // text/plain evita la richiesta preflight CORS, che Apps Script non gestisce.
   const res = await fetch(cfg.appsScriptUrl, {
     method: 'POST',
@@ -159,6 +180,8 @@ function render() {
   renderToday(state.poll);
   $('debug-mode-card').hidden = !me.debug;
   $('debug-mode').checked = debugOn();
+  $('fake-mode').checked = fakeOn();
+  document.body.classList.toggle('fake-data', fakeOn());
   $('viewport-card').hidden = !debugOn();
   if (debugOn()) renderViewportDebug();
   $('chat-notify').checked = !me.chatMuted;
@@ -652,6 +675,13 @@ $('points-info').addEventListener('click', (e) => {
   if (e.target === $('points-info') || e.target.closest('.sheet-close')) $('points-info').hidden = true;
 });
 $('today-open').addEventListener('click', () => selectTab('chat'));
+$('fake-mode').addEventListener('change', async (e) => {
+  store.set('fakeData', e.target.checked);
+  toast(e.target.checked ? 'Dati fittizi attivi: niente viene salvato' : 'Dati veri');
+  await refresh();
+  chat.reload();
+});
+
 $('debug-mode').addEventListener('change', (e) => {
   store.set('debugOff', !e.target.checked);
   render();

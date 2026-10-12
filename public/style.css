@@ -376,3 +376,6 @@ body.chat-mode #scroller { background: #0b0b0c url("chat-bg.svg") repeat; backgr
 /* Corona del Re del mese accanto al nome */
 .crown { display: inline-block; width: 18px; height: 15px; margin-left: 6px; vertical-align: -1px; color: #ffd60a; }
 .sender .crown { width: 14px; height: 12px; margin-left: 4px; }
+
+/* Dati fittizi attivi: avviso fisso in alto */
+body.fake-data #page-title::after { content: 'DATI FITTIZI'; margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: #ff9f0a; color: #000; font-size: 11px; font-weight: 700; letter-spacing: .04em; vertical-align: middle; }
