@@ -177,7 +177,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       <div class="poll-head"><b>Chi va in palestra oggi?</b><span class="muted">da <span class="by"></span> · ${poll.clock}</span></div>
       <div class="choices">
         ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}"${pollBusy ? ' disabled' : ''}>${pollBusy === k ? bicep() : ''}${label}</button>`).join('')}
-        <label class="time-wrap"><select id="poll-time" aria-label="Orario (facoltativo)">${timeOptions(mine.time)}</select></label>
+        <label class="time-wrap${mine.time ? ' filled' : ''}"><input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span></label>
       </div>
       <p class="poll-names"></p>`;
     card.querySelector('.by').textContent = poll.byDisplay;
@@ -186,6 +186,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     // l'ultima modifica, senza ridisegnare la casella mentre la rotella è aperta (si chiuderebbe).
     // Con un orario e nessuna risposta vale "Ci sono".
     const timeInput = card.querySelector('#poll-time');
+    timeInput.oninput = () => timeInput.parentNode.classList.toggle('filled', !!timeInput.value);
     let sent = mine.time || '';
     let timer = null;
     const saveTime = async () => {
@@ -442,19 +443,6 @@ export function answersList(poll) {
     box.append(row);
   });
   return box;
-}
-
-/** Orari del sondaggio ogni 5 minuti, da un'ora fa a mezzanotte (più l'orario già scelto, se fuori griglia):
- *  così la rotella parte vicino all'ora attuale invece che dalle 5 del mattino. */
-function timeOptions(current) {
-  const out = ['<option value="">Orario</option>'];
-  const times = [];
-  const now = new Date();
-  const from = Math.max(5 * 60, Math.floor((now.getHours() * 60 + now.getMinutes() - 60) / 5) * 5);
-  for (let m = Math.min(from, 23 * 60); m < 24 * 60; m += 5) times.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
-  if (current && !times.includes(current)) times.push(current);
-  times.sort().forEach((t) => out.push(`<option${t === current ? ' selected' : ''}>${t}</option>`));
-  return out.join('');
 }
 
 function el(tag, cls, text) {
