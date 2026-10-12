@@ -43,7 +43,7 @@ async function api(action, data = {}) {
     if (fakeOn()) {
       if (action === 'chat') return data.v === 1 ? { v: 1, same: true } : fakeChat(state.me);
       if (action === 'photo' && String(data.id).startsWith('fake-')) return fakePhoto(String(data.id));
-      if (action !== 'photo') throw new Error('Dati fittizi attivi: spegnili in Altro per usare l\'app davvero');
+      if (action !== 'photo' && action !== 'photos') throw new Error('Dati fittizi attivi: spegnili in Altro per usare l\'app davvero');
     }
   }
   return realApi(action, data);
@@ -344,21 +344,53 @@ async function flushPlans() {
   chat.reload();
 }
 
-const photoCache = new Map(); // id → Promise<dataURL>
+const photoCache = new Map(); // id → Promise<url>
+const PHOTO_STORE = 'palestrina-foto'; // le foto non cambiano mai: restano sul telefono dopo il primo caricamento
+const photoWaiting = new Map(); // id → { resolve, reject } in attesa della prossima richiesta a gruppi
+let photoTimer = null;
 
 function loadPhoto(id) {
   if (!photoCache.has(id)) {
-    photoCache.set(
-      id,
-      api('photo', { id })
-        .then((r) => `data:${r.mime};base64,${r.data}`)
-        .catch((err) => {
-          photoCache.delete(id);
-          throw err;
-        })
-    );
+    const p = (String(id).startsWith('fake-') ? Promise.resolve(fakePhoto(String(id))).then((r) => `data:${r.mime};base64,${r.data}`) : fromStore(id)).catch((err) => {
+      photoCache.delete(id);
+      throw err;
+    });
+    photoCache.set(id, p);
   }
   return photoCache.get(id);
+}
+
+/** Prima dal telefono (Cache Storage), altrimenti da Apps Script insieme alle altre foto richieste in quel momento. */
+async function fromStore(id) {
+  const key = `./foto/${encodeURIComponent(id)}`;
+  try {
+    const hit = await caches.match(key, { cacheName: PHOTO_STORE });
+    if (hit) return URL.createObjectURL(await hit.blob());
+  } catch { /* Cache Storage non disponibile */ }
+  const r = await new Promise((resolve, reject) => {
+    photoWaiting.set(id, { resolve, reject });
+    clearTimeout(photoTimer);
+    photoTimer = setTimeout(fetchPhotos, 30);
+  });
+  const blob = await (await fetch(`data:${r.mime};base64,${r.data}`)).blob();
+  try {
+    await (await caches.open(PHOTO_STORE)).put(key, new Response(blob, { headers: { 'Content-Type': r.mime } }));
+  } catch { /* pazienza: la rivedremo dalla rete */ }
+  return URL.createObjectURL(blob);
+}
+
+async function fetchPhotos() {
+  const batch = [...photoWaiting.entries()];
+  photoWaiting.clear();
+  for (let i = 0; i < batch.length; i += 12) {
+    const group = batch.slice(i, i + 12);
+    try {
+      const { photos } = await api('photos', { ids: group.map(([id]) => id) });
+      group.forEach(([id, w]) => (photos && photos[id] ? w.resolve(photos[id]) : w.reject(new Error('Foto non trovata'))));
+    } catch (err) {
+      group.forEach(([, w]) => w.reject(err));
+    }
+  }
 }
 
 function renderGallery() {

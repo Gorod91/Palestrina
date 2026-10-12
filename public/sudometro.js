@@ -101,9 +101,18 @@ function capture(video, max = 640) {
   return canvas;
 }
 
-/** JPEG in base64 (senza prefisso data:) da salvare su Drive. */
-export function toJpegBase64(canvas, quality = 0.8) {
-  return canvas.toDataURL('image/jpeg', quality).split(',')[1];
+/** JPEG in base64 (senza prefisso data:) da salvare su Drive: lato lungo al massimo 480 px e qualità 0,72
+ *  (circa 30-40 KB), così le foto si caricano in fretta. L'analisi usa comunque lo scatto più grande. */
+export function toJpegBase64(canvas, quality = 0.72, max = 480) {
+  const scale = Math.min(1, max / Math.max(canvas.width, canvas.height));
+  let out = canvas;
+  if (scale < 1) {
+    out = document.createElement('canvas');
+    out.width = Math.round(canvas.width * scale);
+    out.height = Math.round(canvas.height * scale);
+    out.getContext('2d').drawImage(canvas, 0, 0, out.width, out.height);
+  }
+  return out.toDataURL('image/jpeg', quality).split(',')[1];
 }
 
 /** Analizza la fotocamera di continuo e mostra parametri e zone misurate. */

@@ -185,6 +185,8 @@ function doPost(e) {
         return json(saveReference(user, req.features, req.photo));
       case 'photo':
         return json(getPhoto(req.id));
+      case 'photos':
+        return json(getPhotos(req.ids));
       case 'chat':
         return json(chatState(user, req.v));
       case 'chatSend':
@@ -797,6 +799,23 @@ function savePhoto(user, base64, label) {
 }
 
 /** Restituisce una foto del Sudometro (non di debug) a chi ha un codice valido. */
+/** Più foto in una sola chiamata (al massimo 12): una richiesta invece di tante. */
+function getPhotos(ids) {
+  const list = (Array.isArray(ids) ? ids : []).map(String).slice(0, 12);
+  const allowed = new Set(rows('sudometro').map((r) => r.photoId).filter(Boolean).concat(Object.values(refPhotoIds())));
+  const photos = {};
+  list.forEach((id) => {
+    if (!allowed.has(id)) return;
+    try {
+      const blob = DriveApp.getFileById(id).getBlob();
+      photos[id] = { mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
+    } catch (err) {
+      console.error('Foto non letta', id, err);
+    }
+  });
+  return { photos };
+}
+
 function getPhoto(id) {
   // Solo file elencati nel foglio Sudometro: lo script non deve leggere altri file del Drive.
   const allowed = id && (rows('sudometro').some((r) => r.photoId === id) || Object.values(refPhotoIds()).includes(id));
