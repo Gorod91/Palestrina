@@ -393,17 +393,21 @@ function dayLabel(day) {
 /** Bicipite che si flette (SVG animato via CSS): feedback mentre si aspetta Apps Script. */
 export function bicep() {
   // Curl con manubrio: l'avambraccio sale ruotando sul gomito e il bicipite si gonfia.
-  // Animazione SMIL (funziona anche su Safari, che non anima "d" via CSS). Le parti hanno il colore di
-  // sfondo (--bicep-bg) per coprire le linee che passano dietro.
+  // Animazione SMIL (funziona anche su Safari, che non anima "d" via CSS). I riempimenti hanno il colore
+  // di sfondo (--bicep-bg) e coprono le linee che passano dietro; il gomito è un disco senza bordo
+  // interno, così tra braccio e avambraccio resta solo il contorno esterno.
   const t = 'dur="1.1s" repeatCount="indefinite" calcMode="spline" keyTimes="0;.5;1" keySplines=".45 0 .55 1;.45 0 .55 1"';
   return `<svg class="bicep" viewBox="-4 -14 86 82" aria-label="Invio in corso" role="img">
-    <path class="bicep-bg" d="M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 L46 56 V61 L0 61">
-      <animate attributeName="d" values="M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 L46 56 V61 L0 61;M0 47 C4 47 9 26 21 26 C32 26 36 37 41 47 L46 56 V61 L0 61;M0 47 C4 47 7 44 19 44 C30 44 34 55 41 47 L46 56 V61 L0 61" ${t} />
-    </path>
+    <path class="fill" d="M0 47 C4 47 7 44 19 44 C30 44 34 53 40 45 L46 52 V61 L0 61 Z"><animate attributeName="d" values="M0 47 C4 47 7 44 19 44 C30 44 34 53 40 45 L46 52 V61 L0 61 Z;M0 47 C4 47 9 26 21 26 C32 26 36 37 41 47 L46 52 V61 L0 61 Z;M0 47 C4 47 7 44 19 44 C30 44 34 53 40 45 L46 52 V61 L0 61 Z" ${t} /></path>
+    <circle class="fill" cx="46" cy="52" r="9" />
+    <path d="M0 61 H46" />
+    <path d="M46 61 A9 9 0 0 0 55 52" />
+    <path d="M0 47 C4 47 7 44 19 44 C30 44 34 53 40 45 L45 51"><animate attributeName="d" values="M0 47 C4 47 7 44 19 44 C30 44 34 53 40 45 L45 51;M0 47 C4 47 9 26 21 26 C32 26 36 37 41 47 L45 51;M0 47 C4 47 7 44 19 44 C30 44 34 53 40 45 L45 51" ${t} /></path>
     <g>
       <animateTransform attributeName="transform" type="rotate" values="50 46 52;4 46 52;50 46 52" ${t} />
       <g transform="translate(5 0)">
-        <path class="bicep-bg" d="M32 52 L35 27 L47 27 L50 52 A9 9 0 0 1 32 52" />
+        <path class="fill" d="M32 52 L35 27 L47 27 L50 52 H48 A7 7 0 0 1 34 52 Z" />
+        <path d="M32 52 L35 27 L47 27 L50 52"><animate attributeName="d" values="M32 52 L35 27 L47 27 L50 52;M33.1 44 L35 27 L47 27 L50 52;M32 52 L35 27 L47 27 L50 52" ${t} /></path>
         <path d="M20 17H62" />
         <rect class="bicep-bg" x="16" y="8" width="7" height="18" rx="2.5" />
         <rect class="bicep-bg" x="59" y="8" width="7" height="18" rx="2.5" />
