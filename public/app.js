@@ -197,31 +197,52 @@ function renderGallery() {
     const title = clean(r.title);
     li.innerHTML = `
       <span class="pos">${i + 1}</span>
-      <div class="photo"><svg><use href="#i-camera"/></svg></div>
+      <div class="photo"></div>
       <div><div class="name"></div><div class="sub"></div></div>
       <div class="pts">${r.score}</div>`;
     const who = r.display || r.name;
     li.querySelector('.name').textContent = who;
     li.querySelector('.sub').textContent = `${title} · ${day}`;
     el.append(li);
-    if (r.photoId) {
-      loadPhoto(r.photoId)
-        .then((src) => {
-          const img = new Image();
-          img.alt = `Selfie di ${who}`;
-          img.src = src;
-          img.onclick = () => openPhoto(src, `${who} · ${r.score} · ${title}`);
-          li.querySelector('.photo').replaceChildren(img);
-        })
-        .catch(() => {});
-    }
+    li.querySelector('.photo').replaceWith(photoPair(r.photoId, (state.refPhotos || {})[r.name], `${who} · ${r.score} · ${title}`));
   });
 }
 
-function openPhoto(src, caption) {
-  $('viewer-img').src = src;
+/** Foto da fresco e da sudato una accanto all'altra; un tocco le apre in grande. */
+function photoPair(sweatyId, freshId, caption, big = false) {
+  const box = document.createElement('div');
+  box.className = `pair${big ? ' big' : ''}`;
+  const slot = (id, kind, label) => {
+    const d = document.createElement('div');
+    d.className = `ph ${kind}`;
+    d.dataset.label = label;
+    d.innerHTML = '<svg><use href="#i-camera"/></svg>';
+    if (id) {
+      loadPhoto(id)
+        .then((src) => {
+          const img = new Image();
+          img.alt = label;
+          img.src = src;
+          d.replaceChildren(img);
+        })
+        .catch(() => {});
+    }
+    return d;
+  };
+  if (freshId) box.append(slot(freshId, 'fresh', 'Fresco'));
+  box.append(slot(sweatyId, 'sweaty', 'Sudato'));
+  if (sweatyId) box.onclick = () => openPhoto(sweatyId, freshId, caption);
+  return box;
+}
+
+function openPhoto(sweatyId, freshId, caption) {
+  $('viewer-img').removeAttribute('src');
+  $('viewer-fresh').removeAttribute('src');
+  $('viewer-fresh-fig').hidden = !freshId;
   $('viewer-caption').textContent = caption;
   $('viewer').hidden = false;
+  loadPhoto(sweatyId).then((src) => ($('viewer-img').src = src)).catch(() => {});
+  if (freshId) loadPhoto(freshId).then((src) => ($('viewer-fresh').src = src)).catch(() => {});
 }
 
 function renderSudometro() {
@@ -251,6 +272,10 @@ function renderSudometro() {
         </div>
       </div>`;
     el.querySelector('.sudo-title').textContent = clean(me.sudometroToday.title);
+    if (me.sudometroToday.photoId) {
+      const t = me.sudometroToday;
+      el.append(photoPair(t.photoId, me.reference && me.reference.photoId, `${me.display} · ${t.score} · ${clean(t.title)}`, true));
+    }
     if (debugOn()) {
       el.insertAdjacentHTML('beforeend', '<button id="btn-redo" class="secondary" style="margin-top:14px">Rifai e sovrascrivi (debug)</button>');
       el.querySelector('#btn-redo').onclick = () => takeSweat(false, true);
@@ -400,7 +425,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
-const chat = createChat({ api, toast, loadPhoto, openPhoto, clean, isDebug: () => debugOn() });
+const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn() });
 
 // ---------- Tab ----------
 

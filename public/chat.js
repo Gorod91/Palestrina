@@ -9,7 +9,7 @@ const CHOICES = [
   ['no', 'No'],
 ];
 
-export function createChat({ api, toast, loadPhoto, openPhoto, clean, isDebug }) {
+export function createChat({ api, toast, photoPair, clean, isDebug }) {
   let me = null; // { name, display }
   let v = 0; // versione dei dati in Apps Script
   let data = null; // { messages, poll, names }
@@ -226,21 +226,9 @@ export function createChat({ api, toast, loadPhoto, openPhoto, clean, isDebug })
       const text = el('div');
       text.append(el('p', 'event-text', `${name} ha fatto il Sudometro`));
       text.append(el('p', 'event-score', `${d.score} · ${clean(d.title)}`));
-      const photo = el('div', 'event-photo');
-      if (d.photoId) box.append(photo);
+      if (d.photoId) box.append(photoPair(d.photoId, (data.refPhotos || {})[m.name], `${name} · ${d.score} · ${clean(d.title)}`));
       box.append(text);
       row.append(box);
-      if (d.photoId) {
-        loadPhoto(d.photoId)
-          .then((src) => {
-            const img = new Image();
-            img.src = src;
-            img.alt = `Selfie di ${name}`;
-            img.onclick = () => openPhoto(src, `${name} · ${d.score} · ${clean(d.title)}`);
-            photo.replaceChildren(img);
-          })
-          .catch(() => {});
-      }
     } else if (d.kind === 'weekly' || d.kind === 'monthly') {
       row.classList.add('award');
       row.append(el('p', 'event-title', d.kind === 'weekly' ? 'Premiazioni della settimana' : `Premiazioni di ${d.month}`));

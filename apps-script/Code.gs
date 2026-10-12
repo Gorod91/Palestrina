@@ -268,6 +268,18 @@ function saveReference(user, features, photo) {
   return { ok: true, photoError: saved.error };
 }
 
+/** Foto di riferimento ("da fresco") di ciascuno, da mostrare accanto ai selfie da sudato: nome → id del file. */
+function refPhotoIds() {
+  const all = props.getProperties();
+  const out = {};
+  Object.keys(all).forEach((k) => {
+    if (k.indexOf('ref_') !== 0) return;
+    const ref = safeJson(all[k]);
+    if (ref && ref.photoId) out[k.slice(4)] = ref.photoId;
+  });
+  return out;
+}
+
 function getReference(user) {
   const raw = props.getProperty('ref_' + user.name);
   return raw ? JSON.parse(raw) : null;
@@ -400,12 +412,13 @@ function buildState(user) {
       goal: user.goal,
       debug: user.debug,
       checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
-      sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title } : null,
+      sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title, photoId: mySudoToday.photoId } : null,
       reference: getReference(user),
       timerSeconds: Number(props.getProperty('timer_' + user.name)) || null,
       chatMuted: !!props.getProperty('mute_' + user.name),
     },
     poll: pollSummary(today, presenze, dn),
+    refPhotos: refPhotoIds(),
     // Per il pallino dei messaggi non letti: orario e autore dei messaggi recenti.
     chatMeta: chatRows()
       .filter((r) => r.type === 'msg' || r.type === 'poll' || r.type === 'event')
@@ -577,6 +590,7 @@ function chatState(user, v) {
       })),
     poll: pollSummary(today, presenze, dn),
     names: Object.fromEntries(allUsers().map((u) => [u.name, u.display])),
+    refPhotos: refPhotoIds(),
   };
 }
 
@@ -710,7 +724,8 @@ function savePhoto(user, base64, label) {
 /** Restituisce una foto del Sudometro (non di debug) a chi ha un codice valido. */
 function getPhoto(id) {
   // Solo file elencati nel foglio Sudometro: lo script non deve leggere altri file del Drive.
-  if (!id || !rows('sudometro').some((r) => r.photoId === id)) return { error: 'Foto non trovata' };
+  const allowed = id && (rows('sudometro').some((r) => r.photoId === id) || Object.values(refPhotoIds()).includes(id));
+  if (!allowed) return { error: 'Foto non trovata' };
   const blob = DriveApp.getFileById(id).getBlob();
   return { mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
 }
