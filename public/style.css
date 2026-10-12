@@ -295,7 +295,6 @@ body.keyboard .composer { padding-bottom: 8px; }
 .bicep { width: 30px; height: 29px; flex: none; overflow: visible; --bicep-bg: var(--exercise); }
 .bicep path, .bicep rect { fill: none; stroke: currentColor; stroke-width: 3.4; stroke-linecap: round; stroke-linejoin: round; }
 .bicep .bicep-bg { fill: var(--bicep-bg); }
-.bicep .bicep-finger { stroke-width: 2.2; }
 .choice .bicep { --bicep-bg: var(--card-2); }
 .choice.si.selected .bicep { --bicep-bg: var(--exercise); }
 .choice.forse.selected .bicep { --bicep-bg: #ffd60a; }

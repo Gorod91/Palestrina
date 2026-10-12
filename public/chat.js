@@ -408,7 +408,6 @@ export function bicep() {
         <rect class="bicep-bg" x="16" y="8" width="7" height="18" rx="2.5" />
         <rect class="bicep-bg" x="59" y="8" width="7" height="18" rx="2.5" />
         <rect class="bicep-bg" x="31" y="8" width="20" height="20" rx="7" />
-        <path class="bicep-finger" d="M38.5 13V23M43.5 13V23" />
       </g>
     </g>
   </svg>`;
