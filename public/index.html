@@ -64,6 +64,9 @@
   </svg>
 
   <!-- Scorre solo quest'area: la pagina resta ferma, così la barra dei tab non si sposta su iPhone -->
+  <!-- Sondaggio della chat: fuori dall'area che scorre, così resta in cima e iOS non lo sfoca -->
+  <div class="chat-top"><section id="poll-card" class="card poll"></section></div>
+
   <main id="scroller">
     <header class="top">
       <div>
@@ -160,7 +163,6 @@
       </div>
 
       <div class="tab-panel chat" data-tab="chat" hidden>
-        <section id="poll-card" class="card poll"></section>
         <div id="chat-list" class="chat-list"></div>
       </div>
 

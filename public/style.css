@@ -230,9 +230,12 @@ body:not(.chat-mode) .composer { display: none; }
 body.keyboard { bottom: auto; height: var(--app-h, 100%); }
 body.keyboard .tabbar { display: none; }
 /* Sondaggio: casella compatta fissa in cima alla chat */
-body.chat-mode #poll-card { position: sticky; top: 0; z-index: 3; margin-bottom: 4px; padding: 10px 12px; box-shadow: 0 6px 16px rgba(0, 0, 0, .45); }
-/* copre la fascia sopra la casella, dove altrimenti scorrerebbero i messaggi */
-body.chat-mode #poll-card::before { content: ''; position: absolute; left: -16px; right: -16px; bottom: 100%; height: calc(env(safe-area-inset-top) + 9px); background: #0b0b0c; }
+/* In chat il titolo sparisce e il sondaggio sta in cima, fuori dall'area che scorre */
+.chat-top { flex: none; padding: 6px max(16px, calc((100% - 480px) / 2)) 6px; background: var(--bg); }
+body:not(.chat-mode) .chat-top { display: none; }
+body.chat-mode header.top { display: none; }
+body.chat-mode #scroller { padding-top: 0; }
+.chat-top #poll-card { margin: 0; padding: 10px 12px; }
 .poll-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 15px; }
 .poll-head .muted { font-size: 12px; white-space: nowrap; }
 .poll .choices { grid-template-columns: repeat(3, 1fr) 92px; gap: 6px; }
@@ -404,8 +407,8 @@ body.fake-data #page-title::after { content: 'DATI FITTIZI'; margin-left: 10px; 
 
 /* iOS 26 sfoca la parte alta delle app installate (circa 40 punti sotto la barra di stato) e nessuna
    impostazione lo spegne: lasciamo lì una fascia vuota, così la sfocatura non copre titoli e sondaggio. */
-html.ios.standalone body { padding-top: 2.5rem; }
-html.ios.standalone .sheet, html.ios.standalone .viewer { top: 2.5rem; }
+html.ios.standalone body { padding-top: 1.75rem; }
+html.ios.standalone .sheet, html.ios.standalone .viewer { top: 1.75rem; }
 
 /* Orario del sondaggio: su iPhone il campo vuoto non mostra nulla, quindi una scritta al suo posto */
 .time-wrap { position: relative; display: block; min-width: 0; }
