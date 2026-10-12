@@ -18,6 +18,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   let loading = false;
   const pending = []; // messaggi inviati ma non ancora salvati in Apps Script
   let pollBusy = null;
+  let timeSaving = null; // orario del sondaggio in salvataggio (bicipite al suo posto)
   let unseen = 0; // messaggi arrivati mentre si legge più in alto
   let lastCount = 0; // 'ask' oppure la risposta in invio ('si' | 'forse' | 'no')
 
@@ -177,7 +178,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       <div class="poll-head"><b>Chi va in palestra oggi?</b><span class="muted">da <span class="by"></span> · ${poll.clock}</span></div>
       <div class="choices">
         ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}"${pollBusy ? ' disabled' : ''}>${pollBusy === k ? bicep() : ''}${label}</button>`).join('')}
-        <label class="time-wrap${mine.time ? ' filled' : ''}"><input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span></label>
+        <label class="time-wrap${mine.time ? ' filled' : ''}${timeSaving !== null ? ' busy' : ''}"><input id="poll-time" type="time" value="${timeSaving !== null ? timeSaving : mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span>${timeSaving !== null ? bicep() : ''}</label>
       </div>
       <p class="poll-names"></p>`;
     card.querySelector('.by').textContent = poll.byDisplay;
@@ -189,34 +190,50 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     timeInput.oninput = () => timeInput.parentNode.classList.toggle('filled', !!timeInput.value);
     let sent = mine.time || '';
     let timer = null;
+    const focused = () => document.activeElement && document.activeElement.id === 'poll-time';
     const saveTime = async () => {
       clearTimeout(timer);
       const t = timeInput.value;
-      if (t === sent || pollBusy) return;
+      if (t === sent || pollBusy || timeSaving !== null) return false;
       sent = t;
-      const wrap = timeInput.parentNode;
-      wrap.classList.add('busy');
-      if (!wrap.querySelector('.bicep')) wrap.insertAdjacentHTML('beforeend', bicep());
+      timeSaving = t;
+      // Bicipite al posto dell'orario finché non è salvato (senza ridisegnare se la rotella è aperta)
+      if (focused()) {
+        timeInput.parentNode.classList.add('busy');
+        timeInput.parentNode.insertAdjacentHTML('beforeend', bicep());
+      } else renderPoll(true);
       try {
         const r = await api('pollAnswer', { choice: mine.choice || 'si', time: t });
+        timeSaving = null;
         v = -1;
         apply(r);
         toast(t ? `Orario ${t} salvato` : 'Orario tolto');
       } catch (err) {
-        sent = '';
+        timeSaving = null;
         toast(err.message);
-      } finally {
-        wrap.classList.remove('busy'); // se la casella non è stata ridisegnata
-        wrap.querySelectorAll('.bicep').forEach((b) => b.remove());
       }
+      if (!focused()) renderPoll(true);
+      else {
+        timeInput.parentNode.classList.remove('busy');
+        timeInput.parentNode.querySelectorAll('.bicep').forEach((x) => x.remove());
+      }
+      return true;
     };
     timeInput.onchange = () => {
       clearTimeout(timer);
       timer = setTimeout(saveTime, 900);
     };
     timeInput.onblur = () => {
+      // aggiorna nomi e orari rimasti indietro mentre la rotella era aperta (il salvataggio ridisegna da sé)
+      setTimeout(() => {
+        if (timeSaving === null && !saveTimeStarted()) renderPoll(true);
+      }, 0);
+    };
+    const saveTimeStarted = () => {
+      const t = timeInput.value;
+      if (t === sent) return false;
       saveTime();
-      setTimeout(() => renderPoll(true), 0); // aggiorna nomi e orari rimasti indietro mentre la rotella era aperta
+      return true;
     };
     // Chi c'è e chi no, in chiaro e in poco spazio
     const names = card.querySelector('.poll-names');

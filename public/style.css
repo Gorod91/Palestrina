@@ -409,9 +409,9 @@ html.ios.standalone .sheet, html.ios.standalone .viewer { top: 1.75rem; }
 .time-wrap > span { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 15px; pointer-events: none; }
 .time-wrap.filled > span, .time-wrap.busy > span { display: none; }
 .time-wrap:not(.filled) input { color: transparent; }
-.time-wrap .bicep { position: absolute; inset: 0; margin: auto; width: 30px; height: 29px; color: #000; --bicep-bg: var(--exercise); pointer-events: none; }
-.time-wrap.busy::after { content: ''; position: absolute; inset: 0; border-radius: 10px; background: var(--exercise); }
-.time-wrap.busy .bicep { z-index: 1; }
+.time-wrap.busy { border-radius: 10px; background: var(--exercise); }
+.time-wrap.busy input { opacity: 0; } /* non visibility: un campo nascosto perde il fuoco e chiuderebbe la rotella */
+.time-wrap .bicep { position: absolute; top: 50%; left: 50%; width: 30px; height: 29px; margin: -14px 0 0 -15px; color: #000; --bicep-bg: var(--exercise); pointer-events: none; }
 /* In chat il sondaggio non scorre: va tenuto tutto sotto la sfocatura di iOS (circa 50 punti dall'alto) */
 html.ios.standalone .chat-top { padding-top: 36px; }
 
