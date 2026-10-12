@@ -416,4 +416,4 @@ html.ios.standalone .sheet, html.ios.standalone .viewer { top: 1.75rem; }
 .time-wrap.filled span { display: none; }
 .time-wrap:not(.filled) input { color: transparent; }
 /* In chat il sondaggio non scorre: va tenuto tutto sotto la sfocatura di iOS (circa 50 punti dall'alto) */
-html.ios.standalone .chat-top { padding-top: 24px; }
+html.ios.standalone .chat-top { padding-top: 36px; }
