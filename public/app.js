@@ -1,6 +1,6 @@
 import * as sudometro from './sudometro.js';
 import { initTimer, setTimerAccount } from './timer.js';
-import { createChat, answersList } from './chat.js';
+import { createChat, answersList, bicep } from './chat.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -43,6 +43,27 @@ async function api(action, data = {}) {
 // ---------- Interfaccia ----------
 
 let toastTimer;
+/** Bicipite dentro un pulsante finché `work` non finisce. */
+async function withBusy(btn, label, work) {
+  const html = btn.innerHTML;
+  btn.disabled = true;
+  btn.classList.add('with-bicep');
+  btn.innerHTML = `${bicep()}${label}`;
+  try {
+    return await work();
+  } finally {
+    btn.innerHTML = html;
+    btn.classList.remove('with-bicep');
+    btn.disabled = false;
+  }
+}
+
+/** Bicipite al posto del contenuto del Sudometro (analisi del selfie, invio della foto). */
+function sudoBusy(text) {
+  $('sudo-body').innerHTML = `<div class="loading">${bicep()}<p></p></div>`;
+  $('sudo-body').querySelector('p').textContent = text;
+}
+
 function toast(msg, ms = 3500) {
   $('toast').textContent = msg;
   $('toast').hidden = false;
@@ -216,7 +237,7 @@ function photoPair(sweatyId, freshId, caption, big = false) {
     const d = document.createElement('div');
     d.className = `ph ${kind}`;
     d.dataset.label = label;
-    d.innerHTML = '<svg><use href="#i-camera"/></svg>';
+    d.innerHTML = id ? bicep() : '<svg><use href="#i-camera"/></svg>';
     if (id) {
       loadPhoto(id)
         .then((src) => {
@@ -225,7 +246,7 @@ function photoPair(sweatyId, freshId, caption, big = false) {
           img.src = src;
           d.replaceChildren(img);
         })
-        .catch(() => {});
+        .catch(() => (d.innerHTML = '<svg><use href="#i-camera"/></svg>'));
     }
     return d;
   };
@@ -238,6 +259,9 @@ function photoPair(sweatyId, freshId, caption, big = false) {
 function openPhoto(sweatyId, freshId, caption) {
   $('viewer-img').removeAttribute('src');
   $('viewer-fresh').removeAttribute('src');
+  document.querySelectorAll('.viewer-pair figure').forEach((f) => {
+    if (!f.querySelector('.ph-loading')) f.insertAdjacentHTML('afterbegin', `<div class="ph-loading">${bicep()}</div>`);
+  });
   $('viewer-fresh-fig').hidden = !freshId;
   $('viewer-caption').textContent = caption;
   $('viewer').hidden = false;
@@ -334,31 +358,31 @@ async function refresh() {
 }
 
 async function checkin() {
-  const btn = $('btn-checkin');
-  btn.disabled = true;
-  try {
-    const r = await api('checkin');
-    toast(r.alreadyToday ? 'Avevi già fatto check-in oggi' : 'Check-in fatto. Gli altri lo sapranno.');
-  } catch (err) {
-    btn.disabled = false;
-    toast(`Errore: ${err.message}`);
-  }
-  refresh();
+  await withBusy($('btn-checkin'), 'Check-in…', async () => {
+    try {
+      const r = await api('checkin');
+      toast(r.alreadyToday ? 'Avevi già fatto check-in oggi' : 'Check-in fatto. Gli altri lo sapranno.');
+    } catch (err) {
+      toast(`Errore: ${err.message}`);
+    }
+    await refresh();
+  });
+  render();
 }
 
 async function checkinUndo() {
   if (!confirm('Annullare il check-in di oggi?')) return;
-  const btn = $('btn-checkin-undo');
-  btn.disabled = true;
-  try {
-    await api('checkinUndo');
-    toast('Check-in annullato');
-    chat.reload();
-  } catch (err) {
-    toast(`Errore: ${err.message}`);
-  }
-  btn.disabled = false;
-  refresh();
+  await withBusy($('btn-checkin-undo'), 'Annullo…', async () => {
+    try {
+      await api('checkinUndo');
+      toast('Check-in annullato');
+      chat.reload();
+    } catch (err) {
+      toast(`Errore: ${err.message}`);
+    }
+    await refresh();
+  });
+  render();
 }
 
 async function takeReference() {
@@ -367,14 +391,16 @@ async function takeReference() {
       live: debugOn(),
     });
     if (!canvas) return;
-    toast('Analizzo…', 10000);
+    sudoBusy('Analizzo la foto…');
     const features = await sudometro.analyze(canvas);
+    sudoBusy('Salvo la foto di riferimento…');
     const r = await api('setReference', { features, photo: sudometro.toJpegBase64(canvas) });
     toast(photoWarning(r) || 'Foto di riferimento salvata. Da ora basta il selfie da sudato.', 5000);
-    refresh();
+    await refresh();
   } catch (err) {
     toast(cameraError(err));
   }
+  renderSudometro();
 }
 
 async function takeSweat(debug, overwrite = false) {
@@ -385,9 +411,10 @@ async function takeSweat(debug, overwrite = false) {
       reference,
     });
     if (!canvas) return;
-    toast('Analizzo…', 10000);
+    sudoBusy('Analizzo il selfie…');
     const features = await sudometro.analyze(canvas);
     const result = sudometro.score(reference, features);
+    sudoBusy('Pubblico la foto…');
     const r = await api('sudometro', {
       score: result.score,
       title: result.title,
@@ -407,10 +434,11 @@ async function takeSweat(debug, overwrite = false) {
     } else {
       toast(result.warnings.length ? result.warnings.join(' ') : `${result.score}: ${result.title}`, 6000);
     }
-    refresh();
+    await refresh();
   } catch (err) {
     toast(cameraError(err));
   }
+  renderSudometro(); // anche se l'aggiornamento non è riuscito, toglie il bicipite
 }
 
 /** Avviso per gli utenti debug se la foto non è finita su Drive (es. Drive non ancora autorizzato). */
@@ -446,7 +474,10 @@ async function saveAlias(value) {
   const alias = value.replace(/\s+/g, ' ').trim();
   if (alias === (state.me.alias || '')) return;
   const btn = $('btn-name');
+  const label = btn.innerHTML;
   btn.disabled = true;
+  btn.classList.add('with-bicep');
+  btn.innerHTML = `${bicep()}Salvo…`;
   try {
     const r = await api('setAlias', { alias });
     session.display = r.display;
@@ -457,6 +488,8 @@ async function saveAlias(value) {
   } catch (err) {
     toast(err.message);
   } finally {
+    btn.innerHTML = label;
+    btn.classList.remove('with-bicep');
     btn.disabled = false;
   }
 }
@@ -525,7 +558,7 @@ async function home() {
   if (!state) {
     // Primo avvio senza dati salvati: anello vuoto e "Caricamento" invece di card vuote.
     $('week-ring').innerHTML = ring(0, ...COLORS.move, { size: 132, width: 20 });
-    $('sudo-body').innerHTML = '<p class="muted">Caricamento…</p>';
+    sudoBusy('Carico i dati…');
   }
   render();
   selectTab(fromUrl || store.get('tab'));
@@ -536,11 +569,11 @@ async function home() {
 
 $('form-login').addEventListener('submit', (e) => {
   e.preventDefault();
-  login($('in-code').value);
+  withBusy($('form-login').querySelector('button'), 'Accedo…', () => login($('in-code').value));
 });
 $('btn-checkin').addEventListener('click', checkin);
 $('btn-checkin-undo').addEventListener('click', checkinUndo);
-$('btn-notify').addEventListener('click', enableNotifications);
+$('btn-notify').addEventListener('click', () => withBusy($('btn-notify'), 'Attivo…', enableNotifications));
 $('btn-logout').addEventListener('click', logout);
 $('form-name').addEventListener('submit', (e) => {
   e.preventDefault();

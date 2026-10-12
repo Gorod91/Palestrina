@@ -320,6 +320,8 @@ export function createChat({ api, toast, photoPair, clean, isDebug }) {
       if (data) {
         render();
         scrollToBottom();
+      } else {
+        $('chat-list').innerHTML = `<div class="loading">${bicep()}<p>Carico la chat…</p></div>`;
       }
       load(!data);
       timer = setInterval(tick, POLL_EVERY);

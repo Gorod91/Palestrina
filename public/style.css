@@ -329,3 +329,20 @@ body.chat-mode #scroller { background: #0b0b0c url("chat-bg.svg") repeat; backgr
 .viewer-pair figure { flex: 1 1 0; margin: 0; min-width: 0; }
 .viewer-pair img { display: block; width: 100%; max-height: 70vh; object-fit: contain; border-radius: 14px; }
 .viewer-pair figcaption { margin-top: 8px; text-align: center; color: var(--muted); font-size: 13px; }
+
+/* Bicipite nei caricamenti */
+.loading { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 18px 0; color: var(--muted); text-align: center; }
+.loading .bicep { width: 64px; height: 62px; color: var(--exercise); --bicep-bg: var(--card); }
+#chat-list .loading .bicep { --bicep-bg: #0b0b0c; }
+.secondary.with-bicep { display: flex; }
+.primary.small.with-bicep { display: inline-flex; }
+.secondary .bicep { --bicep-bg: var(--card-2); }
+.primary.done .bicep { color: var(--exercise); --bicep-bg: var(--card); }
+.link-button.with-bicep { display: flex; color: var(--fg); }
+.link-button .bicep { color: var(--exercise); --bicep-bg: var(--bg); }
+.pair .ph .bicep { width: 30px; height: 29px; color: var(--muted); --bicep-bg: var(--card-2); }
+.viewer-pair figure { position: relative; }
+.ph-loading { display: grid; place-items: center; aspect-ratio: 3 / 4; }
+.ph-loading .bicep { width: 64px; height: 62px; color: var(--exercise); --bicep-bg: #000; }
+.viewer-pair img:not([src]) { display: none; }
+.viewer-pair img[src] ~ .ph-loading, .viewer-pair figure:has(img[src]) .ph-loading { display: none; }
