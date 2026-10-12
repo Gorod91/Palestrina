@@ -265,6 +265,7 @@ async function login(code) {
 async function refresh() {
   try {
     state = await api('state');
+    store.set('state', { day: new Date().toDateString(), data: state });
     setTimerAccount(state.me.name, state.me.timerSeconds, (s) => api('setTimer', { seconds: s }).catch(() => {}));
     render();
   } catch (err) {
@@ -391,6 +392,7 @@ function logout() {
   session = null;
   state = null;
   store.set('session', null);
+  store.set('state', null);
   show('login');
 }
 
@@ -442,9 +444,12 @@ async function home() {
   // Da una notifica della chat l'app si apre con ?tab=chat
   const fromUrl = new URLSearchParams(location.search).get('tab');
   if (fromUrl) history.replaceState(null, '', location.pathname);
+  // Mostra subito l'ultimo stato salvato sul telefono, poi lo aggiorna da Apps Script.
+  const cached = store.get('state');
+  if (!state && cached && cached.day === new Date().toDateString() && cached.data.me.name === session.name) state = cached.data;
   render();
-  await refresh();
   selectTab(fromUrl || store.get('tab'));
+  await refresh();
   updateNotifyCard();
   sudometro.preload();
 }
@@ -500,6 +505,24 @@ $('btn-browser').addEventListener('click', () => {
 });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && session && state) refresh();
+});
+
+// Tastiera aperta: l'app si restringe all'area visibile, così la casella dei messaggi
+// resta sopra la tastiera (i tab spariscono mentre scrivi, come in WhatsApp).
+function fitViewport() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const keyboard = vv.height < window.innerHeight - 120;
+  document.documentElement.style.setProperty('--app-h', `${Math.round(vv.height)}px`);
+  document.body.classList.toggle('keyboard', keyboard);
+  if (keyboard) window.scrollTo(0, 0);
+}
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', fitViewport);
+  window.visualViewport.addEventListener('scroll', fitViewport);
+}
+$('chat-input').addEventListener('focus', () => {
+  setTimeout(() => ($('scroller').scrollTop = $('scroller').scrollHeight), 350);
 });
 
 async function start() {

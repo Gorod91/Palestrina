@@ -142,10 +142,6 @@
       <div class="tab-panel chat" data-tab="chat" hidden>
         <section id="poll-card" class="card poll"></section>
         <div id="chat-list" class="chat-list"></div>
-        <form id="chat-form" class="composer">
-          <textarea id="chat-input" rows="1" maxlength="500" placeholder="Messaggio" enterkeyhint="send"></textarea>
-          <button id="chat-send" type="submit" aria-label="Invia"><svg><use href="#i-send"/></svg></button>
-        </form>
       </div>
 
       <div class="tab-panel timer" data-tab="timer" hidden>
@@ -213,6 +209,12 @@
       <pre id="boot-error-detail" class="muted"></pre>
     </section>
   </main>
+
+  <!-- Casella dei messaggi: fissa in basso come in WhatsApp, visibile solo nel tab Chat -->
+  <form id="chat-form" class="composer">
+    <textarea id="chat-input" rows="1" maxlength="500" placeholder="Messaggio" enterkeyhint="send"></textarea>
+    <button id="chat-send" type="submit" aria-label="Invia"><svg><use href="#i-send"/></svg></button>
+  </form>
 
   <nav id="tabbar" class="tabbar" hidden>
     <button data-tab="oggi" class="active"><svg><use href="#i-rings"/></svg>Oggi</button>

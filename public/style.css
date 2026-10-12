@@ -24,7 +24,9 @@ html { height: 100%; background: var(--bg); }
 body {
   /* Struttura da app: la pagina non scorre (scorre solo #scroller) e la barra dei tab sta sotto,
      senza position: fixed, che su iPhone si sposta quando il contenuto è corto. */
-  height: 100%; height: 100dvh; overflow: hidden; display: flex; flex-direction: column;
+  /* Agganciata ai bordi dello schermo: 100dvh su iPhone (app sulla Home) esclude la barra di stato
+     e lasciava una fascia nera in basso. Con la tastiera aperta l'altezza segue l'area visibile. */
+  position: fixed; inset: 0; overflow: hidden; display: flex; flex-direction: column;
   margin: 0; background: var(--bg); color: var(--fg);
   font: 17px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   letter-spacing: -.01em;
@@ -218,7 +220,13 @@ input.plain { text-transform: none; letter-spacing: -.01em; margin-top: 8px; }
   position: absolute; top: 0; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px;
   border-radius: 9px; background: var(--danger); color: #fff; font-size: 11px; font-weight: 700; line-height: 18px; text-align: center;
 }
-body.chat-mode #scroller { padding-bottom: 0; }
+body.chat-mode #scroller { padding-bottom: 0; display: flex; flex-direction: column; }
+body.chat-mode #screen-home { flex: 1 0 auto; display: flex; flex-direction: column; }
+.tab-panel.chat { flex: 1 0 auto; display: flex; flex-direction: column; }
+.chat-list { margin-top: auto; } /* pochi messaggi: stanno in basso, vicino alla casella */
+body:not(.chat-mode) .composer { display: none; }
+body.keyboard { bottom: auto; height: var(--app-h, 100%); }
+body.keyboard .tabbar { display: none; }
 .poll h3 { font-size: 20px; margin: 2px 0 12px; }
 .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .choice { margin: 0; padding: 12px 0; border: 0; border-radius: 12px; background: var(--card-2); color: var(--fg); font-weight: 600; font-size: 16px; }
@@ -260,9 +268,10 @@ body.chat-mode #scroller { padding-bottom: 0; }
 .event-photo img { width: 100%; height: 100%; object-fit: cover; }
 .event-score { font-size: 15px; font-weight: 600; color: var(--stand); }
 .composer {
-  position: sticky; bottom: 0; display: flex; align-items: flex-end; gap: 8px;
-  padding: 8px 0 10px; background: var(--bg);
+  flex: none; display: flex; align-items: flex-end; gap: 8px;
+  padding: 8px max(16px, calc((100% - 480px) / 2)); background: rgba(22, 22, 24, .9); border-top: .5px solid var(--line);
 }
+body.keyboard .composer { padding-bottom: 8px; }
 .composer textarea {
   flex: 1; resize: none; min-height: 38px; max-height: 120px; padding: 8px 14px; border: 1px solid var(--line); border-radius: 19px;
   background: var(--card); color: var(--fg); font: inherit; font-size: 16px; line-height: 1.3;
