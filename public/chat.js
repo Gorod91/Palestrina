@@ -9,7 +9,7 @@ const CHOICES = [
   ['no', 'No'],
 ];
 
-export function createChat({ api, toast, loadPhoto, clean }) {
+export function createChat({ api, toast, loadPhoto, openPhoto, clean }) {
   let me = null; // { name, display }
   let v = 0; // versione dei dati in Apps Script
   let data = null; // { messages, poll, names }
@@ -209,6 +209,7 @@ export function createChat({ api, toast, loadPhoto, clean }) {
             const img = new Image();
             img.src = src;
             img.alt = `Selfie di ${name}`;
+            img.onclick = () => openPhoto(src, `${name} · ${d.score} · ${clean(d.title)}`);
             photo.replaceChildren(img);
           })
           .catch(() => {});

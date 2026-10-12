@@ -267,7 +267,7 @@ body.keyboard .tabbar { display: none; }
 .event.award .event-text { color: var(--fg); }
 .event-sudo { display: flex; align-items: center; gap: 10px; text-align: left; }
 .event-photo { width: 48px; height: 48px; border-radius: 10px; background: var(--card-2); overflow: hidden; flex: none; }
-.event-photo img { width: 100%; height: 100%; object-fit: cover; }
+.event-photo img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }
 .event-score { font-size: 15px; font-weight: 600; color: var(--stand); }
 .composer {
   flex: none; display: flex; align-items: flex-end; gap: 8px;

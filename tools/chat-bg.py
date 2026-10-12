@@ -5,7 +5,7 @@ T = 400  # lato del tassello
 D = {
  'manubrio': '<rect x="-15" y="-2.5" width="30" height="5" rx="2.5"/><rect x="-22" y="-10" width="7" height="20" rx="2.5"/><rect x="15" y="-10" width="7" height="20" rx="2.5"/><rect x="-27" y="-6" width="5" height="12" rx="2"/><rect x="22" y="-6" width="5" height="12" rx="2"/>',
  'bilanciere': '<path d="M-44 0 H44"/><rect x="-36" y="-14" width="6" height="28" rx="2"/><rect x="-29" y="-10" width="5" height="20" rx="2"/><rect x="30" y="-14" width="6" height="28" rx="2"/><rect x="24" y="-10" width="5" height="20" rx="2"/><path d="M-46 -4 V4 M46 -4 V4"/>',
- 'kettlebell': '<path d="M-9 -6 C-10 -20 10 -20 9 -6"/><path d="M-14 0 C-18 10 -12 18 0 18 C12 18 18 10 14 0 C11 -6 -11 -6 -14 0 Z"/><path d="M-5 6 H5"/>',
+ 'kettlebell': '<path d="M-7.2 17 H7.2 A14 14 0 0 0 10 -4.8 C10.5 -12 7 -18 0 -18 C-7 -18 -10.5 -12 -10 -4.8 A14 14 0 0 0 -7.2 17 Z"/><path d="M-5.5 -6.2 C-6 -11 -3.5 -13.5 0 -13.5 C3.5 -13.5 6 -11 5.5 -6.2 Q0 -7.6 -5.5 -6.2 Z"/>',
  'bicipite': '<g transform="scale(.55) translate(-36 -27)" fill="#0b0b0c" stroke-width="3.6"><path d="M0 47 C4 47 9 26 21 26 C32 26 36 37 41 47 L46 56 V61 L0 61"/><g transform="rotate(4 46 52) translate(5 0)"><path d="M32 52 L35 27 L47 27 L50 52 A9 9 0 0 1 32 52"/><path d="M20 17H62"/><rect x="16" y="8" width="7" height="18" rx="2.5"/><rect x="59" y="8" width="7" height="18" rx="2.5"/><rect x="31" y="8" width="20" height="20" rx="7"/><path d="M38.5 13V23M43.5 13V23" stroke-width="2.6"/></g></g>',
  'cronometro': '<circle cx="0" cy="3" r="13"/><path d="M0 3 V-5 M0 3 L5 6 M-3 -14 H3 M0 -14 V-10 M10 -9 L13 -12"/>',
  'battito': '<path d="M-26 0 H-12 L-8 -10 L-2 12 L3 -16 L8 6 L11 0 H26"/>',

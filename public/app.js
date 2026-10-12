@@ -372,7 +372,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
-const chat = createChat({ api, toast, loadPhoto, clean });
+const chat = createChat({ api, toast, loadPhoto, openPhoto, clean });
 
 // ---------- Tab ----------
 
