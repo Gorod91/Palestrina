@@ -61,20 +61,21 @@ function autorizzaDrive() {
   Logger.log('Cartella foto: ' + photosRoot().getUrl());
 }
 
-const TRIGGERS_VERSION = '2';
+const TRIGGERS_VERSION = '3';
 
 /**
- * Recap ogni domenica alle 19 e premiazioni del mese il primo del mese alle 9 (fuso orario dello script).
+ * Recap ogni domenica alle 19 e premiazioni del mese l'ultimo giorno del mese alle 21 (fuso orario dello script).
  * Chiamata anche dalla web app: dopo un aggiornamento i trigger nuovi si creano da soli.
  */
 function ensureTriggers(force) {
   if (!force && props.getProperty('TRIGGERS_VERSION') === TRIGGERS_VERSION) return;
-  const handlers = ['sendWeeklyRecap', 'sendMonthlyRecap'];
+  const handlers = ['sendWeeklyRecap', 'sendMonthlyRecap', 'eveningCheck'];
   ScriptApp.getProjectTriggers()
     .filter((t) => handlers.includes(t.getHandlerFunction()))
     .forEach((t) => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('sendWeeklyRecap').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(19).create();
-  ScriptApp.newTrigger('sendMonthlyRecap').timeBased().onMonthDay(1).atHour(9).create();
+  // Apps Script non ha "ultimo giorno del mese": controllo ogni sera alle 21
+  ScriptApp.newTrigger('eveningCheck').timeBased().everyDays(1).atHour(21).create();
   props.setProperty('TRIGGERS_VERSION', TRIGGERS_VERSION);
 }
 
@@ -93,17 +94,24 @@ function computeRecap(from, to) {
   };
 }
 
+/** Ogni sera alle 21: se domani è il primo del mese, premiazioni del mese e Re del mese. */
+function eveningCheck() {
+  const today = dayString(new Date());
+  if (addDays(today, 1).slice(8) === '01') sendMonthlyRecap();
+}
+
 function weekRecap() {
   const week = weekKey(dayString(new Date()));
   return computeRecap(week, addDays(week, 6));
 }
 
-/** Mese precedente: { from, to, label } */
-function previousMonth() {
-  const now = new Date();
-  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1, 12);
-  const last = new Date(now.getFullYear(), now.getMonth(), 0, 12);
-  return { from: dayString(first), to: dayString(last), label: `${MONTHS_IT[first.getMonth()]} ${first.getFullYear()}` };
+/** Mese in corso: { key: "yyyy-MM", from, to, label } */
+function currentMonth() {
+  const today = dayString(new Date());
+  const key = today.slice(0, 7);
+  let to = today;
+  while (addDays(to, 1).slice(0, 7) === key) to = addDays(to, 1);
+  return { key, from: key + '-01', to, label: `${MONTHS_IT[Number(key.slice(5, 7)) - 1]} ${key.slice(0, 4)}` };
 }
 
 const MONTHS_IT = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
@@ -125,13 +133,28 @@ function sendWeeklyRecap() {
   dispatch('recap', '');
 }
 
+/** Premiazioni del mese in corso (l'ultimo giorno alle 21): Re del mese nell'albo d'oro, evento in chat e notifica. */
 function sendMonthlyRecap() {
-  const m = previousMonth();
-  const points = computePoints(m.from.slice(0, 7)).filter((t) => t.total > 0);
+  const m = currentMonth();
+  const last = safeJson(props.getProperty('LAST_MONTHLY') || '{}');
+  if (last && last.key === m.key) return; // già fatto questo mese
+  const points = computePoints(m.key).filter((t) => t.total > 0);
   const best = points.length ? points[0].total : 0;
   const king = best ? { names: points.filter((t) => t.total === best).map((t) => t.name), total: best } : null;
+  if (king) {
+    const albo = getAlbo();
+    albo.push({ key: m.key, label: m.label, names: king.names, total: king.total });
+    props.setProperty('ALBO', JSON.stringify(albo));
+  }
+  props.setProperty('LAST_MONTHLY', JSON.stringify(m));
   addChatEvent('', { kind: 'monthly', month: m.label, ...computeRecap(m.from, m.to), king });
   dispatch('monthly', '');
+}
+
+/** Albo d'oro: i Re dei mesi passati, dal più vecchio. */
+function getAlbo() {
+  const albo = safeJson(props.getProperty('ALBO') || '[]');
+  return Array.isArray(albo) ? albo : [];
 }
 
 // ---------- API per la web app (POST con Content-Type text/plain) ----------
@@ -424,6 +447,8 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     refPhotos: refPhotoIds(),
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
+    // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
+    albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
     // Per il pallino dei messaggi non letti: orario e autore dei messaggi recenti.
     chatMeta: chatRows()
       .filter((r) => r.type === 'msg' || r.type === 'poll' || r.type === 'event')
@@ -500,9 +525,10 @@ function buildNotifications(event, name) {
   }
 
   if (event === 'monthly') {
-    const m = previousMonth();
+    const m = safeJson(props.getProperty('LAST_MONTHLY') || '{}');
+    if (!m.key) return [];
     let body = recapText(computeRecap(m.from, m.to), 'del mese');
-    const points = computePoints(m.from.slice(0, 7)).filter((t) => t.total > 0);
+    const points = computePoints(m.key).filter((t) => t.total > 0);
     if (points.length) {
       const dn = displayNames();
       const kings = points.filter((t) => t.total === points[0].total).map((t) => dn(t.name)).join(', ');

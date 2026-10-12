@@ -142,6 +142,7 @@ function render() {
     $('ranking').append(li);
   });
   renderPoints();
+  renderAlbo();
   if (document.activeElement !== $('in-name')) $('in-name').value = me.alias || '';
   $('in-name').placeholder = me.name;
   $('name-hint').textContent = `È il nome che vedono gli altri in classifica e nelle notifiche. Lascia vuoto per usare il nome originale (${me.name}).`;
@@ -219,6 +220,24 @@ function renderPoints() {
       li.classList.toggle('open');
     };
     $('points').append(li);
+  });
+}
+
+function renderAlbo() {
+  const list = $('albo');
+  list.innerHTML = '';
+  const albo = (state.albo || []).slice().reverse();
+  if (!albo.length) {
+    list.innerHTML = '<li><span>Ancora nessun Re: il primo sarà incoronato l\'ultimo giorno del mese alle 21.</span></li>';
+    return;
+  }
+  albo.forEach((a) => {
+    const li = document.createElement('li');
+    li.innerHTML = '<div><b></b><span></span></div><em></em>';
+    li.querySelector('b').textContent = a.displays.join(', ');
+    li.querySelector('span').textContent = a.label.charAt(0).toUpperCase() + a.label.slice(1);
+    li.querySelector('em').textContent = `${a.total} pt`;
+    list.append(li);
   });
 }
 

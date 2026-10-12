@@ -84,7 +84,7 @@ Serve iOS 16.4 o successivo. Il codice resta salvato: va reinserito solo se si c
 | Check-in | tutti tranne chi l'ha fatto | Marco è in palestra. Presenza n. 2 della settimana. E tu dove sei? |
 | Sudometro | tutti tranne chi l'ha fatto | Sudometro di Anna: 78. "Pomodoro maturo" |
 | Domenica alle 19 | tutti | Premiazioni della settimana: MVP, Divano d'oro, Pomodoro |
-| Primo del mese alle 9 | tutti | Premiazioni del mese precedente |
+| Ultimo giorno del mese alle 21 | tutti | Premiazioni del mese e Re del mese (albo d'oro) |
 | Domanda "chi va in palestra oggi?" | tutti tranne chi la fa | Marco chiede: chi va in palestra oggi? |
 | Risposta alla domanda | solo chi l'ha fatta | Anna: ci sono alle 18:30 |
 | Messaggio in chat | gli altri (max 1 ogni 5 min a persona, silenziabile) | Marco: Chi viene stasera? |
@@ -128,7 +128,7 @@ Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il
 
 Tab **Chat**: messaggi del gruppo (ultimi 7 giorni) e, in cima, la domanda **"Chi va in palestra oggi?"**.
 - Chiunque la crea con un tap (una sola al giorno); si risponde con **Ci sono / Forse / No** e un **orario facoltativo**. Chi poi fa check-in risulta "arrivato". Il riepilogo compare anche nel tab **Oggi**.
-- In chat compaiono anche gli **eventi**: check-in, Sudometro (con la foto), **premiazioni della settimana** (domenica alle 19) e **premiazioni del mese** (il primo del mese alle 9: MVP, Divano d'oro e Pomodoro del mese precedente).
+- In chat compaiono anche gli **eventi**: check-in, Sudometro (con la foto), **premiazioni della settimana** (domenica alle 19) e **premiazioni del mese** (l'ultimo giorno del mese alle 21: Re del mese, MVP, Divano d'oro e Pomodoro del mese).
 - Notifiche: la domanda arriva a tutti; ogni risposta solo a chi l'ha fatta; i messaggi agli altri, al massimo una notifica ogni 5 minuti per persona. Si possono silenziare in **Altro → Notifiche** (la domanda arriva comunque). Toccando la notifica si apre la chat.
 - Dati nel foglio **Chat**, creato da solo al primo messaggio. L'app controlla i nuovi messaggi ogni 5 secondi solo mentre la chat è aperta.
 
