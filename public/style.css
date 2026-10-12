@@ -206,3 +206,7 @@ input::placeholder { color: #636366; }
 .shutter { width: 74px; height: 74px; margin: 0; padding: 5px; border-radius: 50%; border: 4px solid #fff; background: none; }
 .shutter span { display: block; width: 100%; height: 100%; border-radius: 50%; background: #fff; }
 .shutter:active span { transform: scale(.92); }
+
+/* Campo di testo normale (il codice di accesso invece è in maiuscolo) */
+input.plain { text-transform: none; letter-spacing: -.01em; margin-top: 8px; }
+.small-text { font-size: 13px; margin: 8px 0 0; }

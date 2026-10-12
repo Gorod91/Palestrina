@@ -110,6 +110,9 @@ I pesi (`WEIGHTS`) e le soglie (`TITLES`) sono in `public/sudometro.js`, da tara
 
 **Anti-furbizia**: solo fotocamera dal vivo (niente galleria), un check-in e un Sudometro al giorno, controllati da Apps Script.
 
+### Alias
+Nel tab **Altro → Profilo** ognuno può scegliere un **nome visualizzato** (colonna **E "Alias"** del foglio Utenti), usato in classifica e nelle notifiche. Il nome della colonna A resta quello originale e collega tutti i dati (presenze, foto, cartelle su Drive, debug), quindi non va cambiato. Alias vuoto = si vede il nome originale.
+
 ### Modalità debug
 Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il pulsante **Prova subito (debug)**, utile per provare e tarare il Sudometro:
 - si può ripetere quante volte si vuole, anche dopo il Sudometro del giorno;

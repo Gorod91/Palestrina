@@ -58,7 +58,8 @@ function show(screen) {
   if (screen !== 'home') $('page-title').textContent = 'Palestrina';
   $('avatar').hidden = !(screen === 'home' && session && session.name);
   if (!$('avatar').hidden) {
-    $('avatar').textContent = session.name.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+    const shown = session.display || session.name;
+    $('avatar').textContent = shown.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
   }
 }
 
@@ -109,10 +110,18 @@ function render() {
       <span class="ring">${ring(r.count / r.goal, ...COLORS.move, { size: 44, width: 7 })}</span>
       <div><div class="name"></div><div class="sub">${r.streak ? `${r.streak} ${r.streak === 1 ? 'settimana' : 'settimane'} di fila` : 'Obiettivo ' + r.goal}</div></div>
       <span class="count">${r.count}<small>/${r.goal}</small></span>`;
-    li.querySelector('.name').textContent = r.name;
+    li.querySelector('.name').textContent = r.display || r.name;
     $('ranking').append(li);
   });
-  $('pomodoro').textContent = week.pomodoro ? `Sudometro più alto: ${week.pomodoro.name}, ${week.pomodoro.score}` : '';
+  if (document.activeElement !== $('in-name')) $('in-name').value = me.alias || '';
+  $('in-name').placeholder = me.name;
+  $('name-hint').textContent = `È il nome che vedono gli altri in classifica e nelle notifiche. Lascia vuoto per usare il nome originale (${me.name}).`;
+  if (session.display !== me.display) {
+    session.display = me.display;
+    store.set('session', session);
+    show('home');
+  }
+  $('pomodoro').textContent = week.pomodoro ? `Sudometro più alto: ${week.pomodoro.display || week.pomodoro.name}, ${week.pomodoro.score}` : '';
 
   renderSudometro();
   renderGallery();
@@ -149,16 +158,17 @@ function renderGallery() {
       <div class="photo"><svg><use href="#i-camera"/></svg></div>
       <div><div class="name"></div><div class="sub"></div></div>
       <div class="pts">${r.score}</div>`;
-    li.querySelector('.name').textContent = r.name;
+    const who = r.display || r.name;
+    li.querySelector('.name').textContent = who;
     li.querySelector('.sub').textContent = `${title} · ${day}`;
     el.append(li);
     if (r.photoId) {
       loadPhoto(r.photoId)
         .then((src) => {
           const img = new Image();
-          img.alt = `Selfie di ${r.name}`;
+          img.alt = `Selfie di ${who}`;
           img.src = src;
-          img.onclick = () => openPhoto(src, `${r.name} · ${r.score} · ${title}`);
+          img.onclick = () => openPhoto(src, `${who} · ${r.score} · ${title}`);
           li.querySelector('.photo').replaceChildren(img);
         })
         .catch(() => {});
@@ -231,6 +241,7 @@ async function login(code) {
   try {
     const r = await api('login');
     session.name = r.name;
+    session.display = r.display;
     store.set('session', session);
     await home();
   } catch (err) {
@@ -337,6 +348,25 @@ function selectTab(name) {
   $('scroller').scrollTop = 0;
 }
 
+async function saveAlias(value) {
+  const alias = value.replace(/\s+/g, ' ').trim();
+  if (alias === (state.me.alias || '')) return;
+  const btn = $('btn-name');
+  btn.disabled = true;
+  try {
+    const r = await api('setAlias', { alias });
+    session.display = r.display;
+    store.set('session', session);
+    show('home');
+    toast(alias ? `Ora gli altri ti vedono come ${r.display}` : `Torni a chiamarti ${r.display}`);
+    await refresh();
+  } catch (err) {
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function logout() {
   setTimerAccount('', null, null);
   session = null;
@@ -404,6 +434,10 @@ $('form-login').addEventListener('submit', (e) => {
 $('btn-checkin').addEventListener('click', checkin);
 $('btn-notify').addEventListener('click', enableNotifications);
 $('btn-logout').addEventListener('click', logout);
+$('form-name').addEventListener('submit', (e) => {
+  e.preventDefault();
+  saveAlias($('in-name').value);
+});
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
 $('avatar').addEventListener('click', () => selectTab('altro'));
 $('today-date').textContent = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });

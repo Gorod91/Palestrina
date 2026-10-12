@@ -12,7 +12,7 @@
  */
 
 const SHEETS = {
-  utenti: { name: 'Utenti', header: ['Nome', 'Codice', 'Obiettivo settimanale', 'Debug'] },
+  utenti: { name: 'Utenti', header: ['Nome', 'Codice', 'Obiettivo settimanale', 'Debug', 'Alias'] },
   presenze: { name: 'Presenze', header: ['Data', 'Ora', 'Nome', 'Fonte'] },
   sudometro: { name: 'Sudometro', header: ['Data', 'Ora', 'Nome', 'Punteggio', 'Titolo', 'Dettagli', 'Debug', 'Foto'] },
   iscrizioni: { name: 'Iscrizioni', header: ['Nome', 'Endpoint', 'Sottoscrizione', 'Aggiornata'] },
@@ -77,7 +77,7 @@ function doPost(e) {
 
     switch (req.action) {
       case 'login':
-        return json({ name: user.name, goal: user.goal, debug: user.debug });
+        return json({ name: user.name, display: user.display, goal: user.goal, debug: user.debug });
       case 'state':
         return json(buildState(user));
       case 'checkin':
@@ -86,6 +86,8 @@ function doPost(e) {
         return json(saveReference(user, req.features, req.photo));
       case 'photo':
         return json(getPhoto(req.id));
+      case 'setAlias':
+        return json(setAlias(user, req.alias));
       case 'setTimer': {
         const s = Math.round(Number(req.seconds));
         if (!(s >= 5 && s <= 600)) return json({ error: 'Durata non valida' });
@@ -114,7 +116,7 @@ function doGet(e) {
     const user = findUserByCode(p.code);
     if (!user) return json({ error: 'Codice non valido' });
     const r = checkin(user, 'automatico');
-    return json({ ...r, message: r.alreadyToday ? 'Check-in già fatto oggi' : `Check-in fatto, ${user.name}` });
+    return json({ ...r, message: r.alreadyToday ? 'Check-in già fatto oggi' : `Check-in fatto, ${user.display}` });
   }
 
   if (!p.secret || p.secret !== props.getProperty('ADMIN_SECRET')) return json({ error: 'Non autorizzato' });
@@ -208,14 +210,16 @@ function buildState(user) {
   const today = dayString(new Date());
   const week = weekKey(today);
 
+  const dn = displayNames();
   const ranking = users
     .map((u) => ({
       name: u.name,
+      display: u.display,
       goal: u.goal,
       count: countInWeek(presenze, u.name, week),
       streak: streak(presenze, u, week),
     }))
-    .sort((a, b) => b.count - a.count || b.streak - a.streak || a.name.localeCompare(b.name));
+    .sort((a, b) => b.count - a.count || b.streak - a.streak || a.display.localeCompare(b.display));
 
   const sudo = rows('sudometro').filter((r) => weekKey(r.day) === week);
   const pomodoro = sudo.reduce((best, r) => (!best || r.score > best.score ? r : best), null);
@@ -224,6 +228,8 @@ function buildState(user) {
   return {
     me: {
       name: user.name,
+      display: user.display,
+      alias: user.alias,
       goal: user.goal,
       debug: user.debug,
       checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
@@ -234,12 +240,12 @@ function buildState(user) {
     week: {
       start: week,
       ranking,
-      pomodoro: pomodoro ? { name: pomodoro.name, score: pomodoro.score } : null,
+      pomodoro: pomodoro ? { name: pomodoro.name, display: dn(pomodoro.name), score: pomodoro.score } : null,
       // Classifica del Sudometro della settimana, con le foto (caricate a parte con l'azione "photo").
       sudometro: sudo
         .slice()
         .sort((a, b) => b.score - a.score)
-        .map((r) => ({ name: r.name, day: r.day, score: r.score, title: r.title, photoId: r.photoId })),
+        .map((r) => ({ name: r.name, display: dn(r.name), day: r.day, score: r.score, title: r.title, photoId: r.photoId })),
     },
   };
 }
@@ -251,12 +257,13 @@ function buildNotifications(event, name) {
   const presenze = rows('presenze');
   const week = weekKey(dayString(new Date()));
   const toAllBut = (n, title, body) => subs.filter((s) => s.name !== n).map((s) => ({ subscription: s.sub, title, body }));
+  const dn = displayNames(); // nei testi si usa l'alias, se c'è
 
   if (event === 'test') {
     return subs.filter((s) => s.name === name).map((s) => ({
       subscription: s.sub,
       title: 'Notifiche attive',
-      body: `Ciao ${name}! Da ora saprai quando gli altri sono in palestra.`,
+      body: `Ciao ${dn(name)}! Da ora saprai quando gli altri sono in palestra.`,
     }));
   }
 
@@ -265,27 +272,27 @@ function buildNotifications(event, name) {
     const n = countInWeek(presenze, name, week);
     const teases = ['E tu dove sei?', 'Il divano può aspettare.', 'Qualcuno lo segua.', 'La classifica trema.'];
     const extra = u && n === u.goal ? `Obiettivo settimanale raggiunto (${n}/${u.goal})` : `Presenza n. ${n} della settimana. ${pick(teases)}`;
-    return toAllBut(name, `${name} è in palestra`, extra);
+    return toAllBut(name, `${dn(name)} è in palestra`, extra);
   }
 
   if (event === 'sudometro') {
     const r = rows('sudometro').filter((x) => x.name === name).pop();
     if (!r) return [];
-    return toAllBut(name, `Sudometro di ${name}: ${r.score}`, `"${clean(r.title)}"`);
+    return toAllBut(name, `Sudometro di ${dn(name)}: ${r.score}`, `"${clean(r.title)}"`);
   }
 
   if (event === 'recap') {
     const counts = users.map((u) => ({ name: u.name, count: countInWeek(presenze, u.name, week) }));
     const max = Math.max(...counts.map((c) => c.count));
     const min = Math.min(...counts.map((c) => c.count));
-    const names = (v) => counts.filter((c) => c.count === v).map((c) => c.name).join(', ');
+    const names = (v) => counts.filter((c) => c.count === v).map((c) => dn(c.name)).join(', ');
     const parts = [];
     if (max > 0) parts.push(`MVP: ${names(max)} (${max})`);
     if (min < max) parts.push(`Divano d'oro: ${names(min)} (${min})`);
     const sudo = rows('sudometro').filter((r) => weekKey(r.day) === week);
     if (sudo.length) {
       const top = sudo.reduce((a, b) => (b.score > a.score ? b : a));
-      parts.push(`Pomodoro della settimana: ${top.name} (${top.score})`);
+      parts.push(`Pomodoro della settimana: ${dn(top.name)} (${top.score})`);
     }
     if (!parts.length) parts.push('Settimana tranquilla... troppo tranquilla.');
     return subs.map((s) => ({ subscription: s.sub, title: 'Recap della settimana', body: parts.join('\n') }));
@@ -330,6 +337,29 @@ function photosRoot() {
   const folder = DriveApp.createFolder('Palestrina - Foto Sudometro');
   props.setProperty('PHOTOS_FOLDER_ID', folder.getId());
   return folder;
+}
+
+/** Nome visualizzato (alias). Vuoto = torna al nome originale. Il nome originale non cambia mai. */
+function setAlias(user, value) {
+  const alias = String(value || '').replace(/\s+/g, ' ').trim();
+  if (alias.length > 20) return { error: 'Alias troppo lungo (massimo 20 caratteri)' };
+  const taken = allUsers().some(
+    (u) => u.code !== user.code && [u.name, u.display].some((n) => n.toLowerCase() === alias.toLowerCase())
+  );
+  if (alias && taken) return { error: 'Questo nome è già usato da qualcun altro' };
+  const sh = sheet('utenti');
+  const values = sh.getDataRange().getValues();
+  const row = values.findIndex((r, i) => i > 0 && String(r[1]).trim() === user.code);
+  if (row < 1) return { error: 'Utente non trovato' };
+  sh.getRange(row + 1, 5).setValue(alias);
+  return { ok: true, display: alias || user.name };
+}
+
+/** Mappa nome originale → nome visualizzato. */
+function displayNames() {
+  const map = {};
+  allUsers().forEach((u) => (map[u.name] = u.display));
+  return (name) => map[name] || name;
 }
 
 function userFolder(name) {
@@ -413,7 +443,10 @@ function allUsers() {
       goal: Number(r[2]) || DEFAULT_GOAL,
       // Colonna D: "sì", "x" o casella spuntata abilitano il pulsante di debug.
       debug: DEBUG_USERS.includes(String(r[0]).trim()) || r[3] === true || /^(s[iì]|x|true|1)$/i.test(String(r[3]).trim()),
-    }));
+      // Colonna E: alias scelto dall'utente. Il nome in colonna A resta la chiave di tutti i dati.
+      alias: String(r[4] || '').trim(),
+    }))
+    .map((u) => ({ ...u, display: u.alias || u.name }));
 }
 
 function findUserByCode(code) {
