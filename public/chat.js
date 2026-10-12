@@ -18,7 +18,6 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   let loading = false;
   const pending = []; // messaggi inviati ma non ancora salvati in Apps Script
   let pollBusy = null;
-  let pollOpen = false; // risposte del sondaggio aperte
   let unseen = 0; // messaggi arrivati mentre si legge più in alto
   let lastCount = 0; // 'ask' oppure la risposta in invio ('si' | 'forse' | 'no')
 
@@ -174,33 +173,36 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     const answered = (poll.people.find((p) => p.name === me.name) || {});
     // Risposta in invio: il pulsante scelto si colora subito, con il bicipite accanto.
     const mine = pollBusy && pollBusy !== 'ask' ? { ...answered, choice: pollBusy } : answered;
-    const count = (k) => poll.people.filter((p) => p.choice === k).length;
     card.innerHTML = `
       <div class="poll-head"><b>Chi va in palestra oggi?</b><span class="muted">da <span class="by"></span> · ${poll.clock}</span></div>
       <div class="choices">
         ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}"${pollBusy ? ' disabled' : ''}>${pollBusy === k ? bicep() : ''}${label}</button>`).join('')}
         <label class="time-wrap${mine.time ? ' filled' : ''}"><input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span></label>
       </div>
-      <button class="poll-summary" type="button" aria-expanded="${pollOpen}">
-        <span class="si">${count('si')} ci sono</span><span class="forse">${count('forse')} forse</span><span class="no">${count('no')} no</span>
-        <span class="toggle">${pollOpen ? 'Nascondi' : 'Chi?'}</span>
-      </button>
-      <div class="answers"${pollOpen ? '' : ' hidden'}></div>`;
+      <p class="poll-names"></p>`;
     card.querySelector('.by').textContent = poll.byDisplay;
     card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice)));
     card.querySelector('#poll-time').oninput = (e) => e.target.parentNode.classList.toggle('filled', !!e.target.value);
     card.querySelector('#poll-time').onchange = () => {
       if (mine.choice) answer(mine.choice); // cambia solo l'orario
     };
-    card.querySelector('.poll-summary').onclick = () => {
-      pollOpen = !pollOpen;
-      renderPoll(true);
-    };
-    const answers = card.querySelector('.answers');
-    answers.append(answersList(poll));
+    // Chi c'è e chi no, in chiaro e in poco spazio
+    const names = card.querySelector('.poll-names');
+    const who = (k) => poll.people.filter((p) => p.choice === k).map((p) => p.display + (p.time ? ` ${p.time}` : '') + (p.arrived ? ' ✓' : ''));
+    [['si', 'Ci sono'], ['forse', 'Forse'], ['no', 'No']].forEach(([k, label]) => {
+      const list = who(k);
+      if (!list.length) return;
+      const part = el('span', `part ${k}`);
+      part.append(el('b', '', `${label} `), document.createTextNode(list.join(', ')));
+      names.append(part);
+    });
+    const missing = poll.people.filter((p) => !p.choice).length;
+    if (missing) names.append(el('span', 'part none', `${missing} senza risposta`));
     if (isDebug()) {
-      answers.insertAdjacentHTML('beforeend', '<button id="poll-cancel" class="secondary small destructive">Annulla sondaggio</button>');
-      answers.querySelector('#poll-cancel').onclick = () => remove(poll.id, 'Annullare il sondaggio di oggi con tutte le risposte?');
+      const cancel = el('button', 'poll-cancel', 'Annulla');
+      cancel.type = 'button';
+      cancel.onclick = () => remove(poll.id, 'Annullare il sondaggio di oggi con tutte le risposte?');
+      names.append(cancel);
     }
   }
 

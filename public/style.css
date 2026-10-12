@@ -242,13 +242,7 @@ body.chat-mode #scroller { padding-top: 0; }
 .poll .choice { padding: 8px 0; font-size: 15px; border-radius: 10px; }
 .poll #poll-time { width: 100%; min-width: 0; padding: 5px 2px; font-size: 16px; border-radius: 10px; text-transform: none; letter-spacing: 0; }
 .poll #poll-ask { margin: 0; }
-.poll-summary { display: flex; align-items: center; gap: 10px; width: 100%; margin: 8px 0 0; padding: 0; border: 0; background: none; color: var(--muted); font-size: 13px; font-weight: 600; }
-.poll-summary .si { color: var(--exercise); }
-.poll-summary .forse { color: #ffd60a; }
-.poll-summary .no { color: var(--danger); }
-.poll-summary .toggle { margin-left: auto; color: var(--stand); }
-.poll .answers { max-height: 40vh; overflow-y: auto; }
-.poll .answers #poll-cancel { margin-top: 8px; }
+
 .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .choice { margin: 0; padding: 12px 0; border: 0; border-radius: 12px; background: var(--card-2); color: var(--fg); font-weight: 600; font-size: 16px; }
 .choice.si.selected { background: var(--exercise); color: #000; }
@@ -417,3 +411,13 @@ html.ios.standalone .sheet, html.ios.standalone .viewer { top: 1.75rem; }
 .time-wrap:not(.filled) input { color: transparent; }
 /* In chat il sondaggio non scorre: va tenuto tutto sotto la sfocatura di iOS (circa 50 punti dall'alto) */
 html.ios.standalone .chat-top { padding-top: 36px; }
+
+/* Sondaggio: chi c'è e chi no, sempre visibile */
+.poll-names { margin: 8px 0 0; font-size: 13px; line-height: 1.35; color: var(--fg); }
+.poll-names .part:not(:last-of-type)::after { content: ' · '; color: var(--muted); }
+.poll-names .part b { font-weight: 700; }
+.poll-names .si b { color: var(--exercise); }
+.poll-names .forse b { color: #ffd60a; }
+.poll-names .no b { color: var(--danger); }
+.poll-names .none { color: var(--muted); }
+.poll-names .poll-cancel { margin-left: 8px; padding: 0; border: 0; background: none; color: var(--danger); font-size: 13px; font-weight: 600; }
