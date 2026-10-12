@@ -225,14 +225,9 @@ body.chat-mode #screen-home { flex: 1 0 auto; display: flex; flex-direction: col
 .tab-panel.chat { flex: 1 0 auto; display: flex; flex-direction: column; }
 .chat-list { margin-top: auto; } /* pochi messaggi: stanno in basso, vicino alla casella */
 body:not(.chat-mode) .composer { display: none; }
-/* App sulla Home con barra di stato trasparente (black-translucent): iOS calcola innerHeight, 100dvh e
-   position: fixed; inset: 0 senza la barra di stato, quindi finiscono ~59pt prima del fondo e resta una
-   fascia nera. 100vh/100lvh invece sono l'altezza vera dello schermo. Solo per l'app installata. */
-@media (display-mode: standalone) {
-  body { bottom: auto; height: 100vh; height: 100lvh; }
-}
-html.standalone body { bottom: auto; height: 100vh; height: 100lvh; }
-body.keyboard, html.standalone body.keyboard { bottom: auto; height: var(--app-h, 100%); }
+/* La barra di stato è nera (non trasparente): iOS dispone l'app sotto la barra con l'altezza giusta.
+   Con "black-translucent" iOS calcolava male l'altezza dell'app installata (fascia nera o barra tagliata). */
+body.keyboard { bottom: auto; height: var(--app-h, 100%); }
 body.keyboard .tabbar { display: none; }
 .poll h3 { font-size: 20px; margin: 2px 0 12px; }
 .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
