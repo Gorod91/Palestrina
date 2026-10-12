@@ -9,7 +9,7 @@ const CHOICES = [
   ['no', 'No'],
 ];
 
-export function createChat({ api, toast, photoPair, clean, isDebug }) {
+export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown }) {
   let me = null; // { name, display }
   let v = 0; // versione dei dati in Apps Script
   let data = null; // { messages, poll, names }
@@ -193,7 +193,11 @@ export function createChat({ api, toast, photoPair, clean, isDebug }) {
       if (m.type === 'msg') {
         const mine = m.name === me.name;
         const row = el('div', `msg ${mine ? 'mine' : 'theirs'}`);
-        if (!mine && lastSender !== m.name) row.append(el('div', 'sender', m.display));
+        if (!mine && lastSender !== m.name) {
+          const sender = el('div', 'sender', m.display);
+          if (isKing(m.name)) sender.insertAdjacentHTML('beforeend', crown);
+          row.append(sender);
+        }
         const bubble = el('div', 'bubble', m.text);
         bubble.append(el('span', 'time', m.time));
         if (isDebug()) bubble.append(delButton(m.id));

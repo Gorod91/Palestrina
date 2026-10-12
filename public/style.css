@@ -372,3 +372,7 @@ body.chat-mode #scroller { background: #0b0b0c url("chat-bg.svg") repeat; backgr
 .rules li span { font-size: 13px; color: var(--muted); }
 .rules em { font-style: normal; font-weight: 700; color: var(--exercise); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .rules.medals em { color: #ffd60a; }
+
+/* Corona del Re del mese accanto al nome */
+.crown { display: inline-block; width: 18px; height: 15px; margin-left: 6px; vertical-align: -1px; color: #ffd60a; }
+.sender .crown { width: 14px; height: 12px; margin-left: 4px; }

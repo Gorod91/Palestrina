@@ -139,6 +139,7 @@ function render() {
       <div><div class="name"></div><div class="sub">${r.streak ? `${r.streak} ${r.streak === 1 ? 'settimana' : 'settimane'} di fila` : 'Obiettivo ' + r.goal}</div></div>
       <span class="count">${r.count}<small>/${r.goal}</small></span>`;
     li.querySelector('.name').textContent = r.display || r.name;
+    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', CROWN);
     $('ranking').append(li);
   });
   renderPoints();
@@ -186,6 +187,14 @@ function renderViewportDebug() {
 }
 
 /** Tab Oggi: chi ha detto che va in palestra oggi. */
+/** Re in carica: l'ultimo dell'albo d'oro, con la corona accanto al nome fino al prossimo. */
+function isKing(name) {
+  const albo = (state && state.albo) || [];
+  return albo.length > 0 && albo[albo.length - 1].names.includes(name);
+}
+
+const CROWN = '<svg class="crown" aria-label="Re del mese"><use href="#i-crown"/></svg>';
+
 const openPoints = new Set(); // dettagli aperti nella classifica a punti
 
 function renderPoints() {
@@ -203,6 +212,7 @@ function renderPoints() {
       <span class="total">${r.total}<small> pt</small></span>
       <div class="detail"></div>`;
     li.querySelector('.name').textContent = r.display || r.name;
+    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', CROWN);
     li.querySelector('.sub').textContent = ach.length ? ach.map((g) => g.label).join(' · ') : 'Nessuna medaglia';
     const detail = li.querySelector('.detail');
     if (!r.detail.length) detail.textContent = 'Ancora nessun punto questo mese.';
@@ -510,7 +520,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
-const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn() });
+const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN });
 
 // ---------- Tab ----------
 
