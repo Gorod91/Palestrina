@@ -1,5 +1,6 @@
 import * as sudometro from './sudometro.js';
 import { initTimer, setTimerAccount } from './timer.js';
+import { createChat, answersList } from './chat.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -49,7 +50,7 @@ function toast(msg, ms = 3500) {
   toastTimer = setTimeout(() => ($('toast').hidden = true), ms);
 }
 
-const TAB_TITLES = { oggi: 'Oggi', classifica: 'Classifica', timer: 'Timer', altro: 'Altro' };
+const TAB_TITLES = { oggi: 'Oggi', classifica: 'Classifica', chat: 'Chat', timer: 'Timer', altro: 'Altro' };
 
 function show(screen) {
   ['install', 'config', 'login', 'home'].forEach((s) => ($(`screen-${s}`).hidden = s !== screen));
@@ -125,6 +126,17 @@ function render() {
 
   renderSudometro();
   renderGallery();
+  renderToday(state.poll);
+  $('chat-notify').checked = !me.chatMuted;
+  chat.setUser({ name: me.name, display: me.display });
+  chat.updateBadge(state.chatMeta);
+}
+
+/** Tab Oggi: chi ha detto che va in palestra oggi. */
+function renderToday(poll) {
+  $('today-card').hidden = !poll;
+  if (!poll) return;
+  $('today-answers').replaceChildren(answersList(poll));
 }
 
 const photoCache = new Map(); // id → Promise<dataURL>
@@ -335,9 +347,13 @@ function cameraError(err) {
   return err && err.message ? err.message : 'Qualcosa è andato storto';
 }
 
+// ---------- Chat ----------
+
+const chat = createChat({ api, toast, loadPhoto, clean });
+
 // ---------- Tab ----------
 
-const TABS = ['oggi', 'classifica', 'timer', 'altro'];
+const TABS = ['oggi', 'classifica', 'chat', 'timer', 'altro'];
 
 function selectTab(name) {
   if (!TABS.includes(name)) name = 'oggi';
@@ -346,6 +362,8 @@ function selectTab(name) {
   store.set('tab', name);
   $('page-title').textContent = TAB_TITLES[name];
   $('scroller').scrollTop = 0;
+  document.body.classList.toggle('chat-mode', name === 'chat');
+  chat.setActive(name === 'chat' && !!session);
 }
 
 async function saveAlias(value) {
@@ -369,6 +387,7 @@ async function saveAlias(value) {
 
 function logout() {
   setTimerAccount('', null, null);
+  chat.reset();
   session = null;
   state = null;
   store.set('session', null);
@@ -420,9 +439,12 @@ async function enableNotifications() {
 
 async function home() {
   show('home');
-  selectTab(store.get('tab'));
+  // Da una notifica della chat l'app si apre con ?tab=chat
+  const fromUrl = new URLSearchParams(location.search).get('tab');
+  if (fromUrl) history.replaceState(null, '', location.pathname);
   render();
   await refresh();
+  selectTab(fromUrl || store.get('tab'));
   updateNotifyCard();
   sudometro.preload();
 }
@@ -439,6 +461,22 @@ $('form-name').addEventListener('submit', (e) => {
   saveAlias($('in-name').value);
 });
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
+$('today-open').addEventListener('click', () => selectTab('chat'));
+$('chat-notify').addEventListener('change', async (e) => {
+  try {
+    await api('chatMute', { muted: !e.target.checked });
+    toast(e.target.checked ? 'Notifiche della chat attive' : 'Notifiche della chat silenziate');
+  } catch (err) {
+    e.target.checked = !e.target.checked;
+    toast(err.message);
+  }
+});
+// Notifica toccata con l'app già aperta: il service worker chiede di aprire un tab.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (e) => {
+    if (e.data && e.data.tab && session) selectTab(e.data.tab);
+  });
+}
 $('avatar').addEventListener('click', () => selectTab('altro'));
 $('today-date').textContent = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
 document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));

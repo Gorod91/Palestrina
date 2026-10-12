@@ -16,6 +16,8 @@ const SHEETS = {
   presenze: { name: 'Presenze', header: ['Data', 'Ora', 'Nome', 'Fonte'] },
   sudometro: { name: 'Sudometro', header: ['Data', 'Ora', 'Nome', 'Punteggio', 'Titolo', 'Dettagli', 'Debug', 'Foto'] },
   iscrizioni: { name: 'Iscrizioni', header: ['Nome', 'Endpoint', 'Sottoscrizione', 'Aggiornata'] },
+  // Tipo: msg (messaggio), poll (domanda "chi va in palestra oggi?"), answer (risposta: Testo = si/forse/no, Rif = ID della domanda)
+  chat: { name: 'Chat', header: ['ID', 'Data', 'Ora', 'Nome', 'Tipo', 'Testo', 'Rif', 'Orario'] },
 };
 const DEFAULT_GOAL = 3;
 // Utenti con il pulsante di debug, oltre a quelli con "sì" nella colonna D di Utenti.
@@ -39,11 +41,7 @@ function setup() {
   }
   if (!props.getProperty('ADMIN_SECRET')) props.setProperty('ADMIN_SECRET', Utilities.getUuid());
 
-  // Recap ogni domenica alle 19 (fuso orario dello script).
-  ScriptApp.getProjectTriggers()
-    .filter((t) => t.getHandlerFunction() === 'sendWeeklyRecap')
-    .forEach((t) => ScriptApp.deleteTrigger(t));
-  ScriptApp.newTrigger('sendWeeklyRecap').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(19).create();
+  ensureTriggers(true);
 
   Logger.log('Fatto. ADMIN_SECRET (da mettere su GitHub come APPS_SCRIPT_SECRET): ' + props.getProperty('ADMIN_SECRET'));
 }
@@ -63,8 +61,74 @@ function autorizzaDrive() {
   Logger.log('Cartella foto: ' + photosRoot().getUrl());
 }
 
+const TRIGGERS_VERSION = '2';
+
+/**
+ * Recap ogni domenica alle 19 e premiazioni del mese il primo del mese alle 9 (fuso orario dello script).
+ * Chiamata anche dalla web app: dopo un aggiornamento i trigger nuovi si creano da soli.
+ */
+function ensureTriggers(force) {
+  if (!force && props.getProperty('TRIGGERS_VERSION') === TRIGGERS_VERSION) return;
+  const handlers = ['sendWeeklyRecap', 'sendMonthlyRecap'];
+  ScriptApp.getProjectTriggers()
+    .filter((t) => handlers.includes(t.getHandlerFunction()))
+    .forEach((t) => ScriptApp.deleteTrigger(t));
+  ScriptApp.newTrigger('sendWeeklyRecap').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(19).create();
+  ScriptApp.newTrigger('sendMonthlyRecap').timeBased().onMonthDay(1).atHour(9).create();
+  props.setProperty('TRIGGERS_VERSION', TRIGGERS_VERSION);
+}
+
+/** Premiazioni di un periodo (giorni "yyyy-MM-dd", estremi inclusi). */
+function computeRecap(from, to) {
+  const presenze = rows('presenze').filter((r) => r.day >= from && r.day <= to);
+  const counts = allUsers().map((u) => ({ name: u.name, count: new Set(presenze.filter((r) => r.name === u.name).map((r) => r.day)).size }));
+  const max = counts.length ? Math.max(...counts.map((c) => c.count)) : 0;
+  const min = counts.length ? Math.min(...counts.map((c) => c.count)) : 0;
+  const sudo = rows('sudometro').filter((r) => r.day >= from && r.day <= to);
+  const top = sudo.length ? sudo.reduce((a, b) => (b.score > a.score ? b : a)) : null;
+  return {
+    mvp: max > 0 ? { names: counts.filter((c) => c.count === max).map((c) => c.name), count: max } : null,
+    divano: min < max ? { names: counts.filter((c) => c.count === min).map((c) => c.name), count: min } : null,
+    pomodoro: top ? { name: top.name, score: top.score } : null,
+  };
+}
+
+function weekRecap() {
+  const week = weekKey(dayString(new Date()));
+  return computeRecap(week, addDays(week, 6));
+}
+
+/** Mese precedente: { from, to, label } */
+function previousMonth() {
+  const now = new Date();
+  const first = new Date(now.getFullYear(), now.getMonth() - 1, 1, 12);
+  const last = new Date(now.getFullYear(), now.getMonth(), 0, 12);
+  return { from: dayString(first), to: dayString(last), label: `${MONTHS_IT[first.getMonth()]} ${first.getFullYear()}` };
+}
+
+const MONTHS_IT = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+
+/** Testo delle premiazioni, per le notifiche. */
+function recapText(recap, period) {
+  const dn = displayNames();
+  const names = (list) => list.map(dn).join(', ');
+  const parts = [];
+  if (recap.mvp) parts.push(`MVP: ${names(recap.mvp.names)} (${recap.mvp.count})`);
+  if (recap.divano) parts.push(`Divano d'oro: ${names(recap.divano.names)} (${recap.divano.count})`);
+  if (recap.pomodoro) parts.push(`Pomodoro ${period}: ${dn(recap.pomodoro.name)} (${recap.pomodoro.score})`);
+  if (!parts.length) parts.push('Periodo tranquillo... troppo tranquillo.');
+  return parts.join('\n');
+}
+
 function sendWeeklyRecap() {
+  addChatEvent('', { kind: 'weekly', ...weekRecap() });
   dispatch('recap', '');
+}
+
+function sendMonthlyRecap() {
+  const m = previousMonth();
+  addChatEvent('', { kind: 'monthly', month: m.label, ...computeRecap(m.from, m.to) });
+  dispatch('monthly', '');
 }
 
 // ---------- API per la web app (POST con Content-Type text/plain) ----------
@@ -72,6 +136,11 @@ function sendWeeklyRecap() {
 function doPost(e) {
   try {
     const req = JSON.parse(e.postData.contents);
+    try {
+      ensureTriggers(false);
+    } catch (err) {
+      console.error('Trigger non aggiornati', err);
+    }
     const user = findUserByCode(req.code);
     if (!user) return json({ error: 'Codice non valido' });
 
@@ -86,6 +155,18 @@ function doPost(e) {
         return json(saveReference(user, req.features, req.photo));
       case 'photo':
         return json(getPhoto(req.id));
+      case 'chat':
+        return json(chatState(user, req.v));
+      case 'chatSend':
+        return json(chatSend(user, req.text));
+      case 'pollAsk':
+        return json(pollAsk(user));
+      case 'pollAnswer':
+        return json(pollAnswer(user, req.choice, req.time));
+      case 'chatMute':
+        if (req.muted) props.setProperty('mute_' + user.name, '1');
+        else props.deleteProperty('mute_' + user.name);
+        return json({ ok: true, muted: !!req.muted });
       case 'setAlias':
         return json(setAlias(user, req.alias));
       case 'setTimer': {
@@ -141,6 +222,8 @@ function checkin(user, source) {
   } finally {
     lock.releaseLock();
   }
+  const count = countInWeek(rows('presenze'), user.name, weekKey(dayString(new Date())));
+  addChatEvent(user.name, { kind: 'checkin', count, goal: user.goal, auto: source === 'automatico' });
   dispatch('checkin', user.name);
   return { ok: true, alreadyToday: false };
 }
@@ -179,7 +262,10 @@ function saveSudometro(user, req) {
     debug ? 'sì' : '',
     saved.id || '',
   ]);
-  if (!debug) dispatch('sudometro', user.name);
+  if (!debug) {
+    addChatEvent(user.name, { kind: 'sudometro', score, title: String(req.title || '').slice(0, 60), photoId: saved.id || '' });
+    dispatch('sudometro', user.name);
+  }
   return { ok: true, score, debug, photoError: saved.error };
 }
 
@@ -236,7 +322,13 @@ function buildState(user) {
       sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title } : null,
       reference: getReference(user),
       timerSeconds: Number(props.getProperty('timer_' + user.name)) || null,
+      chatMuted: !!props.getProperty('mute_' + user.name),
     },
+    poll: pollSummary(today, presenze, dn),
+    // Per il pallino dei messaggi non letti: orario e autore dei messaggi recenti.
+    chatMeta: chatRows()
+      .filter((r) => r.type === 'msg' || r.type === 'poll' || r.type === 'event')
+      .map((r) => ({ id: r.id, name: r.name })),
     week: {
       start: week,
       ranking,
@@ -281,24 +373,218 @@ function buildNotifications(event, name) {
     return toAllBut(name, `Sudometro di ${dn(name)}: ${r.score}`, `"${clean(r.title)}"`);
   }
 
+  if (event === 'chat') {
+    const r = chatRows().filter((x) => x.type === 'msg' && x.name === name).pop();
+    if (!r) return [];
+    return subs
+      .filter((s) => s.name !== name && !props.getProperty('mute_' + s.name))
+      .map((s) => ({ subscription: s.sub, title: dn(name), body: r.text.slice(0, 140), tab: 'chat' }));
+  }
+
+  if (event === 'poll') {
+    // La domanda arriva a tutti, anche a chi ha silenziato la chat.
+    return toAllBut(name, `${dn(name)} chiede: chi va in palestra oggi?`, 'Rispondi con un tap: ci sono, forse o no.').map((n) => ({ ...n, tab: 'chat' }));
+  }
+
+  if (event === 'answer') {
+    const poll = todayPoll();
+    if (!poll || poll.name === name) return [];
+    const a = chatRows().filter((x) => x.type === 'answer' && x.ref === poll.id && x.name === name).pop();
+    if (!a) return [];
+    const title = `${dn(name)}: ${CHOICE_LABELS[a.text] || a.text}${a.time ? ' alle ' + a.time : ''}`;
+    return subs.filter((s) => s.name === poll.name).map((s) => ({ subscription: s.sub, title, body: 'Chi va in palestra oggi?', tab: 'chat' }));
+  }
+
   if (event === 'recap') {
-    const counts = users.map((u) => ({ name: u.name, count: countInWeek(presenze, u.name, week) }));
-    const max = Math.max(...counts.map((c) => c.count));
-    const min = Math.min(...counts.map((c) => c.count));
-    const names = (v) => counts.filter((c) => c.count === v).map((c) => dn(c.name)).join(', ');
-    const parts = [];
-    if (max > 0) parts.push(`MVP: ${names(max)} (${max})`);
-    if (min < max) parts.push(`Divano d'oro: ${names(min)} (${min})`);
-    const sudo = rows('sudometro').filter((r) => weekKey(r.day) === week);
-    if (sudo.length) {
-      const top = sudo.reduce((a, b) => (b.score > a.score ? b : a));
-      parts.push(`Pomodoro della settimana: ${dn(top.name)} (${top.score})`);
-    }
-    if (!parts.length) parts.push('Settimana tranquilla... troppo tranquilla.');
-    return subs.map((s) => ({ subscription: s.sub, title: 'Recap della settimana', body: parts.join('\n') }));
+    const body = recapText(weekRecap(), 'della settimana');
+    return subs.map((s) => ({ subscription: s.sub, title: 'Premiazioni della settimana', body, tab: 'chat' }));
+  }
+
+  if (event === 'monthly') {
+    const m = previousMonth();
+    const body = recapText(computeRecap(m.from, m.to), 'del mese');
+    return subs.map((s) => ({ subscription: s.sub, title: `Premiazioni di ${m.label}`, body, tab: 'chat' }));
   }
 
   return [];
+}
+
+// ---------- Chat ----------
+
+const CHAT_DAYS = 7; // messaggi mostrati
+const CHAT_NOTIFY_EVERY_MIN = 5; // al massimo una notifica di chat ogni 5 minuti per persona
+const CHOICE_LABELS = { si: 'ci sono', forse: 'forse', no: 'oggi no' };
+
+function chatRows() {
+  const from = addDays(dayString(new Date()), -(CHAT_DAYS - 1));
+  return sheet('chat')
+    .getDataRange()
+    .getValues()
+    .slice(1)
+    .map((r) => ({
+      id: String(r[0]),
+      day: toDay(r[1]),
+      time: toTime(r[2]),
+      name: String(r[3]),
+      type: String(r[4]),
+      text: String(r[5]),
+      ref: String(r[6]),
+      at: toTime(r[7]),
+    }))
+    .filter((r) => r.day >= from)
+    .map((r) => ({ ...r, time: r.type === 'answer' ? r.at : r.time, clock: r.time }));
+}
+
+function bumpChat() {
+  const v = Number(props.getProperty('CHAT_VERSION') || 0) + 1;
+  props.setProperty('CHAT_VERSION', String(v));
+  return v;
+}
+
+function newId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+}
+
+function todayPoll() {
+  const today = dayString(new Date());
+  return chatRows().find((r) => r.type === 'poll' && r.day === today) || null;
+}
+
+/** Riepilogo della domanda di oggi, per la chat e per il tab Oggi. */
+function pollSummary(today, presenze, dn) {
+  const rowsNow = chatRows();
+  const poll = rowsNow.find((r) => r.type === 'poll' && r.day === today);
+  if (!poll) return null;
+  const arrived = new Set(presenze.filter((p) => p.day === today).map((p) => p.name));
+  const answers = {};
+  rowsNow.filter((r) => r.type === 'answer' && r.ref === poll.id).forEach((r) => (answers[r.name] = r));
+  return {
+    id: poll.id,
+    by: poll.name,
+    byDisplay: dn(poll.name),
+    clock: poll.clock,
+    people: allUsers().map((u) => ({
+      name: u.name,
+      display: u.display,
+      choice: answers[u.name] ? answers[u.name].text : null,
+      time: answers[u.name] ? answers[u.name].time : '',
+      arrived: arrived.has(u.name),
+    })),
+  };
+}
+
+/** Messaggi degli ultimi giorni. Se la versione `v` del client è aggiornata risponde solo { same: true }. */
+function chatState(user, v) {
+  const version = Number(props.getProperty('CHAT_VERSION') || 0);
+  if (Number(v) === version && version > 0) return { v: version, same: true };
+  const dn = displayNames();
+  const today = dayString(new Date());
+  const presenze = rows('presenze');
+  return {
+    v: version,
+    messages: chatRows()
+      .filter((r) => r.type === 'msg' || r.type === 'poll' || r.type === 'event')
+      .map((r) => ({
+        id: r.id,
+        day: r.day,
+        time: r.clock,
+        name: r.name,
+        display: r.name ? dn(r.name) : '',
+        type: r.type,
+        text: r.type === 'msg' ? r.text : '',
+        data: r.type === 'event' ? safeJson(r.text) : null,
+      })),
+    poll: pollSummary(today, presenze, dn),
+    names: Object.fromEntries(allUsers().map((u) => [u.name, u.display])),
+  };
+}
+
+/** Evento automatico in chat (check-in, Sudometro, premiazioni). I dati restano strutturati: il testo lo fa l'app. */
+function addChatEvent(name, data) {
+  try {
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      appendChat({ name }, 'event', JSON.stringify(data));
+      bumpChat();
+    } finally {
+      lock.releaseLock();
+    }
+  } catch (err) {
+    console.error('Evento chat non salvato', err); // non deve bloccare check-in o Sudometro
+  }
+}
+
+function appendChat(user, type, text, ref, at) {
+  const now = new Date();
+  const id = newId();
+  sheet('chat').appendRow([id, dayString(now), Utilities.formatDate(now, TZ, 'HH:mm'), user.name, type, text || '', ref || '', at || '']);
+  return id;
+}
+
+function chatSend(user, text) {
+  const t = String(text || '').trim().slice(0, 500);
+  if (!t) return { error: 'Messaggio vuoto' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    appendChat(user, 'msg', t);
+    bumpChat();
+  } finally {
+    lock.releaseLock();
+  }
+  const last = Number(props.getProperty('chatNotify_' + user.name) || 0);
+  if (Date.now() - last > CHAT_NOTIFY_EVERY_MIN * 60000) {
+    props.setProperty('chatNotify_' + user.name, String(Date.now()));
+    dispatch('chat', user.name);
+  }
+  return chatState(user, -1);
+}
+
+/** Crea la domanda di oggi, se non c'è già. */
+function pollAsk(user) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  let created = false;
+  try {
+    if (!todayPoll()) {
+      appendChat(user, 'poll', 'Chi va in palestra oggi?');
+      bumpChat();
+      created = true;
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  if (created) dispatch('poll', user.name);
+  return chatState(user, -1);
+}
+
+/** Risposta alla domanda di oggi: una per persona, si può cambiare. Orario facoltativo (HH:MM). */
+function pollAnswer(user, choice, time) {
+  if (!CHOICE_LABELS[choice]) return { error: 'Risposta non valida' };
+  const at = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(time || '')) ? String(time) : '';
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  let notify = false;
+  try {
+    const poll = todayPoll();
+    if (!poll) return { error: 'Nessuna domanda per oggi' };
+    const sh = sheet('chat');
+    const values = sh.getDataRange().getValues();
+    const row = values.findIndex((r, i) => i > 0 && String(r[4]) === 'answer' && String(r[6]) === poll.id && String(r[3]) === user.name);
+    if (row > 0) {
+      notify = String(values[row][5]) !== choice || toTime(values[row][7]) !== at;
+      sh.getRange(row + 1, 6, 1, 3).setValues([[choice, poll.id, at]]);
+    } else {
+      appendChat(user, 'answer', choice, poll.id, at);
+      notify = true;
+    }
+    bumpChat();
+  } finally {
+    lock.releaseLock();
+  }
+  if (notify) dispatch('answer', user.name);
+  return chatState(user, -1);
 }
 
 // ---------- Foto su Drive ----------
@@ -410,8 +696,20 @@ function dayString(date) {
 // ---------- Dati ----------
 
 function sheet(key) {
-  const sh = SpreadsheetApp.getActive().getSheetByName(SHEETS[key].name);
-  if (!sh) throw new Error('Esegui prima setup() dall\'editor di Apps Script');
+  const ss = SpreadsheetApp.getActive();
+  let sh = ss.getSheetByName(SHEETS[key].name);
+  if (!sh) {
+    // Fogli aggiunti dopo il primo setup (es. Chat): li crea al primo uso.
+    if (key === 'utenti') throw new Error('Esegui prima setup() dall\'editor di Apps Script');
+    sh = ss.insertSheet(SHEETS[key].name);
+    sh.appendRow(SHEETS[key].header);
+    sh.setFrozenRows(1);
+  }
+  if (key === 'chat' && !props.getProperty('CHAT_TEXT_FORMAT')) {
+    // Tutto come testo: un messaggio che inizia con "=" non deve diventare una formula.
+    sh.getRange('A:H').setNumberFormat('@');
+    props.setProperty('CHAT_TEXT_FORMAT', '1');
+  }
   return sh;
 }
 
@@ -486,6 +784,14 @@ function randomCode(name) {
 /** Titoli vecchi del Sudometro potevano contenere emoji. */
 function clean(t) {
   return String(t || '').replace(/[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}\u{200D}]/gu, '').trim();
+}
+
+function safeJson(t) {
+  try {
+    return JSON.parse(t);
+  } catch (err) {
+    return {};
+  }
 }
 
 function pick(list) {

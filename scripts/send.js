@@ -47,7 +47,7 @@ async function appsScript(params) {
   let ok = 0;
   for (const n of notifications) {
     try {
-      await webpush.sendNotification(n.subscription, JSON.stringify({ title: n.title, body: n.body }), { TTL: 6 * 3600 });
+      await webpush.sendNotification(n.subscription, JSON.stringify({ title: n.title, body: n.body, tab: n.tab || '' }), { TTL: 6 * 3600 });
       ok++;
     } catch (err) {
       console.warn(`::warning::Invio fallito (HTTP ${err.statusCode}): ${err.body || err.message}`);

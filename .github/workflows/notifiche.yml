@@ -1,16 +1,16 @@
 name: Notifiche
 
-# Avviata da Apps Script (check-in, Sudometro, recap della domenica, test)
+# Avviata da Apps Script (check-in, Sudometro, chat, premiazioni, test)
 # oppure a mano da Actions → Notifiche → Run workflow.
 on:
   repository_dispatch:
-    types: [checkin, sudometro, recap, test]
+    types: [checkin, sudometro, recap, monthly, test, chat, poll, answer]
   workflow_dispatch:
     inputs:
       event:
         description: Evento
         type: choice
-        options: [recap, test, checkin, sudometro]
+        options: [recap, monthly, test, checkin, sudometro, chat, poll, answer]
         default: recap
       name:
         description: Nome (per test, checkin, sudometro)
