@@ -463,6 +463,10 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       $('chat-list').innerHTML = '';
       delete $('chat-list').dataset.rendered;
     },
+    /** Carica la chat di nascosto (all'apertura dell'app), così il tab si apre già pieno. */
+    preload() {
+      if (!active && !data) load(false);
+    },
     setActive(on) {
       active = on;
       clearInterval(timer);

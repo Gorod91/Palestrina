@@ -456,3 +456,7 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 
 .poll-names .poll-side { margin-left: 8px; font-size: 12px; }
 .poll-names .poll-side .ask-link { vertical-align: baseline; }
+
+/* Conto alla rovescia di 3 secondi prima che parta il timer */
+.timer-running.counting span { font-size: 140px; color: var(--exercise); animation: count-pop 1s ease-out infinite; }
+@keyframes count-pop { from { transform: scale(1.25); opacity: .4; } 30% { transform: scale(1); opacity: 1; } }

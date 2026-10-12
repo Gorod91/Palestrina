@@ -717,6 +717,7 @@ async function home() {
   render();
   selectTab(fromUrl || store.get('tab'));
   await refresh();
+  chat.preload(); // la chat si carica di nascosto, così il tab si apre già pieno
   updateNotifyCard();
   sudometro.preload();
 }
@@ -789,7 +790,7 @@ $('btn-browser').addEventListener('click', () => {
   start();
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && session && state) refresh();
+  if (document.visibilityState === 'visible' && session && state) refresh().then(() => chat.preload());
 });
 
 // Tastiera aperta: l'app si restringe all'area visibile, così la casella dei messaggi

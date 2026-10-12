@@ -11,6 +11,8 @@ let account = null; // { name, save(seconds) }: l'ultimo tempo usato è salvato 
 let deadline = null; // ms epoch di fine, null se fermo
 let frame = null;
 let wakeLock = null;
+let goAt = 0; // fine del conto alla rovescia iniziale
+const COUNTDOWN = 3;
 
 const valid = (v) => Number.isFinite(v) && v >= MIN && v <= MAX;
 const localKey = () => `palestrina.timer.${account ? account.name : ''}`;
@@ -77,14 +79,25 @@ function releaseAwake() {
 function start() {
   saveLocal();
   if (account && account.save) account.save(seconds); // ultimo tempo usato, anche su altri telefoni
-  deadline = Date.now() + seconds * 1000;
+  // 3 secondi di conto alla rovescia prima che parta il tempo
+  goAt = Date.now() + COUNTDOWN * 1000;
+  deadline = goAt + seconds * 1000;
   render();
   keepAwake();
   tick();
 }
 
 function tick() {
-  const left = deadline - Date.now();
+  const now = Date.now();
+  const counting = now < goAt;
+  $('timer-running').classList.toggle('counting', counting);
+  if (counting) {
+    $('timer-left').textContent = String(Math.ceil((goAt - now) / 1000));
+    $('timer-running').style.setProperty('--p', '0');
+    frame = requestAnimationFrame(tick);
+    return;
+  }
+  const left = deadline - now;
   if (left <= 0) return finish();
   const s = Math.ceil(left / 1000);
   $('timer-left').textContent = s >= 60 ? fmt(s) : String(s);
