@@ -362,9 +362,15 @@ function dayLabel(day) {
 
 /** Bicipite che si flette (SVG animato via CSS): feedback mentre si aspetta Apps Script. */
 export function bicep() {
-  return `<svg class="bicep" viewBox="0 0 64 64" aria-label="Invio in corso" role="img">
-    <path class="bicep-upper" d="M7 49 L37 49" />
-    <path class="bicep-muscle" d="M9 47 C12 31 32 29 37 45 Z" />
-    <g class="bicep-forearm"><path d="M37 49 L37 22" /><circle cx="37" cy="14" r="9" /></g>
+  // Ispirato all'emoji del bicipite: braccio dal basso a sinistra, muscolo rotondo, avambraccio che sale e
+  // pugno con nocche e pollice. Avambraccio e pugno ruotano sul gomito mentre il muscolo si gonfia.
+  return `<svg class="bicep" viewBox="0 0 80 64" aria-label="Invio in corso" role="img">
+    <rect class="bicep-arm" x="3" y="43" width="42" height="14" rx="7" />
+    <path class="bicep-muscle" d="M7 47 C8 28 31 24 39 42 Z" />
+    <g class="bicep-forearm">
+      <path d="M34 54 L35 22 H47 L48 54 Z" />
+      <rect x="27" y="3" width="27" height="24" rx="11" />
+      <path class="bicep-cut" d="M28 10 H35 M28 15.5 H35 M29 21 H35.5 M33.5 25.5 C38 22.5 44 22 50 23.5" />
+    </g>
   </svg>`;
 }
