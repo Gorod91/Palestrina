@@ -202,14 +202,14 @@ function renderPoints() {
       <span class="total">${r.total}<small> pt</small></span>
       <div class="detail"></div>`;
     li.querySelector('.name').textContent = r.display || r.name;
-    li.querySelector('.sub').textContent = ach.length ? ach.map((g) => g.label).join(' · ') : 'Nessun achievement';
+    li.querySelector('.sub').textContent = ach.length ? ach.map((g) => g.label).join(' · ') : 'Nessuna medaglia';
     const detail = li.querySelector('.detail');
     if (!r.detail.length) detail.textContent = 'Ancora nessun punto questo mese.';
     r.detail.forEach((g) => {
       const row = document.createElement('div');
       row.className = 'detail-row';
       row.innerHTML = '<span></span><b></b>';
-      row.querySelector('span').textContent = g.achievement ? `Achievement: ${g.label}` : g.count > 1 ? `${g.label} × ${g.count}` : g.label;
+      row.querySelector('span').textContent = g.achievement ? `Medaglia: ${g.label}` : g.count > 1 ? `${g.label} × ${g.count}` : g.label;
       row.querySelector('b').textContent = `+${g.pts}`;
       detail.append(row);
     });
@@ -618,6 +618,10 @@ $('form-name').addEventListener('submit', (e) => {
   saveAlias($('in-name').value);
 });
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
+$('btn-points-info').addEventListener('click', () => ($('points-info').hidden = false));
+$('points-info').addEventListener('click', (e) => {
+  if (e.target === $('points-info') || e.target.closest('.sheet-close')) $('points-info').hidden = true;
+});
 $('today-open').addEventListener('click', () => selectTab('chat'));
 $('debug-mode').addEventListener('change', (e) => {
   store.set('debugOff', !e.target.checked);

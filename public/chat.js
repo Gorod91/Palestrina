@@ -231,7 +231,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug }) {
       row.append(box);
     } else if (d.kind === 'achievement') {
       row.classList.add('award');
-      row.append(el('p', 'event-title', 'Achievement sbloccato'));
+      row.append(el('p', 'event-title', 'Medaglia vinta'));
       row.append(el('p', 'event-text', `${name}: ${d.title} (+${d.pts} punti)`));
     } else if (d.kind === 'weekly' || d.kind === 'monthly') {
       row.classList.add('award');

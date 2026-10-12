@@ -130,11 +130,11 @@
       </div>
 
       <div class="tab-panel" data-tab="classifica" hidden>
-        <h2 class="section" id="points-title">Punti del mese</h2>
+        <h2 class="section with-info"><span id="points-title">Punti del mese</span><button id="btn-points-info" class="info-btn" aria-label="Come funzionano punti e medaglie">i</button></h2>
         <section class="card list">
           <ol id="points" class="ranking points"></ol>
         </section>
-        <p class="footnote">Tocca un nome per il dettaglio. Presenza 10 punti, Sudometro da 1 a 3, bonus amici 3 (check-in a meno di un'ora da un altro), settimane di fila con l'obiettivo +5 ciascuna fino a 20, rientro dopo 10 giorni doppio. Achievement: Mai saltato 20, Mattiniero 10 (4 volte prima delle 9), Branco 10 (5 bonus amici), Pomodoro del mese 10.</p>
+        <p class="footnote">Tocca un nome per vedere da dove arrivano i punti.</p>
 
         <h2 class="section">Questa settimana</h2>
         <section class="card list">
@@ -259,6 +259,29 @@
   </div>
 
   <!-- Foto a tutto schermo -->
+  <div id="points-info" class="sheet" hidden>
+    <div class="sheet-card" role="dialog" aria-labelledby="points-info-title">
+      <div class="sheet-head"><h3 id="points-info-title">Punti e medaglie</h3><button class="sheet-close" aria-label="Chiudi">×</button></div>
+      <p class="muted">La classifica a punti riparte da zero ogni mese. Se annulli un check-in, spariscono anche i suoi punti.</p>
+      <h4>Punti</h4>
+      <ul class="rules">
+          <li><div><b>Presenza</b><span>Un check-in al giorno</span></div><em>10</em></li>
+          <li><div><b>Sudometro</b><span>In base al punteggio: fino a 33, fino a 66, oltre</span></div><em>1 · 2 · 3</em></li>
+          <li><div><b>Bonus amici</b><span>Check-in a meno di un'ora da quello di un altro, una volta al giorno</span></div><em>3</em></li>
+          <li><div><b>Settimane di fila</b><span>Per ogni settimana consecutiva con l'obiettivo raggiunto, oltre la prima</span></div><em>+5, max 20</em></li>
+          <li><div><b>Rientro</b><span>Dopo più di 10 giorni senza palestra la presenza vale doppio</span></div><em>10</em></li>
+      </ul>
+      <h4>Medaglie del mese</h4>
+      <ul class="rules medals">
+          <li><div><b>Mai saltato</b><span>Obiettivo raggiunto in ogni settimana che inizia nel mese</span></div><em>20</em></li>
+          <li><div><b>Mattiniero</b><span>4 check-in prima delle 9</span></div><em>10</em></li>
+          <li><div><b>Branco</b><span>5 bonus amici</span></div><em>10</em></li>
+          <li><div><b>Pomodoro del mese</b><span>Il Sudometro più alto del mese. Fino alla fine del mese può cambiare proprietario</span></div><em>10</em></li>
+      </ul>
+      <p class="muted">Quando qualcuno vince una medaglia compare in chat. Il primo della classifica viene festeggiato come Re del mese nel riepilogo del 1° del mese.</p>
+    </div>
+  </div>
+
   <div id="viewer" class="viewer" hidden>
     <div class="viewer-pair">
       <figure id="viewer-fresh-fig"><img id="viewer-fresh" alt="Da fresco"><figcaption>Fresco</figcaption></figure>
