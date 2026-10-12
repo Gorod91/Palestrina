@@ -426,3 +426,30 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 .poll-names .no b { color: var(--danger); }
 .poll-names .none { color: var(--muted); }
 .poll-names .poll-cancel { margin-left: 8px; padding: 0; border: 0; background: none; color: var(--danger); font-size: 13px; font-weight: 600; }
+
+/* Pianificazione: fila dei giorni nel sondaggio della chat */
+.pdays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-bottom: 8px; }
+.pday { margin: 0; padding: 4px 0 3px; border: 0; border-radius: 9px; background: var(--card-2); color: var(--muted); font-size: 11px; line-height: 1.15; }
+.pday b { display: block; color: var(--fg); font-size: 15px; }
+.pday i { display: block; font-style: normal; color: var(--exercise); font-size: 10px; font-weight: 700; }
+.pday.si { box-shadow: inset 0 -2px 0 var(--exercise); }
+.pday.forse { box-shadow: inset 0 -2px 0 #ffd60a; }
+.pday.no { box-shadow: inset 0 -2px 0 var(--danger); }
+.pday.on { background: var(--exercise); color: #000; }
+.pday.on b, .pday.on i { color: #000; }
+.ask-link { margin: 0; padding: 0; border: 0; background: none; color: var(--stand); font-size: 13px; font-weight: 600; display: inline-flex; align-items: center; gap: 4px; }
+.ask-link .bicep { width: 22px; height: 21px; color: var(--stand); --bicep-bg: var(--card); }
+
+/* Pianificazione: griglia nel tab Oggi */
+.plan-grid { width: 100%; margin-top: 8px; border-collapse: separate; border-spacing: 3px; table-layout: fixed; }
+.plan-grid th { color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1.2; }
+.plan-grid th:first-child, .plan-grid td.n { width: 72px; }
+.plan-grid td.n { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 4px; }
+.pcell { display: grid; place-items: center; width: 100%; height: 30px; margin: 0; padding: 0; border: 0; border-radius: 8px; background: var(--card-2); color: var(--fg); font-size: 10px; font-weight: 700; }
+.pcell.si { background: var(--exercise); color: #000; }
+.pcell.forse { background: #ffd60a; color: #000; }
+.pcell.no { background: rgba(255, 69, 58, .2); color: var(--danger); }
+.pcell.me { box-shadow: 0 0 0 1.5px var(--stand); }
+.pcell .bicep { width: 22px; height: 21px; color: var(--exercise); --bicep-bg: var(--card-2); }
+.pcell.si .bicep { color: #000; --bicep-bg: var(--exercise); }
+.plan-note { margin: 6px 0 0; }

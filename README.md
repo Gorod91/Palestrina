@@ -127,7 +127,8 @@ Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il
 ## Chat
 
 Tab **Chat**: messaggi del gruppo (ultimi 7 giorni) e, in cima, la domanda **"Chi va in palestra oggi?"**.
-- Chiunque la crea con un tap (una sola al giorno); si risponde con **Ci sono / Forse / No** e un **orario facoltativo**. Chi poi fa check-in risulta "arrivato". Il riepilogo compare anche nel tab **Oggi**.
+- Si risponde con **Ci sono / Forse / No** e un **orario facoltativo**, per oggi e per i **6 giorni dopo** (fila dei giorni sopra la domanda; ritoccare la risposta la toglie). "Chiedi a tutti" manda la domanda di oggi a tutti (una al giorno). Chi poi fa check-in risulta "arrivato".
+- Nel tab **Oggi** c'è la griglia persone × prossimi 7 giorni: le proprie caselle si toccano per cambiare risposta. Le risposte stanno nel foglio **Piani**, creato da solo.
 - In chat compaiono anche gli **eventi**: check-in, Sudometro (con la foto), **premiazioni della settimana** (domenica alle 19) e **premiazioni del mese** (l'ultimo giorno del mese alle 21: Re del mese, MVP, Divano d'oro e Pomodoro del mese).
 - Notifiche: la domanda arriva a tutti; ogni risposta solo a chi l'ha fatta; i messaggi agli altri, al massimo una notifica ogni 5 minuti per persona. Si possono silenziare in **Altro → Notifiche** (la domanda arriva comunque). Toccando la notifica si apre la chat.
 - Dati nel foglio **Chat**, creato da solo al primo messaggio. L'app controlla i nuovi messaggi ogni 5 secondi solo mentre la chat è aperta.

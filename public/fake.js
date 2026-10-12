@@ -57,6 +57,21 @@ export function fakeState(real) {
       reference: { ...(me.reference || { features: { redness: 0, shine: 0 } }), photoId: `fake-fresh-${me.name}` },
     },
     refPhotos,
+    plans: [0, 1, 2, 3, 4, 5, 6].map((n) => ({
+      day: daysAgo(-n),
+      people: people.map((p, i) => {
+        const pattern = [
+          ['si', 'si', '', 'forse', 'si', '', ''],
+          ['si', '', 'si', 'si', '', '', ''],
+          ['forse', 'si', '', 'si', '', 'si', ''],
+          ['no', '', '', 'si', '', '', ''],
+          [null, '', 'forse', '', '', '', 'si'],
+          ['si', '', 'si', '', 'si', '', ''],
+        ][i];
+        const c = pattern[n] || null;
+        return { name: p.name, display: p.display, choice: c, time: c === 'si' ? ['18:30', '19:00', '18:00', '18:30', '19:30', '18:30'][i] : '', arrived: n === 0 && i === 5 };
+      }),
+    })),
     poll: {
       id: 'fake-poll',
       by: 'Giulia',
@@ -117,7 +132,8 @@ export function fakeChat(me) {
   add(daysAgo(0), '08:30', 'Sara', 'msg', { text: 'Forse passo verso le 19' });
   add(daysAgo(0), '09:02', 'Marta', 'event', { data: { kind: 'checkin', count: 4, goal: 4 } });
   add(daysAgo(0), '09:05', 'Marta', 'msg', { text: 'Obiettivo della settimana fatto' });
-  return { v: 1, messages: msgs, names, poll: fakeState({ me, week: null }).poll, refPhotos: fakeState({ me, week: null }).refPhotos };
+  const st = fakeState({ me, week: null });
+  return { v: 1, messages: msgs, names, poll: st.poll, plans: st.plans, refPhotos: st.refPhotos };
 }
 
 /** Foto fittizia (SVG) per gli id "fake-fresh-Nome" e "fake-sweat-Nome". */

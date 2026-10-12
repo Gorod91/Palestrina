@@ -18,6 +18,8 @@ const SHEETS = {
   iscrizioni: { name: 'Iscrizioni', header: ['Nome', 'Endpoint', 'Sottoscrizione', 'Aggiornata'] },
   // Tipo: msg (messaggio), poll (domanda "chi va in palestra oggi?"), answer (risposta: Testo = si/forse/no, Rif = ID della domanda)
   chat: { name: 'Chat', header: ['ID', 'Data', 'Ora', 'Nome', 'Tipo', 'Testo', 'Rif', 'Orario'] },
+  // Chi va in palestra, oggi e nei 6 giorni dopo: una riga per persona e giorno (Risposta = si/forse/no)
+  piani: { name: 'Piani', header: ['Giorno', 'Nome', 'Risposta', 'Orario', 'Aggiornato'] },
 };
 const DEFAULT_GOAL = 3;
 // Utenti con il pulsante di debug, oltre a quelli con "sì" nella colonna D di Utenti.
@@ -191,6 +193,8 @@ function doPost(e) {
         return json(pollAsk(user));
       case 'pollAnswer':
         return json(pollAnswer(user, req.choice, req.time));
+      case 'planSet':
+        return json(planSet(user, req.day, req.choice, req.time));
       case 'chatDelete':
         return json(chatDelete(user, req.id));
       case 'chatMute':
@@ -445,6 +449,7 @@ function buildState(user) {
       chatMuted: !!props.getProperty('mute_' + user.name),
     },
     poll: pollSummary(today, presenze, dn),
+    plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
@@ -513,9 +518,9 @@ function buildNotifications(event, name) {
   if (event === 'answer') {
     const poll = todayPoll();
     if (!poll || poll.name === name) return [];
-    const a = chatRows().filter((x) => x.type === 'answer' && x.ref === poll.id && x.name === name).pop();
-    if (!a) return [];
-    const title = `${dn(name)}: ${CHOICE_LABELS[a.text] || a.text}${a.time ? ' alle ' + a.time : ''}`;
+    const a = plansSummary(rows('presenze'))[0].people.find((x) => x.name === name);
+    if (!a || !a.choice) return [];
+    const title = `${dn(name)}: ${CHOICE_LABELS[a.choice] || a.choice}${a.time ? ' alle ' + a.time : ''}`;
     return subs.filter((s) => s.name === poll.name).map((s) => ({ subscription: s.sub, title, body: 'Chi va in palestra oggi?', tab: 'chat' }));
   }
 
@@ -581,27 +586,39 @@ function todayPoll() {
   return chatRows().find((r) => r.type === 'poll' && r.day === today) || null;
 }
 
+/** I 7 giorni pianificabili: oggi e i 6 successivi. */
+function planDays() {
+  const today = dayString(new Date());
+  return [0, 1, 2, 3, 4, 5, 6].map((n) => addDays(today, n));
+}
+
+/** Chi va in palestra nei prossimi 7 giorni: per ogni giorno tutte le persone con risposta e orario. */
+function plansSummary(presenze) {
+  const days = planDays();
+  const today = days[0];
+  const answers = {};
+  // Risposte di oggi date prima dei piani (righe "answer" della chat)
+  const poll = todayPoll();
+  if (poll) chatRows().filter((r) => r.type === 'answer' && r.ref === poll.id).forEach((r) => (answers[today + '|' + r.name] = { choice: r.text, time: r.time }));
+  rows('piani').forEach((r) => {
+    if (days.indexOf(r.day) >= 0) answers[r.day + '|' + r.name] = { choice: r.choice, time: r.time };
+  });
+  const arrived = new Set(presenze.filter((p) => p.day === today).map((p) => p.name));
+  const users = allUsers();
+  return days.map((day) => ({
+    day,
+    people: users.map((u) => {
+      const a = answers[day + '|' + u.name];
+      return { name: u.name, display: u.display, choice: a ? a.choice : null, time: a ? a.time : '', arrived: day === today && arrived.has(u.name) };
+    }),
+  }));
+}
+
 /** Riepilogo della domanda di oggi, per la chat e per il tab Oggi. */
 function pollSummary(today, presenze, dn) {
-  const rowsNow = chatRows();
-  const poll = rowsNow.find((r) => r.type === 'poll' && r.day === today);
+  const poll = todayPoll();
   if (!poll) return null;
-  const arrived = new Set(presenze.filter((p) => p.day === today).map((p) => p.name));
-  const answers = {};
-  rowsNow.filter((r) => r.type === 'answer' && r.ref === poll.id).forEach((r) => (answers[r.name] = r));
-  return {
-    id: poll.id,
-    by: poll.name,
-    byDisplay: dn(poll.name),
-    clock: poll.clock,
-    people: allUsers().map((u) => ({
-      name: u.name,
-      display: u.display,
-      choice: answers[u.name] ? answers[u.name].text : null,
-      time: answers[u.name] ? answers[u.name].time : '',
-      arrived: arrived.has(u.name),
-    })),
-  };
+  return { id: poll.id, by: poll.name, byDisplay: dn(poll.name), clock: poll.clock, people: plansSummary(presenze)[0].people };
 }
 
 /** Messaggi degli ultimi giorni. Se la versione `v` del client è aggiornata risponde solo { same: true }. */
@@ -626,6 +643,7 @@ function chatState(user, v) {
         data: r.type === 'event' ? safeJson(r.text) : null,
       })),
     poll: pollSummary(today, presenze, dn),
+    plans: plansSummary(presenze),
     names: Object.fromEntries(allUsers().map((u) => [u.name, u.display])),
     refPhotos: refPhotoIds(),
   };
@@ -691,31 +709,40 @@ function pollAsk(user) {
   return chatState(user, -1);
 }
 
-/** Risposta alla domanda di oggi: una per persona, si può cambiare. Orario facoltativo (HH:MM). */
+/** Risposta per oggi (anche senza domanda): una per persona, si può cambiare. Orario facoltativo (HH:MM). */
 function pollAnswer(user, choice, time) {
-  if (!CHOICE_LABELS[choice]) return { error: 'Risposta non valida' };
-  const at = /^([01]\d|2[0-3]):[0-5]\d$/.test(String(time || '')) ? String(time) : '';
+  return planSet(user, dayString(new Date()), choice, time);
+}
+
+/** Chi va in palestra in un giorno dei prossimi 7. Risposta vuota = toglie la risposta. */
+function planSet(user, day, choice, time) {
+  const c = String(choice || '');
+  if (c && !CHOICE_LABELS[c]) return { error: 'Risposta non valida' };
+  const d = String(day || '');
+  if (planDays().indexOf(d) < 0) return { error: 'Si può pianificare solo da oggi a 6 giorni' };
+  const at = c && /^([01]\d|2[0-3]):[0-5]\d$/.test(String(time || '')) ? String(time) : '';
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
-  let notify = false;
+  let changed = false;
   try {
-    const poll = todayPoll();
-    if (!poll) return { error: 'Nessuna domanda per oggi' };
-    const sh = sheet('chat');
+    const sh = sheet('piani');
     const values = sh.getDataRange().getValues();
-    const row = values.findIndex((r, i) => i > 0 && String(r[4]) === 'answer' && String(r[6]) === poll.id && String(r[3]) === user.name);
+    const row = values.findIndex((r, i) => i > 0 && toDay(r[0]) === d && String(r[1]) === user.name);
+    const now = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm');
     if (row > 0) {
-      notify = String(values[row][5]) !== choice || toTime(values[row][7]) !== at;
-      sh.getRange(row + 1, 6, 1, 3).setValues([[choice, poll.id, at]]);
-    } else {
-      appendChat(user, 'answer', choice, poll.id, at);
-      notify = true;
+      changed = String(values[row][2]) !== c || (values[row][3] ? toTime(values[row][3]) : '') !== at;
+      if (!c) sh.deleteRow(row + 1);
+      else sh.getRange(row + 1, 1, 1, 5).setValues([[d, user.name, c, at, now]]);
+    } else if (c) {
+      sh.appendRow([d, user.name, c, at, now]);
+      changed = true;
     }
-    bumpChat();
+    if (changed) bumpChat();
   } finally {
     lock.releaseLock();
   }
-  if (notify) dispatch('answer', user.name);
+  // Avvisa chi ha fatto la domanda di oggi (solo per oggi)
+  if (changed && c && d === dayString(new Date()) && todayPoll()) dispatch('answer', user.name);
   return chatState(user, -1);
 }
 
@@ -734,7 +761,18 @@ function chatDelete(user, id) {
       if (i > 0 && (String(r[0]) === target || (String(r[4]) === 'answer' && String(r[6]) === target))) remove.push(i + 1);
     });
     if (!remove.length) return { error: 'Messaggio non trovato' };
+    const target0 = values.find((r, i) => i > 0 && String(r[0]) === target);
     remove.reverse().forEach((row) => sh.deleteRow(row)); // dal fondo, così gli indici restano validi
+    // Annullare la domanda toglie anche le risposte di quel giorno
+    if (target0 && String(target0[4]) === 'poll') {
+      const day = toDay(target0[1]);
+      const pi = sheet('piani');
+      const rowsPi = [];
+      pi.getDataRange().getValues().forEach((r, i) => {
+        if (i > 0 && toDay(r[0]) === day) rowsPi.push(i + 1);
+      });
+      rowsPi.reverse().forEach((row) => pi.deleteRow(row));
+    }
     bumpChat();
   } finally {
     lock.releaseLock();
@@ -974,6 +1012,10 @@ function sheet(key) {
     sh.appendRow(SHEETS[key].header);
     sh.setFrozenRows(1);
   }
+  if (key === 'piani' && !props.getProperty('PIANI_TEXT_FORMAT')) {
+    sh.getRange('A:E').setNumberFormat('@'); // giorni e orari restano testo, non date
+    props.setProperty('PIANI_TEXT_FORMAT', '1');
+  }
   if (key === 'chat' && !props.getProperty('CHAT_TEXT_FORMAT')) {
     // Tutto come testo: un messaggio che inizia con "=" non deve diventare una formula.
     sh.getRange('A:H').setNumberFormat('@');
@@ -998,6 +1040,7 @@ function rows(key) {
     return values.filter((r) => !r[6]).map((r) => ({ day: toDay(r[0]), name: r[2], score: Number(r[3]), title: r[4], photoId: r[7] || '' }));
   }
   if (key === 'iscrizioni') return values.map((r) => ({ name: r[0], sub: JSON.parse(r[2]) }));
+  if (key === 'piani') return values.map((r) => ({ day: toDay(r[0]), name: String(r[1]), choice: String(r[2]), time: r[3] ? toTime(r[3]) : '' }));
   return values;
 }
 

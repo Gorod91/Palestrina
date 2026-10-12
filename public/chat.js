@@ -3,6 +3,8 @@
 
 const $ = (id) => document.getElementById(id);
 const POLL_EVERY = 5000;
+const WEEKDAYS = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+const WEEKDAYS_LONG = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
 const CHOICES = [
   ['si', 'Ci sono'],
   ['forse', 'Forse'],
@@ -18,6 +20,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   let loading = false;
   const pending = []; // messaggi inviati ma non ancora salvati in Apps Script
   let pollBusy = null;
+  let selDay = ''; // giorno scelto nella fila dei giorni del sondaggio
   let timeSaving = null; // orario del sondaggio in salvataggio (bicipite al suo posto)
   let unseen = 0; // messaggi arrivati mentre si legge più in alto
   let lastCount = 0; // 'ask' oppure la risposta in invio ('si' | 'forse' | 'no')
@@ -119,8 +122,15 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   }
 
   const ask = () => withPollBusy('ask', () => api('pollAsk'));
-  const answer = (choice) =>
-    withPollBusy(choice, () => api('pollAnswer', { choice, time: $('poll-time') ? $('poll-time').value : '' }));
+  // Risposta per il giorno scelto nella fila dei giorni; ritoccare la risposta già data la toglie.
+  const answer = (choice, current) =>
+    withPollBusy(choice, () =>
+      api('planSet', { day: selectedDay(), choice: choice === current ? '' : choice, time: $('poll-time') ? $('poll-time').value : '' }));
+  const selectedDay = () => {
+    const days = (data && data.plans) || [];
+    if (!days.some((d) => d.day === selDay)) selDay = days.length ? days[0].day : '';
+    return selDay;
+  };
 
   // ---------- Interfaccia ----------
 
@@ -162,27 +172,46 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     // non disturbare chi sta scrivendo l'orario
     if (!force && document.activeElement && document.activeElement.id === 'poll-time') return;
     const poll = data && data.poll;
-    // Casella compatta, sempre visibile in cima alla chat
-    if (!poll) {
-      const busy = pollBusy === 'ask';
-      card.innerHTML = `
-        <div class="poll-head"><b>Chi va in palestra oggi?</b><span class="muted">nessuno l'ha chiesto</span></div>
-        <button id="poll-ask" class="primary small with-bicep"${busy ? ' disabled' : ''}>${busy ? `${bicep()}Chiedo a tutti…` : 'Chiedi a tutti'}</button>`;
-      card.querySelector('#poll-ask').onclick = ask;
-      return;
-    }
-    const answered = (poll.people.find((p) => p.name === me.name) || {});
+    const plans = (data && data.plans) || [];
+    const day = selectedDay();
+    const isToday = !plans.length || day === plans[0].day;
+    const plan = plans.find((d) => d.day === day) || { people: poll ? poll.people : [] };
+    const answered = plan.people.find((p) => p.name === me.name) || {};
     // Risposta in invio: il pulsante scelto si colora subito, con il bicipite accanto.
     const mine = pollBusy && pollBusy !== 'ask' ? { ...answered, choice: pollBusy } : answered;
+    const askBusy = pollBusy === 'ask';
+    const side = !isToday
+      ? ''
+      : poll
+        ? `<span class="muted">da <span class="by"></span> · ${poll.clock}</span>`
+        : `<button id="poll-ask" class="ask-link with-bicep"${askBusy ? ' disabled' : ''}>${askBusy ? `${bicep()}Chiedo…` : 'Chiedi a tutti'}</button>`;
+    // Fila dei prossimi 7 giorni, con quanti ci vanno
+    const strip = plans
+      .map((d, i) => {
+        const date = new Date(d.day + 'T12:00:00');
+        const n = d.people.filter((p) => p.choice === 'si').length;
+        const mineDay = d.people.find((p) => p.name === me.name) || {};
+        return `<button class="pday${d.day === day ? ' on' : ''}${mineDay.choice ? ' ' + mineDay.choice : ''}" data-day="${d.day}">${i ? WEEKDAYS[date.getDay()] : 'Oggi'}<b>${date.getDate()}</b><i>${n || '·'}</i></button>`;
+      })
+      .join('');
+    const title = isToday ? 'Chi va in palestra oggi?' : `Chi va in palestra ${WEEKDAYS_LONG[new Date(day + 'T12:00:00').getDay()]} ${new Date(day + 'T12:00:00').getDate()}?`;
     card.innerHTML = `
-      <div class="poll-head"><b>Chi va in palestra oggi?</b><span class="muted">da <span class="by"></span> · ${poll.clock}</span></div>
+      ${strip ? `<div class="pdays">${strip}</div>` : ''}
+      <div class="poll-head"><b>${title}</b>${side}</div>
       <div class="choices">
         ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}"${pollBusy ? ' disabled' : ''}>${pollBusy === k ? bicep() : ''}${label}</button>`).join('')}
         <label class="time-wrap${mine.time ? ' filled' : ''}${timeSaving !== null ? ' busy' : ''}"><input id="poll-time" type="time" value="${timeSaving !== null ? timeSaving : mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span>${timeSaving !== null ? bicep() : ''}</label>
       </div>
       <p class="poll-names"></p>`;
-    card.querySelector('.by').textContent = poll.byDisplay;
-    card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice)));
+    if (poll && isToday) card.querySelector('.by').textContent = poll.byDisplay;
+    if (card.querySelector('#poll-ask')) card.querySelector('#poll-ask').onclick = ask;
+    card.querySelectorAll('[data-day]').forEach((b) => {
+      b.onclick = () => {
+        selDay = b.dataset.day;
+        renderPoll(true);
+      };
+    });
+    card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice, answered.choice)));
     // Su iPhone "change" arriva a ogni giro della rotella e "blur" non sempre: si salva in silenzio poco dopo
     // l'ultima modifica, senza ridisegnare la casella mentre la rotella è aperta (si chiuderebbe).
     // Con un orario e nessuna risposta vale "Ci sono".
@@ -203,7 +232,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         timeInput.parentNode.insertAdjacentHTML('beforeend', bicep());
       } else renderPoll(true);
       try {
-        const r = await api('pollAnswer', { choice: mine.choice || 'si', time: t });
+        const r = await api('planSet', { day, choice: mine.choice || 'si', time: t });
         timeSaving = null;
         v = -1;
         apply(r);
@@ -237,7 +266,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     };
     // Chi c'è e chi no, in chiaro e in poco spazio
     const names = card.querySelector('.poll-names');
-    const who = (k) => poll.people.filter((p) => p.choice === k).map((p) => p.display + (p.time ? ` ${p.time}` : '') + (p.arrived ? ' ✓' : ''));
+    const who = (k) => plan.people.filter((p) => p.choice === k).map((p) => p.display + (p.time ? ` ${p.time}` : '') + (p.arrived ? ' ✓' : ''));
     [['si', 'Ci sono'], ['forse', 'Forse'], ['no', 'No']].forEach(([k, label]) => {
       const list = who(k);
       if (!list.length) return;
@@ -245,9 +274,9 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       part.append(el('b', '', `${label} `), document.createTextNode(list.join(', ')));
       names.append(part);
     });
-    const missing = poll.people.filter((p) => !p.choice).length;
+    const missing = plan.people.filter((p) => !p.choice).length;
     if (missing) names.append(el('span', 'part none', `${missing} senza risposta`));
-    if (isDebug()) {
+    if (isDebug() && poll && isToday) {
       const cancel = el('button', 'poll-cancel', 'Annulla');
       cancel.type = 'button';
       cancel.onclick = () => remove(poll.id, 'Annullare il sondaggio di oggi con tutte le risposte?');

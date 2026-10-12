@@ -177,7 +177,7 @@ function render() {
 
   renderSudometro();
   renderGallery();
-  renderToday(state.poll);
+  renderToday();
   $('debug-mode-card').hidden = !me.debug;
   $('debug-mode').checked = debugOn();
   $('fake-mode').checked = fakeOn();
@@ -274,10 +274,60 @@ function renderAlbo() {
   });
 }
 
-function renderToday(poll) {
-  $('today-card').hidden = !poll;
-  if (!poll) return;
-  $('today-answers').replaceChildren(answersList(poll));
+const DAY_SHORT = ['Do', 'Lu', 'Ma', 'Me', 'Gi', 'Ve', 'Sa'];
+const NEXT_CHOICE = { '': 'si', si: 'forse', forse: 'no', no: '' };
+const planBusy = new Set(); // caselle in salvataggio ("giorno")
+
+/** Griglia persone × prossimi 7 giorni; le proprie caselle si toccano per cambiare risposta. */
+function renderToday() {
+  const plans = state.plans || [];
+  $('today-card').hidden = !plans.length;
+  if (!plans.length) return;
+  const grid = $('plan-grid');
+  const head = plans.map((d, i) => {
+    const date = new Date(d.day + 'T12:00:00');
+    return `<th>${i ? DAY_SHORT[date.getDay()] : 'Oggi'}<br>${date.getDate()}</th>`;
+  });
+  grid.innerHTML = `<tr><th></th>${head.join('')}</tr>`;
+  // io per primo, poi gli altri
+  const names = plans[0].people.map((p) => p.name).sort((a, b) => (a === state.me.name ? -1 : b === state.me.name ? 1 : 0));
+  names.forEach((name) => {
+    const tr = document.createElement('tr');
+    const isMe = name === state.me.name;
+    const person = plans[0].people.find((p) => p.name === name);
+    const th = document.createElement('td');
+    th.className = 'n';
+    th.textContent = person.display;
+    tr.append(th);
+    plans.forEach((d) => {
+      const p = d.people.find((x) => x.name === name) || {};
+      const td = document.createElement('td');
+      const cell = document.createElement(isMe ? 'button' : 'div');
+      cell.className = `pcell ${p.choice || ''}${isMe ? ' me' : ''}`;
+      if (isMe && planBusy.has(d.day)) cell.innerHTML = bicep();
+      else cell.textContent = p.choice === 'si' ? p.time || '✓' : p.choice === 'forse' ? 'forse' : p.choice === 'no' ? 'no' : '';
+      if (isMe) cell.onclick = () => cyclePlan(d.day, p.choice || '', p.time || '');
+      td.append(cell);
+      tr.append(td);
+    });
+    grid.append(tr);
+  });
+}
+
+async function cyclePlan(day, choice, time) {
+  if (planBusy.has(day)) return;
+  planBusy.add(day);
+  renderToday();
+  const next = NEXT_CHOICE[choice];
+  try {
+    await api('planSet', { day, choice: next, time: next === 'si' || next === 'forse' ? time : '' });
+    await refresh();
+    chat.reload();
+  } catch (err) {
+    toast(err.message);
+  }
+  planBusy.delete(day);
+  renderToday();
 }
 
 const photoCache = new Map(); // id → Promise<dataURL>
