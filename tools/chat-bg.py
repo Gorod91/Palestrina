@@ -8,13 +8,9 @@ D = {
  'kettlebell': '<path d="M-9 -6 C-10 -20 10 -20 9 -6"/><path d="M-14 0 C-18 10 -12 18 0 18 C12 18 18 10 14 0 C11 -6 -11 -6 -14 0 Z"/><path d="M-5 6 H5"/>',
  'bicipite': '<g transform="scale(.55) translate(-36 -27)" fill="#0b0b0c" stroke-width="3.6"><path d="M0 47 C4 47 9 26 21 26 C32 26 36 37 41 47 L46 56 V61 L0 61"/><g transform="rotate(4 46 52) translate(5 0)"><path d="M32 52 L35 27 L47 27 L50 52 A9 9 0 0 1 32 52"/><path d="M20 17H62"/><rect x="16" y="8" width="7" height="18" rx="2.5"/><rect x="59" y="8" width="7" height="18" rx="2.5"/><rect x="31" y="8" width="20" height="20" rx="7"/><path d="M38.5 13V23M43.5 13V23" stroke-width="2.6"/></g></g>',
  'cronometro': '<circle cx="0" cy="3" r="13"/><path d="M0 3 V-5 M0 3 L5 6 M-3 -14 H3 M0 -14 V-10 M10 -9 L13 -12"/>',
- 'borraccia': '<rect x="-7" y="-10" width="14" height="26" rx="4"/><path d="M-4 -10 V-15 H4 V-10 M-7 -1 H7 M-7 7 H7"/>',
  'disco': '<circle r="15"/><circle r="9"/><circle r="2.5"/><path d="M-4 -12 H4"/>',
- 'scarpa': '<path d="M-20 6 C-20 -4 -14 -6 -10 -6 L-4 -2 C2 2 10 2 16 4 C21 5 22 9 20 11 H-20 Z"/><path d="M-20 11 V8 M-8 -3 L-6 -6 M-4 -1 L-2 -4 M0 1 L2 -2"/>',
  'battito': '<path d="M-26 0 H-12 L-8 -10 L-2 12 L3 -16 L8 6 L11 0 H26"/>',
  'corda': '<rect x="-24" y="-16" width="6" height="12" rx="3"/><rect x="18" y="-16" width="6" height="12" rx="3"/><path d="M-21 -4 C-22 22 22 22 21 -4"/>',
- 'medaglia': '<path d="M-8 -18 L-3 -4 M8 -18 L3 -4 M-8 -18 H-2 L0 -12 L2 -18 H8"/><circle cx="0" cy="6" r="10"/><path d="M0 1 L1.6 4.6 L5.5 5 L2.6 7.6 L3.4 11.4 L0 9.4 L-3.4 11.4 L-2.6 7.6 L-5.5 5 L-1.6 4.6 Z"/>',
- 'shaker': '<path d="M-9 -8 H9 L7 18 H-7 Z"/><path d="M-10 -8 H10 V-12 H-10 Z M-4 -12 V-16 H4 V-12 M-8 2 H8"/>',
  'cuore': '<path d="M0 12 C-16 2 -14 -12 -6 -12 C-2 -12 0 -9 0 -7 C0 -9 2 -12 6 -12 C14 -12 16 2 0 12 Z"/>',
  'fulmine': '<path d="M3 -16 L-8 2 H0 L-3 16 L9 -3 H1 Z"/>',
  'mela': '<path d="M0 -6 C-6 -10 -15 -8 -15 2 C-15 12 -7 18 0 15 C7 18 15 12 15 2 C15 -8 6 -10 0 -6 Z"/><path d="M0 -6 C0 -11 2 -14 5 -15"/>',
@@ -34,7 +30,7 @@ items = []
 cols, rows = 5, 6
 cw, rh = T / cols, T / rows
 # ogni disegno almeno una volta, poi si riempie la griglia
-order = names + random.sample(names, cols * rows - len(names))
+order = names + random.sample(names * 2, cols * rows - len(names))
 random.shuffle(order)
 k = 0
 for r in range(rows):
@@ -52,12 +48,12 @@ def dist(ax, ay, bx, by):
 # riempitivi solo negli spazi liberi
 fills = []
 tries = 0
-while len(fills) < 70 and tries < 20000:
+while len(fills) < 32 and tries < 20000:
     tries += 1
     x, y = random.uniform(0, T), random.uniform(0, T)
     if any(dist(x, y, ix, iy) < 27 for _, ix, iy, _, _ in items):
         continue
-    if any(dist(x, y, fx, fy) < 14 for _, fx, fy in fills):
+    if any(dist(x, y, fx, fy) < 22 for _, fx, fy in fills):
         continue
     fills.append((random.choice(list(filler)), x, y))
 
