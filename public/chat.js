@@ -20,7 +20,9 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   const pending = []; // messaggi inviati ma non ancora salvati in Apps Script
   let pollBusy = null;
   let selDay = ''; // giorno scelto nella fila dei giorni del sondaggio
-  let timeSaving = null; // orario del sondaggio in salvataggio (bicipite al suo posto)
+  // Risposte al sondaggio: si vedono subito e partono in ordine in sottofondo (l'ultima vince)
+  const outbox = [];
+  let sending = false;
   let unseen = 0; // messaggi arrivati mentre si legge più in alto
   let lastCount = 0; // 'ask' oppure la risposta in invio ('si' | 'forse' | 'no')
 
@@ -55,6 +57,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
 
   function apply(r) {
     if (!r || r.same) return;
+    if (outbox.length || sending) return; // risposte ancora da inviare: vale quello che vede l'utente
     v = r.v;
     data = r;
     render();
@@ -121,10 +124,59 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   }
 
   const ask = () => withPollBusy('ask', () => api('pollAsk'));
+
+  /** La mia risposta per un giorno, cambiata subito sullo schermo. */
+  function setLocal(day, choice, time) {
+    const lists = [];
+    const plan = (data.plans || []).find((d) => d.day === day);
+    if (plan) lists.push(plan.people);
+    if (data.poll && data.plans && data.plans[0] && data.plans[0].day === day && data.poll.people !== (plan && plan.people)) lists.push(data.poll.people);
+    lists.forEach((people) => {
+      const p = people.find((x) => x.name === me.name);
+      if (p) Object.assign(p, { choice: choice || null, time: choice ? time : '' });
+    });
+  }
+
+  /** Mette in coda l'invio; per lo stesso giorno conta solo l'ultima scelta. */
+  function queuePlan(day, choice, time) {
+    const i = outbox.findIndex((x) => x.day === day);
+    if (i >= 0) outbox.splice(i, 1);
+    outbox.push({ day, choice, time });
+    flush();
+  }
+
+  async function flush() {
+    if (sending) return;
+    sending = true;
+    let last = null;
+    while (outbox.length) {
+      const job = outbox.shift();
+      try {
+        last = await api('planSet', job);
+      } catch (err) {
+        toast(err.message);
+        outbox.length = 0;
+        sending = false;
+        v = -1;
+        load(true); // torna ai dati veri
+        return;
+      }
+    }
+    sending = false;
+    if (last) {
+      v = -1;
+      apply(last);
+    }
+  }
+
   // Risposta per il giorno scelto nella fila dei giorni; ritoccare la risposta già data la toglie.
-  const answer = (choice, current) =>
-    withPollBusy(choice, () =>
-      api('planSet', { day: selectedDay(), choice: choice === current ? '' : choice, time: $('poll-time') ? $('poll-time').value : '' }));
+  function answer(choice, current, time) {
+    const day = selectedDay();
+    const c = choice === current ? '' : choice;
+    setLocal(day, c, time);
+    renderPoll(true);
+    queuePlan(day, c, c ? time : '');
+  }
   const selectedDay = () => {
     const days = (data && data.plans) || [];
     if (!days.some((d) => d.day === selDay)) selDay = days.length ? days[0].day : '';
@@ -177,7 +229,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     const plan = plans.find((d) => d.day === day) || { people: poll ? poll.people : [] };
     const answered = plan.people.find((p) => p.name === me.name) || {};
     // Risposta in invio: il pulsante scelto si colora subito, con il bicipite accanto.
-    const mine = pollBusy && pollBusy !== 'ask' ? { ...answered, choice: pollBusy } : answered;
+    const mine = answered;
     const askBusy = pollBusy === 'ask';
     const side = !isToday
       ? ''
@@ -196,8 +248,8 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     card.innerHTML = `
       ${strip ? `<div class="pdays">${strip}</div>` : ''}
       <div class="choices">
-        ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}"${pollBusy ? ' disabled' : ''}>${pollBusy === k ? bicep() : ''}${label}</button>`).join('')}
-        <label class="time-wrap${mine.time ? ' filled' : ''}${timeSaving !== null ? ' busy' : ''}"><input id="poll-time" type="time" value="${timeSaving !== null ? timeSaving : mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span>${timeSaving !== null ? bicep() : ''}</label>
+        ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}">${label}</button>`).join('')}
+        <label class="time-wrap${mine.time ? ' filled' : ''}"><input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span></label>
       </div>
       <p class="poll-names"></p>`;
     card.querySelectorAll('[data-day]').forEach((b) => {
@@ -206,59 +258,36 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         renderPoll(true);
       };
     });
-    card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice, answered.choice)));
+    card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice, answered.choice, answered.time || '')));
     // Su iPhone "change" arriva a ogni giro della rotella e "blur" non sempre: si salva in silenzio poco dopo
     // l'ultima modifica, senza ridisegnare la casella mentre la rotella è aperta (si chiuderebbe).
     // Con un orario e nessuna risposta vale "Ci sono".
     const timeInput = card.querySelector('#poll-time');
     timeInput.oninput = () => timeInput.parentNode.classList.toggle('filled', !!timeInput.value);
+    // Orario: si vede subito e parte poco dopo l'ultima modifica o alla chiusura della rotella.
+    // Su iPhone "change" arriva a ogni giro della rotella: mentre è aperta la casella non si ridisegna (si chiuderebbe).
+    // Con un orario e nessuna risposta vale "Ci sono".
     let sent = mine.time || '';
     let timer = null;
     const focused = () => document.activeElement && document.activeElement.id === 'poll-time';
-    const saveTime = async () => {
+    const saveTime = () => {
       clearTimeout(timer);
       const t = timeInput.value;
-      if (t === sent || pollBusy || timeSaving !== null) return false;
+      if (t === sent) return;
       sent = t;
-      timeSaving = t;
-      // Bicipite al posto dell'orario finché non è salvato (senza ridisegnare se la rotella è aperta)
-      if (focused()) {
-        timeInput.parentNode.classList.add('busy');
-        timeInput.parentNode.insertAdjacentHTML('beforeend', bicep());
-      } else renderPoll(true);
-      try {
-        const r = await api('planSet', { day, choice: mine.choice || 'si', time: t });
-        timeSaving = null;
-        v = -1;
-        apply(r);
-        toast(t ? `Orario ${t} salvato` : 'Orario tolto');
-      } catch (err) {
-        timeSaving = null;
-        toast(err.message);
-      }
+      const c = answered.choice || 'si';
+      setLocal(day, c, t);
+      queuePlan(day, c, t);
       if (!focused()) renderPoll(true);
-      else {
-        timeInput.parentNode.classList.remove('busy');
-        timeInput.parentNode.querySelectorAll('.bicep').forEach((x) => x.remove());
-      }
-      return true;
     };
     timeInput.onchange = () => {
       clearTimeout(timer);
-      timer = setTimeout(saveTime, 900);
+      timer = setTimeout(saveTime, 600);
     };
-    timeInput.onblur = () => {
-      // aggiorna nomi e orari rimasti indietro mentre la rotella era aperta (il salvataggio ridisegna da sé)
-      setTimeout(() => {
-        if (timeSaving === null && !saveTimeStarted()) renderPoll(true);
-      }, 0);
-    };
-    const saveTimeStarted = () => {
-      const t = timeInput.value;
-      if (t === sent) return false;
+    timeInput.onblur = () => setTimeout(() => {
       saveTime();
-      return true;
-    };
+      renderPoll(true); // aggiorna nomi e pulsanti rimasti indietro mentre la rotella era aperta
+    }, 0);
     // Chi c'è e chi no, in chiaro e in poco spazio
     const names = card.querySelector('.poll-names');
     const who = (k) => plan.people.filter((p) => p.choice === k).map((p) => p.display + (p.time ? ` ${p.time}` : '') + (p.arrived ? ' ✓' : ''));

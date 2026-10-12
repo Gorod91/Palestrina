@@ -276,7 +276,6 @@ function renderAlbo() {
 
 const DAY_SHORT = ['Do', 'Lu', 'Ma', 'Me', 'Gi', 'Ve', 'Sa'];
 const NEXT_CHOICE = { '': 'si', si: 'forse', forse: 'no', no: '' };
-const planBusy = new Set(); // caselle in salvataggio ("giorno")
 
 /** Griglia persone × prossimi 7 giorni; le proprie caselle si toccano per cambiare risposta. */
 function renderToday() {
@@ -304,8 +303,7 @@ function renderToday() {
       const td = document.createElement('td');
       const cell = document.createElement(isMe ? 'button' : 'div');
       cell.className = `pcell ${p.choice || ''}${isMe ? ' me' : ''}`;
-      if (isMe && planBusy.has(d.day)) cell.innerHTML = bicep();
-      else cell.textContent = p.choice === 'si' ? p.time || '✓' : p.choice === 'forse' ? 'forse' : p.choice === 'no' ? 'no' : '';
+      cell.textContent = p.choice === 'si' ? p.time || '✓' : p.choice === 'forse' ? 'forse' : p.choice === 'no' ? 'no' : '';
       if (isMe) cell.onclick = () => cyclePlan(d.day, p.choice || '', p.time || '');
       td.append(cell);
       tr.append(td);
@@ -314,20 +312,36 @@ function renderToday() {
   });
 }
 
-async function cyclePlan(day, choice, time) {
-  if (planBusy.has(day)) return;
-  planBusy.add(day);
-  renderToday();
+/** Tocco su una mia casella: cambia subito, l'invio parte in sottofondo (in ordine, per giorno conta l'ultimo). */
+const planOutbox = [];
+let planSending = false;
+function cyclePlan(day, choice, time) {
   const next = NEXT_CHOICE[choice];
-  try {
-    await api('planSet', { day, choice: next, time: next === 'si' || next === 'forse' ? time : '' });
-    await refresh();
-    chat.reload();
-  } catch (err) {
-    toast(err.message);
-  }
-  planBusy.delete(day);
+  const t = next === 'si' || next === 'forse' ? time : '';
+  const plan = (state.plans || []).find((d) => d.day === day);
+  const p = plan && plan.people.find((x) => x.name === state.me.name);
+  if (p) Object.assign(p, { choice: next || null, time: t });
   renderToday();
+  const i = planOutbox.findIndex((x) => x.day === day);
+  if (i >= 0) planOutbox.splice(i, 1);
+  planOutbox.push({ day, choice: next, time: t });
+  flushPlans();
+}
+
+async function flushPlans() {
+  if (planSending) return;
+  planSending = true;
+  while (planOutbox.length) {
+    try {
+      await api('planSet', planOutbox.shift());
+    } catch (err) {
+      toast(err.message);
+      planOutbox.length = 0;
+    }
+  }
+  planSending = false;
+  await refresh();
+  chat.reload();
 }
 
 const photoCache = new Map(); // id → Promise<dataURL>
