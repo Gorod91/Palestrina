@@ -20,15 +20,22 @@
 [hidden] { display: none !important; }
 /* Niente zoom con il doppio tap: l'app deve rispondere subito ai tocchi. */
 html, body, button { touch-action: manipulation; }
+html { height: 100%; background: var(--bg); }
 body {
+  /* Struttura da app: la pagina non scorre (scorre solo #scroller) e la barra dei tab sta sotto,
+     senza position: fixed, che su iPhone si sposta quando il contenuto è corto. */
+  height: 100%; height: 100dvh; overflow: hidden; display: flex; flex-direction: column;
   margin: 0; background: var(--bg); color: var(--fg);
   font: 17px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", sans-serif;
   letter-spacing: -.01em;
-  padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom);
   -webkit-tap-highlight-color: transparent;
   -webkit-font-smoothing: antialiased;
 }
-main { max-width: 480px; margin: 0 auto; padding: 8px 0 40px; }
+#scroller {
+  flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain;
+  padding: calc(env(safe-area-inset-top) + 8px) max(16px, calc((100% - 480px) / 2)) 32px;
+}
+body:not(.has-tabbar) #scroller { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
 p { margin: 0 0 10px; }
 h2, h3 { margin: 0 0 8px; letter-spacing: -.02em; }
 h2 { font-size: 22px; font-weight: 700; }
@@ -119,9 +126,8 @@ input::placeholder { color: #636366; }
 .gallery .pts { font-size: 24px; font-weight: 700; color: var(--stand); font-variant-numeric: tabular-nums; }
 
 /* ---------- Tab ---------- */
-#screen-home { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
 .tabbar {
-  position: fixed; left: 0; right: 0; bottom: 0; z-index: 5;
+  flex: none; z-index: 5;
   display: grid; grid-template-columns: repeat(4, 1fr);
   background: rgba(22, 22, 24, .82); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
   border-top: .5px solid var(--line); padding: 6px 8px calc(4px + env(safe-area-inset-bottom));
@@ -134,7 +140,7 @@ input::placeholder { color: #636366; }
 .tabbar button.active { color: var(--exercise); }
 
 /* ---------- Timer addominali ---------- */
-.timer { display: flex; flex-direction: column; align-items: center; padding-top: 18px; min-height: calc(100dvh - 210px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+.timer { display: flex; flex-direction: column; align-items: center; padding-top: 18px; min-height: calc(100dvh - 250px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
 .timer-set { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 6px; transition: opacity .2s; }
 .timer-display { font-size: 60px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; min-width: 4.1ch; text-align: center; cursor: pointer; color: var(--exercise); }
 .round {
@@ -174,7 +180,7 @@ input::placeholder { color: #636366; }
 
 /* ---------- Messaggi ---------- */
 .toast {
-  position: fixed; left: 16px; right: 16px; bottom: calc(92px + env(safe-area-inset-bottom)); z-index: 40;
+  position: fixed; left: 16px; right: 16px; bottom: calc(96px + env(safe-area-inset-bottom)); z-index: 40;
   max-width: 448px; margin: 0 auto; background: rgba(44, 44, 46, .96); border-radius: 14px; padding: 13px 16px;
   font-size: 15px; box-shadow: 0 8px 30px rgba(0, 0, 0, .5);
 }

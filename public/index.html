@@ -44,7 +44,8 @@
     </symbol>
   </svg>
 
-  <main>
+  <!-- Scorre solo quest'area: la pagina resta ferma, così la barra dei tab non si sposta su iPhone -->
+  <main id="scroller">
     <header class="top">
       <div>
         <p id="today-date" class="eyebrow"></p>
@@ -160,12 +161,6 @@
         </section>
       </div>
 
-      <nav class="tabbar">
-        <button data-tab="oggi" class="active"><svg><use href="#i-rings"/></svg>Riepilogo</button>
-        <button data-tab="classifica"><svg><use href="#i-chart"/></svg>Classifica</button>
-        <button data-tab="timer"><svg><use href="#i-timer"/></svg>Timer</button>
-        <button data-tab="altro"><svg><use href="#i-more"/></svg>Altro</button>
-      </nav>
     </div>
 
     <p id="toast" class="toast" hidden></p>
@@ -178,6 +173,14 @@
       <pre id="boot-error-detail" class="muted"></pre>
     </section>
   </main>
+
+  <nav id="tabbar" class="tabbar" hidden>
+    <button data-tab="oggi" class="active"><svg><use href="#i-rings"/></svg>Riepilogo</button>
+    <button data-tab="classifica"><svg><use href="#i-chart"/></svg>Classifica</button>
+    <button data-tab="timer"><svg><use href="#i-timer"/></svg>Timer</button>
+    <button data-tab="altro"><svg><use href="#i-more"/></svg>Altro</button>
+  </nav>
+
 
   <!-- Fine del timer: lo schermo lampeggia finché non lo tocchi -->
   <div id="timer-alarm" class="timer-alarm" hidden>

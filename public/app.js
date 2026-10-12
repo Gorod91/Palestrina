@@ -53,6 +53,8 @@ const TAB_TITLES = { oggi: 'Riepilogo', classifica: 'Classifica', timer: 'Timer'
 
 function show(screen) {
   ['install', 'config', 'login', 'home'].forEach((s) => ($(`screen-${s}`).hidden = s !== screen));
+  $('tabbar').hidden = screen !== 'home';
+  document.body.classList.toggle('has-tabbar', screen === 'home');
   if (screen !== 'home') $('page-title').textContent = 'Palestrina';
   $('avatar').hidden = !(screen === 'home' && session && session.name);
   if (!$('avatar').hidden) {
@@ -332,7 +334,7 @@ function selectTab(name) {
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
   store.set('tab', name);
   $('page-title').textContent = TAB_TITLES[name];
-  window.scrollTo(0, 0);
+  $('scroller').scrollTop = 0;
 }
 
 function logout() {
