@@ -221,13 +221,14 @@ export function createChat({ api, toast, loadPhoto, openPhoto, clean, isDebug })
       const goal = d.count >= d.goal && d.goal ? ' · obiettivo raggiunto' : '';
       row.append(el('p', 'event-text', `${name} ha fatto check-in${d.auto ? ' (automatico)' : ''} · ${d.count}/${d.goal} questa settimana${goal}`));
     } else if (d.kind === 'sudometro') {
-      row.classList.add('with-photo');
+      if (d.photoId) row.classList.add('with-photo');
       const box = el('div', 'event-sudo');
       const text = el('div');
       text.append(el('p', 'event-text', `${name} ha fatto il Sudometro`));
       text.append(el('p', 'event-score', `${d.score} · ${clean(d.title)}`));
       const photo = el('div', 'event-photo');
-      box.append(photo, text);
+      if (d.photoId) box.append(photo);
+      box.append(text);
       row.append(box);
       if (d.photoId) {
         loadPhoto(d.photoId)
@@ -235,7 +236,7 @@ export function createChat({ api, toast, loadPhoto, openPhoto, clean, isDebug })
             const img = new Image();
             img.src = src;
             img.alt = `Selfie di ${name}`;
-            img.onclick = () => openPhoto(src, `${name} · ${d.score} · ${clean(d.title)}`);
+            img.onclick = () => openPhoto(src, `${name} · ${d.score} · ${clean(d.title)}`, d.photoId);
             photo.replaceChildren(img);
           })
           .catch(() => {});
@@ -312,6 +313,9 @@ export function createChat({ api, toast, loadPhoto, openPhoto, clean, isDebug })
   return {
     redraw() {
       if (data) render();
+    },
+    reload() {
+      load(true);
     },
     setUser(user) {
       if (me && me.name === user.name) return;

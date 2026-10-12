@@ -165,6 +165,8 @@ function doPost(e) {
         return json(pollAnswer(user, req.choice, req.time));
       case 'chatDelete':
         return json(chatDelete(user, req.id));
+      case 'photoDelete':
+        return json(photoDelete(user, req.id));
       case 'chatMute':
         if (req.muted) props.setProperty('mute_' + user.name, '1');
         else props.deleteProperty('mute_' + user.name);
@@ -626,6 +628,45 @@ function savePhoto(user, base64, label) {
     console.error('Salvataggio foto fallito', err);
     return { error: 'Foto non salvata su Drive: ' + (err.message || err) };
   }
+}
+
+/** Solo utenti debug: toglie una foto del Sudometro da galleria e chat e la sposta nel cestino di Drive. Il punteggio resta. */
+function photoDelete(user, id) {
+  if (!user.debug) return { error: 'Solo per gli utenti debug' };
+  const target = String(id || '');
+  if (!target) return { error: 'Foto non indicata' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  let found = false;
+  try {
+    const sudo = sheet('sudometro');
+    sudo.getDataRange().getValues().forEach((r, i) => {
+      if (i > 0 && String(r[7]) === target) {
+        sudo.getRange(i + 1, 8).setValue('');
+        found = true;
+      }
+    });
+    if (!found) return { error: 'Foto non trovata' };
+    // Eventi della chat che mostravano la foto
+    const chat = sheet('chat');
+    chat.getDataRange().getValues().forEach((r, i) => {
+      if (i === 0 || String(r[4]) !== 'event') return;
+      const data = safeJson(r[5]);
+      if (data && data.photoId === target) {
+        data.photoId = '';
+        chat.getRange(i + 1, 6).setValue(JSON.stringify(data));
+      }
+    });
+    bumpChat();
+  } finally {
+    lock.releaseLock();
+  }
+  try {
+    DriveApp.getFileById(target).setTrashed(true);
+  } catch (err) {
+    console.error('Foto non spostata nel cestino', err); // è già fuori da galleria e chat
+  }
+  return { ok: true };
 }
 
 /** Restituisce una foto del Sudometro (non di debug) a chi ha un codice valido. */

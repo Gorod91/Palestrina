@@ -209,7 +209,7 @@ function renderGallery() {
           const img = new Image();
           img.alt = `Selfie di ${who}`;
           img.src = src;
-          img.onclick = () => openPhoto(src, `${who} · ${r.score} · ${title}`);
+          img.onclick = () => openPhoto(src, `${who} · ${r.score} · ${title}`, r.photoId);
           li.querySelector('.photo').replaceChildren(img);
         })
         .catch(() => {});
@@ -217,10 +217,30 @@ function renderGallery() {
   });
 }
 
-function openPhoto(src, caption) {
+let viewerPhotoId = '';
+
+function openPhoto(src, caption, id = '') {
+  viewerPhotoId = id;
   $('viewer-img').src = src;
   $('viewer-caption').textContent = caption;
+  $('viewer-delete').hidden = !(id && debugOn());
   $('viewer').hidden = false;
+}
+
+/** Modalità debug: toglie la foto da galleria e chat (il punteggio resta). */
+async function deletePhoto() {
+  const id = viewerPhotoId;
+  if (!id || !confirm('Eliminare questa foto per tutti? Il punteggio resta.')) return;
+  try {
+    await api('photoDelete', { id });
+    photoCache.delete(id);
+    $('viewer').hidden = true;
+    toast('Foto eliminata');
+    refresh();
+    chat.reload();
+  } catch (err) {
+    toast(err.message);
+  }
 }
 
 function renderSudometro() {
@@ -500,6 +520,10 @@ $('form-name').addEventListener('submit', (e) => {
   saveAlias($('in-name').value);
 });
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
+$('viewer-delete').addEventListener('click', (e) => {
+  e.stopPropagation();
+  deletePhoto();
+});
 $('today-open').addEventListener('click', () => selectTab('chat'));
 $('debug-mode').addEventListener('change', (e) => {
   store.set('debugOff', !e.target.checked);
