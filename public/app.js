@@ -49,7 +49,7 @@ function toast(msg, ms = 3500) {
   toastTimer = setTimeout(() => ($('toast').hidden = true), ms);
 }
 
-const TAB_TITLES = { oggi: 'Riepilogo', classifica: 'Classifica', timer: 'Timer', altro: 'Altro' };
+const TAB_TITLES = { oggi: 'Oggi', classifica: 'Classifica', timer: 'Timer', altro: 'Altro' };
 
 function show(screen) {
   ['install', 'config', 'login', 'home'].forEach((s) => ($(`screen-${s}`).hidden = s !== screen));
