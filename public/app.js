@@ -100,6 +100,7 @@ function render() {
   btn.disabled = me.checkedInToday;
   btn.classList.toggle('done', me.checkedInToday);
   btn.innerHTML = me.checkedInToday ? '<svg><use href="#i-check"/></svg>Check-in fatto oggi' : 'Sono in palestra';
+  $('btn-checkin-undo').hidden = !me.checkedInToday;
 
   const mine = week.ranking.find((r) => r.name === me.name) || { count: 0, goal: me.goal, streak: 0 };
   $('week-ring').innerHTML = ring(mine.count / mine.goal, ...COLORS.move, { size: 132, width: 20 });
@@ -320,6 +321,21 @@ async function checkin() {
   refresh();
 }
 
+async function checkinUndo() {
+  if (!confirm('Annullare il check-in di oggi?')) return;
+  const btn = $('btn-checkin-undo');
+  btn.disabled = true;
+  try {
+    await api('checkinUndo');
+    toast('Check-in annullato');
+    chat.reload();
+  } catch (err) {
+    toast(`Errore: ${err.message}`);
+  }
+  btn.disabled = false;
+  refresh();
+}
+
 async function takeReference() {
   try {
     const canvas = await sudometro.takeSelfie('Foto di riferimento: viso al centro, da riposato, buona luce', {
@@ -498,6 +514,7 @@ $('form-login').addEventListener('submit', (e) => {
   login($('in-code').value);
 });
 $('btn-checkin').addEventListener('click', checkin);
+$('btn-checkin-undo').addEventListener('click', checkinUndo);
 $('btn-notify').addEventListener('click', enableNotifications);
 $('btn-logout').addEventListener('click', logout);
 $('form-name').addEventListener('submit', (e) => {

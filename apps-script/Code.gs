@@ -151,6 +151,8 @@ function doPost(e) {
         return json(buildState(user));
       case 'checkin':
         return json(checkin(user, 'app'));
+      case 'checkinUndo':
+        return json(checkinUndo(user));
       case 'setReference':
         return json(saveReference(user, req.features, req.photo));
       case 'photo':
@@ -228,6 +230,34 @@ function checkin(user, source) {
   addChatEvent(user.name, { kind: 'checkin', count, goal: user.goal, auto: source === 'automatico' });
   dispatch('checkin', user.name);
   return { ok: true, alreadyToday: false };
+}
+
+/** Annulla il check-in di oggi: lo toglie dalle presenze e dalla chat, senza notifiche. */
+function checkinUndo(user) {
+  const today = dayString(new Date());
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const sh = sheet('presenze');
+    const remove = [];
+    sh.getDataRange().getValues().forEach((r, i) => {
+      if (i > 0 && toDay(r[0]) === today && String(r[2]) === user.name) remove.push(i + 1);
+    });
+    if (!remove.length) return { ok: true, nothing: true };
+    remove.reverse().forEach((row) => sh.deleteRow(row));
+    const chat = sheet('chat');
+    const events = [];
+    chat.getDataRange().getValues().forEach((r, i) => {
+      if (i === 0 || String(r[4]) !== 'event' || String(r[3]) !== user.name || toDay(r[1]) !== today) return;
+      const data = safeJson(r[5]);
+      if (data && data.kind === 'checkin') events.push(i + 1);
+    });
+    events.reverse().forEach((row) => chat.deleteRow(row));
+    if (events.length) bumpChat();
+  } finally {
+    lock.releaseLock();
+  }
+  return { ok: true };
 }
 
 /** Foto di riferimento ("riposato"): solo i valori calcolati, mai la foto. Si fa una volta. */
