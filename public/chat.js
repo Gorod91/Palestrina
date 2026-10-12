@@ -177,12 +177,11 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       <div class="poll-head"><b>Chi va in palestra oggi?</b><span class="muted">da <span class="by"></span> · ${poll.clock}</span></div>
       <div class="choices">
         ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}"${pollBusy ? ' disabled' : ''}>${pollBusy === k ? bicep() : ''}${label}</button>`).join('')}
-        <label class="time-wrap${mine.time ? ' filled' : ''}"><input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span></label>
+        <label class="time-wrap"><select id="poll-time" aria-label="Orario (facoltativo)">${timeOptions(mine.time)}</select></label>
       </div>
       <p class="poll-names"></p>`;
     card.querySelector('.by').textContent = poll.byDisplay;
     card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice)));
-    card.querySelector('#poll-time').oninput = (e) => e.target.parentNode.classList.toggle('filled', !!e.target.value);
     // Su iPhone "change" arriva a ogni giro della rotella e "blur" non sempre: si salva in silenzio poco dopo
     // l'ultima modifica, senza ridisegnare la casella mentre la rotella è aperta (si chiuderebbe).
     // Con un orario e nessuna risposta vale "Ci sono".
@@ -194,6 +193,9 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       const t = timeInput.value;
       if (t === sent || pollBusy) return;
       sent = t;
+      const wrap = timeInput.parentNode;
+      wrap.classList.add('busy');
+      if (!wrap.querySelector('.bicep')) wrap.insertAdjacentHTML('beforeend', bicep());
       try {
         const r = await api('pollAnswer', { choice: mine.choice || 'si', time: t });
         v = -1;
@@ -202,6 +204,9 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       } catch (err) {
         sent = '';
         toast(err.message);
+      } finally {
+        wrap.classList.remove('busy'); // se la casella non è stata ridisegnata
+        wrap.querySelectorAll('.bicep').forEach((b) => b.remove());
       }
     };
     timeInput.onchange = () => {
@@ -437,6 +442,19 @@ export function answersList(poll) {
     box.append(row);
   });
   return box;
+}
+
+/** Orari del sondaggio ogni 5 minuti, da un'ora fa a mezzanotte (più l'orario già scelto, se fuori griglia):
+ *  così la rotella parte vicino all'ora attuale invece che dalle 5 del mattino. */
+function timeOptions(current) {
+  const out = ['<option value="">Orario</option>'];
+  const times = [];
+  const now = new Date();
+  const from = Math.max(5 * 60, Math.floor((now.getHours() * 60 + now.getMinutes() - 60) / 5) * 5);
+  for (let m = Math.min(from, 23 * 60); m < 24 * 60; m += 5) times.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`);
+  if (current && !times.includes(current)) times.push(current);
+  times.sort().forEach((t) => out.push(`<option${t === current ? ' selected' : ''}>${t}</option>`));
+  return out.join('');
 }
 
 function el(tag, cls, text) {

@@ -240,7 +240,8 @@ body.chat-mode #scroller { padding-top: 0; }
 .poll-head .muted { font-size: 12px; white-space: nowrap; }
 .poll .choices { grid-template-columns: repeat(3, 1fr) 92px; gap: 6px; }
 .poll .choice { padding: 8px 0; font-size: 15px; border-radius: 10px; }
-.poll #poll-time { width: 100%; min-width: 0; padding: 5px 2px; font-size: 16px; border-radius: 10px; text-transform: none; letter-spacing: 0; }
+.poll #poll-time { width: 100%; height: 100%; min-width: 0; margin: 0; padding: 0 4px; border: 0; border-radius: 10px; background: var(--card-2); color: var(--fg); font: inherit; font-size: 16px; font-weight: 600; text-align: center; text-align-last: center; -webkit-appearance: none; appearance: none; }
+.poll #poll-time:has(option[value='']:checked) { color: var(--muted); font-weight: 400; }
 .poll #poll-ask { margin: 0; }
 
 .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
@@ -406,9 +407,9 @@ html.ios.standalone .sheet, html.ios.standalone .viewer { top: 1.75rem; }
 
 /* Orario del sondaggio: su iPhone il campo vuoto non mostra nulla, quindi una scritta al suo posto */
 .time-wrap { position: relative; display: block; min-width: 0; }
-.time-wrap span { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 15px; pointer-events: none; }
-.time-wrap.filled span { display: none; }
-.time-wrap:not(.filled) input { color: transparent; }
+.time-wrap .bicep { position: absolute; inset: 0; margin: auto; width: 30px; height: 29px; color: #000; --bicep-bg: var(--exercise); pointer-events: none; }
+.time-wrap.busy::after { content: ''; position: absolute; inset: 0; border-radius: 10px; background: var(--exercise); }
+.time-wrap.busy .bicep { z-index: 1; }
 /* In chat il sondaggio non scorre: va tenuto tutto sotto la sfocatura di iOS (circa 50 punti dall'alto) */
 html.ios.standalone .chat-top { padding-top: 36px; }
 
