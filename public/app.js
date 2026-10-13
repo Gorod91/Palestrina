@@ -659,6 +659,35 @@ async function enableNotifications() {
   updateNotifyCard();
 }
 
+// ---------- Cambio di giorno ----------
+
+/** Stato di un altro giorno: classifiche e punti vanno bene come anteprima, il resto di oggi no. */
+function withoutToday(s) {
+  return { ...s, poll: null, plans: null, me: { ...s.me, checkedInToday: false, sudometroToday: null } };
+}
+
+// Data in alto e dati di oggi seguono il giorno vero anche se l'app resta aperta oltre la mezzanotte.
+let shownDay = '';
+let midnightTimer = 0;
+function syncDay() {
+  const now = new Date();
+  const day = now.toDateString();
+  clearTimeout(midnightTimer);
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 2);
+  midnightTimer = setTimeout(() => {
+    syncDay();
+    if (session && state && document.visibilityState === 'visible') refresh().then(() => chat.preload());
+  }, midnight - now);
+  if (day === shownDay) return;
+  const changed = !!shownDay;
+  shownDay = day;
+  $('today-date').textContent = now.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+  if (changed && state) {
+    state = withoutToday(state);
+    render();
+  }
+}
+
 // ---------- Avvio ----------
 
 async function home() {
@@ -671,9 +700,7 @@ async function home() {
   if (!state && cached && cached.data && cached.data.me && cached.data.me.name === session.name) {
     state = cached.data;
     // Stato di un altro giorno: classifiche e punti vanno bene come anteprima, il resto di oggi no
-    if (cached.day !== new Date().toDateString()) {
-      state = { ...state, poll: null, plans: null, me: { ...state.me, checkedInToday: false, sudometroToday: null } };
-    }
+    if (cached.day !== new Date().toDateString()) state = withoutToday(state);
   }
   if (!state) {
     // Primo avvio senza dati salvati: anello vuoto e "Caricamento" invece di card vuote.
@@ -740,7 +767,7 @@ if ('serviceWorker' in navigator) {
   });
 }
 $('avatar').addEventListener('click', () => selectTab('altro'));
-$('today-date').textContent = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+syncDay();
 document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
 try {
   initTimer();
@@ -761,7 +788,9 @@ $('btn-browser').addEventListener('click', () => {
   start();
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && session && state) refresh().then(() => chat.preload());
+  if (document.visibilityState !== 'visible') return;
+  syncDay();
+  if (session && state) refresh().then(() => chat.preload());
 });
 
 // Tastiera aperta: l'app si restringe all'area visibile, così la casella dei messaggi
