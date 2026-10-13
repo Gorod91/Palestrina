@@ -144,7 +144,7 @@ Il timer non suona: a fine tempo lo schermo pulsa lentamente in verde (meno di u
 
 ## Check-in automatico (Comandi iOS)
 
-Nell'app, tab **Impostazioni**, sezione **Check-in automatico**: ognuno copia il proprio link personale (`…/exec?action=checkin&code=…`) e crea l'automazione in **Comandi → Automazione → + → Arrivo** → posizione della palestra → **Esegui immediatamente** → azione **Ottieni contenuto dell'URL** con il link.
+Nell'app, tab **Impostazioni**, sezione **Check-in automatico**: ognuno copia il proprio link personale (`…/exec?action=checkin&code=…`) e crea l'automazione in **Comandi → Automazione → + → Wi-Fi** → rete Wi-Fi della palestra (bisogna esserci collegati almeno una volta) → **Esegui immediatamente** → azione **Ottieni contenuto dell'URL** con il link.
 Nel foglio Presenze, la colonna *Fonte* dice se il check-in è arrivato dall'app o dall'automazione.
 
 ## Sicurezza e privacy
