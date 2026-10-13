@@ -96,6 +96,50 @@ function ensureTriggers(force) {
   props.setProperty('TRIGGERS_VERSION', TRIGGERS_VERSION);
 }
 
+// Azzeramento una tantum: cambiando RESET_ID, la prima richiesta dopo la pubblicazione riparte da zero.
+const RESET_ID = '2026-10-13';
+
+function ensureReset() {
+  if (props.getProperty('RESET_ID') === RESET_ID) return;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    if (props.getProperty('RESET_ID') === RESET_ID) return;
+    azzeraDati();
+    props.setProperty('RESET_ID', RESET_ID);
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/**
+ * Cancella presenze, Sudometro, chat, piani, cambi, albo d'oro e selfie da sudato (nel cestino di Drive).
+ * Restano utenti, codici, alias, obiettivi, iscrizioni alle notifiche e foto di riferimento.
+ */
+function azzeraDati() {
+  ['presenze', 'sudometro', 'chat', 'piani', 'cambi'].forEach((key) => {
+    const sh = sheet(key);
+    const last = sh.getLastRow();
+    if (last > 1) sh.getRange(2, 1, last - 1, sh.getMaxColumns()).clearContent();
+  });
+  const keep = new Set(Object.values(readRefPhotoIds()));
+  const folders = photosRoot().getFolders();
+  while (folders.hasNext()) {
+    const files = folders.next().getFiles();
+    while (files.hasNext()) {
+      const f = files.next();
+      if (!keep.has(f.getId())) f.setTrashed(true);
+    }
+  }
+  ['ALBO', 'LAST_MONTHLY'].forEach((k) => props.deleteProperty(k));
+  Object.keys(props.getProperties())
+    .filter((k) => k.indexOf('chatNotify_') === 0)
+    .forEach((k) => props.deleteProperty(k));
+  props.setProperty('PENALTIES_FROM', dayString(new Date()));
+  bumpChat(); // i telefoni ricaricano la chat vuota
+  MEMO = {};
+}
+
 /** Premiazioni di un periodo (giorni "yyyy-MM-dd", estremi inclusi). */
 function computeRecap(from, to) {
   const presenze = rows('presenze').filter((r) => r.day >= from && r.day <= to);
@@ -185,6 +229,7 @@ function doPost(e) {
     } catch (err) {
       console.error('Trigger non aggiornati', err);
     }
+    ensureReset();
     const user = findUserByCode(req.code);
     if (!user) return json({ error: 'Codice non valido' });
 
@@ -243,6 +288,7 @@ function doPost(e) {
 
 function doGet(e) {
   MEMO = {};
+  ensureReset();
   const p = e.parameter;
 
   // Link personale per l'automazione "Arrivo" di Comandi: ?action=checkin&code=...
