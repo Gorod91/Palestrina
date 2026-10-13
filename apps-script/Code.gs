@@ -20,6 +20,8 @@ const SHEETS = {
   chat: { name: 'Chat', header: ['ID', 'Data', 'Ora', 'Nome', 'Tipo', 'Testo', 'Rif', 'Orario'] },
   // Chi va in palestra, oggi e nei 6 giorni dopo: una riga per persona e giorno (Risposta = si/forse/no)
   piani: { name: 'Piani', header: ['Giorno', 'Nome', 'Risposta', 'Orario', 'Aggiornato'] },
+  // Storico dei cambi di risposta, per le penalità (cambio all'ultimo, check-in senza avviso)
+  cambi: { name: 'Cambi', header: ['Quando', 'Giorno', 'Nome', 'Da', 'A', 'Orario prima', 'Orario dopo'] },
 };
 const DEFAULT_GOAL = 3;
 // Utenti con il pulsante di debug, oltre a quelli con "sì" nella colonna D di Utenti.
@@ -802,6 +804,7 @@ function planSet(user, day, choice, time) {
     const values = sh.getDataRange().getValues();
     const row = values.findIndex((r, i) => i > 0 && toDay(r[0]) === d && String(r[1]) === user.name);
     const now = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm');
+    const before = row > 0 ? { choice: String(values[row][2]), time: values[row][3] ? toTime(values[row][3]) : '' } : { choice: '', time: '' };
     if (row > 0) {
       changed = String(values[row][2]) !== c || (values[row][3] ? toTime(values[row][3]) : '') !== at;
       if (!c) sh.deleteRow(row + 1);
@@ -810,7 +813,10 @@ function planSet(user, day, choice, time) {
       sh.appendRow([d, user.name, c, at, now]);
       changed = true;
     }
-    if (changed) bumpChat();
+    if (changed) {
+      sheet('cambi').appendRow([now, d, user.name, before.choice, c, before.time, at]);
+      bumpChat();
+    }
   } finally {
     lock.releaseLock();
   }
@@ -956,7 +962,33 @@ const POINTS = {
   mattiniero: 10,
   branco: 10,
   pomodoro: 10,
+  // Penalità
+  bidone: -10, // "ci sono" e poi niente check-in quel giorno
+  cambioUltimo: -5, // da "ci sono" a forse/no (o tolto) a meno di 4 ore dall'orario, senza poi venire
+  cambioOre: 4,
+  cambioSenzaOrario: '14:00', // senza orario contano i cambi di quel giorno dalle 14 in poi
+  ritardo: -2, // check-in più di 45 minuti dopo l'orario detto
+  ritardoMinuti: 45,
+  settimanaVuota: -5, // nessuna presenza in una settimana intera
+  senzaAvviso: -3, // check-in senza aver detto "ci sono" o "forse" almeno 1 ora prima
+  avvisoMinuti: 60,
 };
+
+/** Da quando valgono le penalità: il giorno in cui sono state introdotte (prima non c'era lo storico dei cambi). */
+function penaltiesFrom() {
+  let d = props.getProperty('PENALTIES_FROM');
+  if (!d) {
+    d = dayString(new Date());
+    props.setProperty('PENALTIES_FROM', d);
+  }
+  return d;
+}
+
+function hhmmMinus(t, minutes) {
+  const [h, m] = String(t).split(':').map(Number);
+  const v = Math.max(0, h * 60 + (m || 0) - minutes);
+  return `${String(Math.floor(v / 60)).padStart(2, '0')}:${String(v % 60).padStart(2, '0')}`;
+}
 
 /** Classifica a punti di un mese ("yyyy-MM"), con il dettaglio di ciascuno. */
 function computePoints(month) {
@@ -975,6 +1007,9 @@ function computePoints(month) {
   });
   const pres = Object.keys(first).map((k) => first[k]);
   const sudo = rows('sudometro').filter((r) => inMonth(r.day));
+  const piani = {};
+  rows('piani').forEach((r) => (piani[r.day + '|' + r.name] = r));
+  const cambi = rows('cambi');
   const monthStart = month + '-01';
   const mondays = [];
   for (let d = monthStart; inMonth(d); d = addDays(d, 1)) if (weekKey(d) === d) mondays.push(d);
@@ -1005,6 +1040,34 @@ function computePoints(month) {
       while (countInWeek(pres, u.name, addDays(w, -7 * n)) >= u.goal) n++;
       if (n > 1) add('serie', 'Settimane di fila', Math.min(P.seriePerSettimana * (n - 1), P.serieMax));
     }
+    // Penalità (da quando esistono)
+    const today = dayString(new Date());
+    const penFrom = penaltiesFrom();
+    const myCambi = cambi.filter((c) => c.name === u.name);
+    for (let day = monthStart; inMonth(day) && day <= today; day = addDays(day, 1)) {
+      if (day < penFrom) continue;
+      const plan = piani[day + '|' + u.name];
+      const came = first[u.name + '|' + day];
+      if (!came) {
+        if (day < today && plan && plan.choice === 'si') add('bidone', 'Bidone', P.bidone);
+        else {
+          // Cambio all'ultimo: da "ci sono" ad altro a meno di 4 ore dall'orario (senza orario: dalle 14 di quel giorno)
+          const late = myCambi.some((c) => c.day === day && c.from === 'si' && c.to !== 'si' && c.at >= `${day} ${c.timeBefore ? hhmmMinus(c.timeBefore, P.cambioOre * 60) : P.cambioSenzaOrario}`);
+          if (late) add('cambio', 'Cambio all\'ultimo', P.cambioUltimo);
+        }
+        continue;
+      }
+      if (plan && plan.choice === 'si' && plan.time && minutes(came.time) > minutes(plan.time) + P.ritardoMinuti) add('ritardo', 'Ritardo', P.ritardo);
+      const told = myCambi.filter((c) => c.day === day && (c.to === 'si' || c.to === 'forse')).map((c) => c.at).sort()[0];
+      if (!told || told > `${day} ${hhmmMinus(came.time, P.avvisoMinuti)}`) add('avviso', 'Check-in senza avvisare', P.senzaAvviso);
+    }
+    // Settimana a vuoto: settimane finite (domenica nel mese) senza presenze, per chi c'era già
+    const firstEver = mine.length ? mine[0].day : null;
+    for (let w = weekKey(monthStart); w <= addDays(monthStart, 31); w = addDays(w, 7)) {
+      const sunday = addDays(w, 6);
+      if (!inMonth(sunday) || sunday >= today || w < penFrom || !firstEver || firstEver >= w) continue;
+      if (countInWeek(pres, u.name, w) === 0) add('vuota', 'Settimana a vuoto', P.settimanaVuota);
+    }
     if (early >= P.mattinieroVolte) add('mattiniero', 'Mattiniero', P.mattiniero, true);
     if (friends >= P.brancoVolte) add('branco', 'Branco', P.branco, true);
     if (mondays.length && mondays.every((w) => countInWeek(pres, u.name, w) >= u.goal)) add('maiSaltato', 'Mai saltato', P.maiSaltato, true);
@@ -1028,7 +1091,8 @@ function computePoints(month) {
         g.pts += it.pts;
       });
       const detail = Object.keys(groups).map((k) => groups[k]);
-      return { name: t.name, display: t.display, total: detail.reduce((a, g) => a + g.pts, 0), detail };
+      // il totale del mese non scende sotto zero
+      return { name: t.name, display: t.display, total: Math.max(0, detail.reduce((a, g) => a + g.pts, 0)), detail };
     })
     .sort((a, b) => b.total - a.total || a.display.localeCompare(b.display));
 }
@@ -1113,6 +1177,10 @@ function openSheet(key) {
     sh.appendRow(SHEETS[key].header);
     sh.setFrozenRows(1);
   }
+  if (key === 'cambi' && !props.getProperty('CAMBI_TEXT_FORMAT')) {
+    sh.getRange('A:G').setNumberFormat('@');
+    props.setProperty('CAMBI_TEXT_FORMAT', '1');
+  }
   if (key === 'piani' && !props.getProperty('PIANI_TEXT_FORMAT')) {
     sh.getRange('A:E').setNumberFormat('@'); // giorni e orari restano testo, non date
     props.setProperty('PIANI_TEXT_FORMAT', '1');
@@ -1145,6 +1213,7 @@ function readRows(key) {
     return values.filter((r) => !r[6]).map((r) => ({ day: toDay(r[0]), name: r[2], score: Number(r[3]), title: r[4], photoId: r[7] || '' }));
   }
   if (key === 'iscrizioni') return values.map((r) => ({ name: r[0], sub: JSON.parse(r[2]) }));
+  if (key === 'cambi') return values.map((r) => ({ at: String(r[0]), day: toDay(r[1]), name: String(r[2]), from: String(r[3]), to: String(r[4]), timeBefore: r[5] ? toTime(r[5]) : '', timeAfter: r[6] ? toTime(r[6]) : '' }));
   if (key === 'piani') return values.map((r) => ({ day: toDay(r[0]), name: String(r[1]), choice: String(r[2]), time: r[3] ? toTime(r[3]) : '', updated: String(r[4] || '') }));
   return values;
 }

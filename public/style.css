@@ -474,3 +474,7 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 .tabbar button .badge ~ .pending-dot { display: none; }
 .plan-grid th.closed { opacity: .45; }
 .pcell.closed { opacity: .35; }
+
+/* Penalità */
+.points .detail-row.minus b, .points .detail-row.minus span { color: var(--danger); }
+.rules.minus em { color: var(--danger); }

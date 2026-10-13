@@ -41,6 +41,7 @@ export function fakeState(real) {
     if (scores[i]) d.push({ key: 'sudometro', label: 'Sudometro', count: [3, 4, 1, 2, 0, 5][i], pts: [7, 11, 2, 5, 0, 14][i] });
     if (streaks[i] > 1) d.push({ key: 'serie', label: 'Settimane di fila', count: 2, pts: Math.min(5 * streaks[i], 20) });
     if (i === 2) d.push({ key: 'rientro', label: 'Rientro (vale doppio)', count: 1, pts: 10 });
+    if (i === 3) d.push({ key: 'bidone', label: 'Bidone', count: 1, pts: -10 }, { key: 'avviso', label: 'Check-in senza avvisare', count: 2, pts: -6 });
     if ([1, 5].includes(i)) d.push({ key: 'mattiniero', label: 'Mattiniero', count: 1, pts: 10, achievement: true });
     if ([1, 5].includes(i)) d.push({ key: 'branco', label: 'Branco', count: 1, pts: 10, achievement: true });
     if (i === 5) d.push({ key: 'maiSaltato', label: 'Mai saltato', count: 1, pts: 20, achievement: true });

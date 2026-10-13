@@ -128,6 +128,7 @@ Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il
 
 Tab **Chat**: messaggi del gruppo (ultimi 7 giorni) e, in cima, la domanda **"Chi va in palestra oggi?"**.
 - Un giorno (oggi o uno dei 6 dopo, nella fila dei giorni) resta **chiuso** finché qualcuno non tocca **"Chiedi a tutti"**: parte la notifica a tutti e da lì si risponde con **Ci sono / Forse / No** e un **orario facoltativo** (ritoccare la risposta la toglie). Chi non ha ancora risposto a una domanda vede un **pallino rosso** sul tab Chat e sul giorno. Chi poi fa check-in risulta "arrivato".
+- **Penalità** nei punti del mese (dettaglio nel pulsante "i" della Classifica): Bidone −10, Cambio all'ultimo −5, Ritardo −2, Check-in senza avvisare −3, Settimana a vuoto −5. Valgono dal giorno in cui sono state introdotte (proprietà PENALTIES_FROM); i cambi di risposta si salvano nel foglio **Cambi**.
 - Nel tab **Oggi** c'è la griglia persone × prossimi 7 giorni: le proprie caselle si toccano per cambiare risposta. Le risposte stanno nel foglio **Piani**, creato da solo.
 - In chat compaiono anche gli **eventi**: check-in, Sudometro (con la foto), **premiazioni della settimana** (domenica alle 19) e **premiazioni del mese** (l'ultimo giorno del mese alle 21: Re del mese, MVP, Divano d'oro e Pomodoro del mese).
 - Notifiche: la domanda arriva a tutti; ogni risposta solo a chi l'ha fatta; i messaggi agli altri, al massimo una notifica ogni 5 minuti per persona. Si possono silenziare in **Altro → Notifiche** (la domanda arriva comunque). Toccando la notifica si apre la chat.

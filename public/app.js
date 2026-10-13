@@ -245,7 +245,8 @@ function renderPoints() {
       row.className = 'detail-row';
       row.innerHTML = '<span></span><b></b>';
       row.querySelector('span').textContent = g.achievement ? `Medaglia: ${g.label}` : g.count > 1 ? `${g.label} × ${g.count}` : g.label;
-      row.querySelector('b').textContent = `+${g.pts}`;
+      row.querySelector('b').textContent = g.pts < 0 ? `${g.pts}` : `+${g.pts}`;
+      if (g.pts < 0) row.classList.add('minus');
       detail.append(row);
     });
     li.onclick = () => {
