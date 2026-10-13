@@ -59,16 +59,18 @@ export function fakeState(real) {
     refPhotos,
     plans: [0, 1, 2, 3, 4, 5, 6].map((n) => ({
       day: daysAgo(-n),
+      // giorni con la domanda aperta (gli altri sono "chiusi")
+      poll: [0, 1, 3, 4].includes(n) ? { id: '', by: ['Giulia', 'Luca', '', 'Marta', 'Sara'][n] || 'Giulia', byDisplay: ['Giulia', 'Luca', '', 'Marta', 'Sara'][n] || 'Giulia', clock: '08:12' } : null,
       people: people.map((p, i) => {
         const pattern = [
-          ['si', 'si', '', 'forse', 'si', '', ''],
+          ['si', 'si', '', '', 'si', '', ''],
           ['si', '', 'si', 'si', '', '', ''],
           ['forse', 'si', '', 'si', '', 'si', ''],
           ['no', '', '', 'si', '', '', ''],
           [null, '', 'forse', '', '', '', 'si'],
           ['si', '', 'si', '', 'si', '', ''],
         ][i];
-        const c = pattern[n] || null;
+        const c = [0, 1, 3, 4].includes(n) ? pattern[n] || null : null;
         return { name: p.name, display: p.display, choice: c, time: c === 'si' ? ['18:30', '19:00', '18:00', '18:30', '19:30', '18:30'][i] : '', arrived: n === 0 && i === 5 };
       }),
     })),

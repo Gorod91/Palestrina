@@ -27,6 +27,19 @@ const DEBUG_USERS = ['Francesco'];
 const TZ = Session.getScriptTimeZone();
 const props = PropertiesService.getScriptProperties();
 
+// Letture del foglio ricordate per la durata di una richiesta: lo stato legge molte volte gli stessi fogli.
+// Chi prende un foglio con sheet() per scriverci cancella il ricordo di quel foglio.
+let MEMO = {};
+function memo(key, fn) {
+  if (!(key in MEMO)) MEMO[key] = fn();
+  return MEMO[key];
+}
+function forget(key) {
+  Object.keys(MEMO).forEach((k) => {
+    if (k === key || k.indexOf(key + ':') === 0) delete MEMO[k];
+  });
+}
+
 // ---------- Setup (da eseguire una volta dall'editor) ----------
 
 function setup() {
@@ -162,6 +175,7 @@ function getAlbo() {
 // ---------- API per la web app (POST con Content-Type text/plain) ----------
 
 function doPost(e) {
+  MEMO = {};
   try {
     const req = JSON.parse(e.postData.contents);
     try {
@@ -192,7 +206,7 @@ function doPost(e) {
       case 'chatSend':
         return json(chatSend(user, req.text));
       case 'pollAsk':
-        return json(pollAsk(user));
+        return json(pollAsk(user, req.day));
       case 'pollAnswer':
         return json(pollAnswer(user, req.choice, req.time));
       case 'planSet':
@@ -226,6 +240,7 @@ function doPost(e) {
 // ---------- API GET: check-in automatico (Comandi iOS) e GitHub Action ----------
 
 function doGet(e) {
+  MEMO = {};
   const p = e.parameter;
 
   // Link personale per l'automazione "Arrivo" di Comandi: ?action=checkin&code=...
@@ -298,11 +313,17 @@ function saveReference(user, features, photo) {
   if (!features || typeof features.redness !== 'number') return { error: 'Foto di riferimento non valida' };
   const saved = savePhoto(user, photo, 'riferimento');
   props.setProperty('ref_' + user.name, JSON.stringify({ features, at: Date.now(), photoId: saved.id || '' }));
+  forget('refs');
+  bumpChat(); // la foto da fresco compare anche in chat
   return { ok: true, photoError: saved.error };
 }
 
 /** Foto di riferimento ("da fresco") di ciascuno, da mostrare accanto ai selfie da sudato: nome → id del file. */
 function refPhotoIds() {
+  return memo('refs', readRefPhotoIds);
+}
+
+function readRefPhotoIds() {
   const all = props.getProperties();
   const out = {};
   Object.keys(all).forEach((k) => {
@@ -514,16 +535,19 @@ function buildNotifications(event, name) {
 
   if (event === 'poll') {
     // La domanda arriva a tutti, anche a chi ha silenziato la chat.
-    return toAllBut(name, `${dn(name)} chiede: chi va in palestra oggi?`, 'Rispondi con un tap: ci sono, forse o no.').map((n) => ({ ...n, tab: 'chat' }));
+    const asked = chatRows().filter((r) => r.type === 'poll' && r.name === name).pop();
+    const label = asked ? dayLabel(pollDay(asked)) : 'oggi';
+    return toAllBut(name, `${dn(name)} chiede: chi va in palestra ${label}?`, 'Rispondi con un tap: ci sono, forse o no.').map((n) => ({ ...n, tab: 'chat' }));
   }
 
   if (event === 'answer') {
-    const poll = todayPoll();
+    // L'ultima risposta cambiata da questa persona
+    const last = rows('piani').filter((r) => r.name === name && r.choice).sort((a, b) => (a.updated < b.updated ? -1 : 1)).pop();
+    if (!last) return [];
+    const poll = pollFor(last.day);
     if (!poll || poll.name === name) return [];
-    const a = plansSummary(rows('presenze'))[0].people.find((x) => x.name === name);
-    if (!a || !a.choice) return [];
-    const title = `${dn(name)}: ${CHOICE_LABELS[a.choice] || a.choice}${a.time ? ' alle ' + a.time : ''}`;
-    return subs.filter((s) => s.name === poll.name).map((s) => ({ subscription: s.sub, title, body: 'Chi va in palestra oggi?', tab: 'chat' }));
+    const title = `${dn(name)}: ${CHOICE_LABELS[last.choice] || last.choice}${last.time ? ' alle ' + last.time : ''}`;
+    return subs.filter((s) => s.name === poll.name).map((s) => ({ subscription: s.sub, title, body: `Chi va in palestra ${dayLabel(last.day)}?`, tab: 'chat' }));
   }
 
   if (event === 'recap') {
@@ -554,8 +578,12 @@ const CHAT_NOTIFY_EVERY_MIN = 5; // al massimo una notifica di chat ogni 5 minut
 const CHOICE_LABELS = { si: 'ci sono', forse: 'forse', no: 'oggi no' };
 
 function chatRows() {
+  return memo('chat:rows', readChatRows);
+}
+
+function readChatRows() {
   const from = addDays(dayString(new Date()), -(CHAT_DAYS - 1));
-  return sheet('chat')
+  return sheetRaw('chat')
     .getDataRange()
     .getValues()
     .slice(1)
@@ -583,9 +611,26 @@ function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 }
 
+/** Giorno a cui si riferisce una domanda: Rif (domande per i giorni dopo) o il giorno in cui è stata fatta. */
+function pollDay(r) {
+  return /^\d{4}-\d\d-\d\d$/.test(r.ref) ? r.ref : r.day;
+}
+
+function pollFor(day) {
+  return chatRows().find((r) => r.type === 'poll' && pollDay(r) === day) || null;
+}
+
 function todayPoll() {
+  return pollFor(dayString(new Date()));
+}
+
+/** "oggi", "domani" o "giovedì 15" */
+function dayLabel(day) {
   const today = dayString(new Date());
-  return chatRows().find((r) => r.type === 'poll' && r.day === today) || null;
+  if (day === today) return 'oggi';
+  if (day === addDays(today, 1)) return 'domani';
+  const d = parseDay(day);
+  return `${['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'][d.getUTCDay()]} ${d.getUTCDate()}`;
 }
 
 /** I 7 giorni pianificabili: oggi e i 6 successivi. */
@@ -607,8 +652,14 @@ function plansSummary(presenze) {
   });
   const arrived = new Set(presenze.filter((p) => p.day === today).map((p) => p.name));
   const users = allUsers();
+  const dn = displayNames();
   return days.map((day) => ({
     day,
+    // Un giorno è "aperto" solo se qualcuno ha chiesto a tutti
+    poll: (() => {
+      const p = pollFor(day);
+      return p ? { id: p.id, by: p.name, byDisplay: dn(p.name), clock: p.clock } : null;
+    })(),
     people: users.map((u) => {
       const a = answers[day + '|' + u.name];
       return { name: u.name, display: u.display, choice: a ? a.choice : null, time: a ? a.time : '', arrived: day === today && arrived.has(u.name) };
@@ -627,8 +678,24 @@ function pollSummary(today, presenze, dn) {
 function chatState(user, v) {
   const version = Number(props.getProperty('CHAT_VERSION') || 0);
   if (Number(v) === version && version > 0) return { v: version, same: true };
-  const dn = displayNames();
+  // Uguale per tutti: si calcola una volta per versione e giorno e si tiene in cache qualche minuto
   const today = dayString(new Date());
+  const cache = CacheService.getScriptCache();
+  const key = `chat_${version}_${today}`;
+  const hit = cache.get(key);
+  if (hit) return JSON.parse(hit);
+  const out = buildChatState(version, today);
+  try {
+    const text = JSON.stringify(out);
+    if (text.length < 95000) cache.put(key, text, 300);
+  } catch (err) {
+    console.error('Cache chat non salvata', err);
+  }
+  return out;
+}
+
+function buildChatState(version, today) {
+  const dn = displayNames();
   const presenze = rows('presenze');
   return {
     v: version,
@@ -642,6 +709,7 @@ function chatState(user, v) {
         display: r.name ? dn(r.name) : '',
         type: r.type,
         text: r.type === 'msg' ? r.text : '',
+        target: r.type === 'poll' ? pollDay(r) : '',
         data: r.type === 'event' ? safeJson(r.text) : null,
       })),
     poll: pollSummary(today, presenze, dn),
@@ -693,14 +761,16 @@ function chatSend(user, text) {
   return chatState(user, -1);
 }
 
-/** Crea la domanda di oggi, se non c'è già. */
-function pollAsk(user) {
+/** Crea la domanda per un giorno dei prossimi 7 (oggi se non indicato), se non c'è già. */
+function pollAsk(user, day) {
+  const d = day ? String(day) : dayString(new Date());
+  if (planDays().indexOf(d) < 0) return { error: 'Si può chiedere solo da oggi a 6 giorni' };
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   let created = false;
   try {
-    if (!todayPoll()) {
-      appendChat(user, 'poll', 'Chi va in palestra oggi?');
+    if (!pollFor(d)) {
+      appendChat(user, 'poll', `Chi va in palestra ${dayLabel(d)}?`, d);
       bumpChat();
       created = true;
     }
@@ -722,6 +792,7 @@ function planSet(user, day, choice, time) {
   if (c && !CHOICE_LABELS[c]) return { error: 'Risposta non valida' };
   const d = String(day || '');
   if (planDays().indexOf(d) < 0) return { error: 'Si può pianificare solo da oggi a 6 giorni' };
+  if (c && !pollFor(d)) return { error: 'Per quel giorno nessuno ha ancora chiesto: tocca "Chiedi a tutti"' };
   const at = c && /^([01]\d|2[0-3]):[0-5]\d$/.test(String(time || '')) ? String(time) : '';
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
@@ -743,8 +814,8 @@ function planSet(user, day, choice, time) {
   } finally {
     lock.releaseLock();
   }
-  // Avvisa chi ha fatto la domanda di oggi (solo per oggi)
-  if (changed && c && d === dayString(new Date()) && todayPoll()) dispatch('answer', user.name);
+  // Avvisa chi ha fatto la domanda per quel giorno
+  if (changed && c) dispatch('answer', user.name);
   return chatState(user, -1);
 }
 
@@ -767,7 +838,7 @@ function chatDelete(user, id) {
     remove.reverse().forEach((row) => sh.deleteRow(row)); // dal fondo, così gli indici restano validi
     // Annullare la domanda toglie anche le risposte di quel giorno
     if (target0 && String(target0[4]) === 'poll') {
-      const day = toDay(target0[1]);
+      const day = pollDay({ ref: String(target0[6]), day: toDay(target0[1]) });
       const pi = sheet('piani');
       const rowsPi = [];
       pi.getDataRange().getValues().forEach((r, i) => {
@@ -851,6 +922,7 @@ function setAlias(user, value) {
   const row = values.findIndex((r, i) => i > 0 && String(r[1]).trim() === user.code);
   if (row < 1) return { error: 'Utente non trovato' };
   sh.getRange(row + 1, 5).setValue(alias);
+  bumpChat(); // il nome compare anche in chat
   return { ok: true, display: alias || user.name };
 }
 
@@ -1021,7 +1093,17 @@ function dayString(date) {
 
 // ---------- Dati ----------
 
+/** Foglio da modificare: cancella le letture ricordate di quel foglio. */
 function sheet(key) {
+  forget(key);
+  return sheetRaw(key);
+}
+
+function sheetRaw(key) {
+  return memo('sheet:' + key, () => openSheet(key));
+}
+
+function openSheet(key) {
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(SHEETS[key].name);
   if (!sh) {
@@ -1052,18 +1134,26 @@ function toDay(v) {
 }
 
 function rows(key) {
-  const values = sheet(key).getDataRange().getValues().slice(1);
+  return memo(key + ':rows', () => readRows(key));
+}
+
+function readRows(key) {
+  const values = sheetRaw(key).getDataRange().getValues().slice(1);
   if (key === 'presenze') return values.map((r) => ({ day: toDay(r[0]), time: toTime(r[1]), name: r[2] }));
   if (key === 'sudometro') {
     // Le prove di debug restano nel foglio ma non contano.
     return values.filter((r) => !r[6]).map((r) => ({ day: toDay(r[0]), name: r[2], score: Number(r[3]), title: r[4], photoId: r[7] || '' }));
   }
   if (key === 'iscrizioni') return values.map((r) => ({ name: r[0], sub: JSON.parse(r[2]) }));
-  if (key === 'piani') return values.map((r) => ({ day: toDay(r[0]), name: String(r[1]), choice: String(r[2]), time: r[3] ? toTime(r[3]) : '' }));
+  if (key === 'piani') return values.map((r) => ({ day: toDay(r[0]), name: String(r[1]), choice: String(r[2]), time: r[3] ? toTime(r[3]) : '', updated: String(r[4] || '') }));
   return values;
 }
 
 function allUsers() {
+  return memo('utenti:users', readUsers);
+}
+
+function readUsers() {
   return rows('utenti')
     .filter((r) => r[0] && r[1])
     .map((r) => ({

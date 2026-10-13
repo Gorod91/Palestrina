@@ -4,6 +4,17 @@
 const $ = (id) => document.getElementById(id);
 const POLL_EVERY = 5000;
 const WEEKDAYS = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
+/** "oggi", "domani" o "giovedì 15" */
+function planLabel(day) {
+  const d = new Date(day + 'T12:00:00');
+  const t = new Date();
+  t.setHours(12, 0, 0, 0);
+  const diff = Math.round((d - t) / 86400000);
+  if (diff === 0) return 'oggi';
+  if (diff === 1) return 'domani';
+  return `${['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'][d.getDay()]} ${d.getDate()}`;
+}
+
 const CHOICES = [
   ['si', 'Ci sono'],
   ['forse', 'Forse'],
@@ -18,11 +29,11 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   let timer = null;
   let loading = false;
   const pending = []; // messaggi inviati ma non ancora salvati in Apps Script
-  let pollBusy = null;
   let selDay = ''; // giorno scelto nella fila dei giorni del sondaggio
   // Risposte al sondaggio: si vedono subito e partono in ordine in sottofondo (l'ultima vince)
   const outbox = [];
   let sending = false;
+  let asking = 0; // domande "Chiedi a tutti" in invio
   let unseen = 0; // messaggi arrivati mentre si legge più in alto
   let lastCount = 0; // 'ask' oppure la risposta in invio ('si' | 'forse' | 'no')
 
@@ -55,11 +66,29 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     }
   }
 
+  // Ultima chat scaricata, tenuta sul telefono: all'apertura si vede subito, poi si aggiorna
+  const cacheKey = () => `palestrina.chatCache.${me ? me.name : ''}`;
+  function saveCache(r) {
+    try {
+      localStorage.setItem(cacheKey(), JSON.stringify({ day: new Date().toDateString(), r }));
+    } catch { /* storage pieno o non disponibile */ }
+  }
+  function readCache() {
+    try {
+      const c = JSON.parse(localStorage.getItem(cacheKey()));
+      // di un altro giorno: i giorni della pianificazione sono cambiati, meglio non mostrarla
+      return c && c.day === new Date().toDateString() ? c.r : null;
+    } catch {
+      return null;
+    }
+  }
+
   function apply(r) {
     if (!r || r.same) return;
-    if (outbox.length || sending) return; // risposte ancora da inviare: vale quello che vede l'utente
+    if (outbox.length || sending || asking) return; // azioni ancora da inviare: vale quello che vede l'utente
     v = r.v;
     data = r;
+    saveCache(r);
     render();
   }
 
@@ -86,22 +115,6 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     }
   }
 
-  async function withPollBusy(what, call) {
-    if (pollBusy) return;
-    pollBusy = what;
-    renderPoll(true);
-    try {
-      const r = await call();
-      pollBusy = null;
-      v = -1;
-      apply(r);
-    } catch (err) {
-      pollBusy = null;
-      renderPoll(true);
-      toast(err.message);
-    }
-  }
-
   // Modalità debug: cancella un messaggio o annulla la domanda di oggi.
   async function remove(id, question) {
     if (!confirm(question)) return;
@@ -123,7 +136,49 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     return b;
   }
 
-  const ask = () => withPollBusy('ask', () => api('pollAsk'));
+  const ask = () => askDay(selectedDay());
+
+  /** Devo rispondere: c'è una domanda per quel giorno, non l'ho fatta io e non ho ancora risposto. */
+  function isPending(plan) {
+    if (!plan || !plan.poll || !me || plan.poll.by === me.name) return false;
+    const p = plan.people.find((x) => x.name === me.name);
+    return !!p && !p.choice;
+  }
+
+  /** Pallino rosso sul tab Chat finché c'è una domanda a cui non hai risposto. */
+  function updatePending(plans) {
+    const btn = document.querySelector('.tabbar button[data-tab=chat]');
+    if (!btn) return;
+    const n = (plans || []).filter(isPending).length;
+    let dot = btn.querySelector('.pending-dot');
+    if (!n) return dot && dot.remove();
+    if (!dot) {
+      dot = el('span', 'pending-dot');
+      btn.append(dot);
+    }
+  }
+
+  /** "Chiedi a tutti" per un giorno: il giorno si apre subito, la domanda parte in sottofondo. */
+  async function askDay(day) {
+    const plan = (data.plans || []).find((d) => d.day === day);
+    if (!plan || plan.poll) return;
+    const now = new Date();
+    plan.poll = { id: '', by: me.name, byDisplay: me.display, clock: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}` };
+    renderPoll(true);
+    asking++;
+    try {
+      const r = await api('pollAsk', { day });
+      asking--;
+      v = -1;
+      apply(r);
+      toast('Domanda mandata a tutti');
+    } catch (err) {
+      asking--;
+      toast(err.message);
+      v = -1;
+      load(true);
+    }
+  }
 
   /** La mia risposta per un giorno, cambiata subito sullo schermo. */
   function setLocal(day, choice, time) {
@@ -192,6 +247,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     const firstRender = !$('chat-list').dataset.rendered;
     renderPoll();
     renderList();
+    updatePending(data.plans);
     const n = data.messages.length;
     if (!firstRender && !nearBottom && n > lastCount) unseen += n - lastCount;
     lastCount = n;
@@ -222,42 +278,47 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     const card = $('poll-card');
     // non disturbare chi sta scrivendo l'orario
     if (!force && document.activeElement && document.activeElement.id === 'poll-time') return;
-    const poll = data && data.poll;
     const plans = (data && data.plans) || [];
     const day = selectedDay();
-    const isToday = !plans.length || day === plans[0].day;
-    const plan = plans.find((d) => d.day === day) || { people: poll ? poll.people : [] };
+    const plan = plans.find((d) => d.day === day) || { people: [], poll: null };
+    const poll = plan.poll;
     const answered = plan.people.find((p) => p.name === me.name) || {};
-    // Risposta in invio: il pulsante scelto si colora subito, con il bicipite accanto.
     const mine = answered;
-    const askBusy = pollBusy === 'ask';
-    const side = !isToday
-      ? ''
-      : poll
-        ? `<span class="muted">da <span class="by"></span> · ${poll.clock}</span>`
-        : `<button id="poll-ask" class="ask-link with-bicep"${askBusy ? ' disabled' : ''}>${askBusy ? `${bicep()}Chiedo…` : 'Chiedi a tutti'}</button>`;
-    // Fila dei prossimi 7 giorni, con quanti ci vanno
+    // Fila dei prossimi 7 giorni: i giorni senza domanda sono "chiusi", pallino rosso dove devi rispondere
     const strip = plans
       .map((d, i) => {
         const date = new Date(d.day + 'T12:00:00');
         const n = d.people.filter((p) => p.choice === 'si').length;
         const mineDay = d.people.find((p) => p.name === me.name) || {};
-        return `<button class="pday${d.day === day ? ' on' : ''}${mineDay.choice ? ' ' + mineDay.choice : ''}" data-day="${d.day}">${i ? WEEKDAYS[date.getDay()] : 'Oggi'}<b>${date.getDate()}</b><i>${n || '·'}</i></button>`;
+        const cls = ['pday', d.day === day && 'on', !d.poll && 'closed', mineDay.choice, isPending(d) && 'pending'].filter(Boolean).join(' ');
+        return `<button class="${cls}" data-day="${d.day}">${i ? WEEKDAYS[date.getDay()] : 'Oggi'}<b>${date.getDate()}</b><i>${d.poll && n ? n : '·'}</i></button>`;
       })
       .join('');
-    card.innerHTML = `
-      ${strip ? `<div class="pdays">${strip}</div>` : ''}
-      <div class="choices">
-        ${CHOICES.map(([k, label]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}">${label}</button>`).join('')}
-        <label class="time-wrap${mine.time ? ' filled' : ''}"><input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span></label>
-      </div>
-      <p class="poll-names"></p>`;
+    const label = planLabel(day);
+    if (!poll) {
+      // Giorno chiuso: si apre chiedendo a tutti
+      card.innerHTML = `
+        ${strip ? `<div class="pdays">${strip}</div>` : ''}
+        <div class="poll-closed"><span>Nessuno ha ancora chiesto chi va in palestra ${label}</span><button id="poll-ask" class="primary small">Chiedi a tutti</button></div>`;
+      card.querySelector('#poll-ask').onclick = () => askDay(day);
+    } else {
+      card.innerHTML = `
+        ${strip ? `<div class="pdays">${strip}</div>` : ''}
+        ${isPending(plan) ? `<p class="poll-askme"><b></b> ti chiede: ${label} ci sei?</p>` : ''}
+        <div class="choices">
+          ${CHOICES.map(([k, l]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}">${l}</button>`).join('')}
+          <label class="time-wrap${mine.time ? ' filled' : ''}"><input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span></label>
+        </div>
+        <p class="poll-names"></p>`;
+      if (card.querySelector('.poll-askme b')) card.querySelector('.poll-askme b').textContent = poll.byDisplay;
+    }
     card.querySelectorAll('[data-day]').forEach((b) => {
       b.onclick = () => {
         selDay = b.dataset.day;
         renderPoll(true);
       };
     });
+    if (!poll) return;
     card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice, answered.choice, answered.time || '')));
     // Su iPhone "change" arriva a ogni giro della rotella e "blur" non sempre: si salva in silenzio poco dopo
     // l'ultima modifica, senza ridisegnare la casella mentre la rotella è aperta (si chiuderebbe).
@@ -300,16 +361,13 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     });
     const missing = plan.people.filter((p) => !p.choice).length;
     if (missing) names.append(el('span', 'part none', `${missing} senza risposta`));
-    // Per oggi: chi ha fatto la domanda, oppure "Chiedi a tutti"
-    if (side) {
-      names.insertAdjacentHTML('beforeend', `<span class="poll-side">${side}</span>`);
-      if (poll) names.querySelector('.by').textContent = poll.byDisplay;
-      if (names.querySelector('#poll-ask')) names.querySelector('#poll-ask').onclick = ask;
-    }
-    if (isDebug() && poll && isToday) {
+    // Chi ha fatto la domanda
+    const side = el('span', 'poll-side muted', `da ${poll.byDisplay} · ${poll.clock}`);
+    names.append(side);
+    if (isDebug() && poll.id) {
       const cancel = el('button', 'poll-cancel', 'Annulla');
       cancel.type = 'button';
-      cancel.onclick = () => remove(poll.id, 'Annullare il sondaggio di oggi con tutte le risposte?');
+      cancel.onclick = () => remove(poll.id, `Annullare la domanda di ${label} con tutte le risposte?`);
       names.append(cancel);
     }
   }
@@ -356,7 +414,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     const d = m.data || {};
     const name = m.display || who(m.name);
     if (m.type === 'poll') {
-      row.append(el('p', 'event-text', `${name} ha chiesto chi va in palestra oggi`));
+      row.append(el('p', 'event-text', `${name} ha chiesto chi va in palestra ${m.target ? planLabel(m.target) : 'oggi'}`));
     } else if (d.kind === 'checkin') {
       const goal = d.count >= d.goal && d.goal ? ' · obiettivo raggiunto' : '';
       row.append(el('p', 'event-text', `${name} ha fatto check-in${d.auto ? ' (automatico)' : ''} · ${d.count}/${d.goal} questa settimana${goal}`));
@@ -462,10 +520,21 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       data = null;
       $('chat-list').innerHTML = '';
       delete $('chat-list').dataset.rendered;
+      const cached = readCache();
+      if (cached) {
+        // chat dell'ultima volta subito pronta; la versione fa sì che il server mandi solo le novità
+        data = cached;
+        v = cached.v;
+        render();
+      }
+    },
+    /** Pallino "devi rispondere" anche prima che la chat sia caricata (dallo stato generale). */
+    updatePending(plans) {
+      if (!data || !data.plans) updatePending(plans);
     },
     /** Carica la chat di nascosto (all'apertura dell'app), così il tab si apre già pieno. */
     preload() {
-      if (!active && !data) load(false);
+      if (!active) load(false); // con la chat già in memoria il server risponde solo se ci sono novità
     },
     setActive(on) {
       active = on;

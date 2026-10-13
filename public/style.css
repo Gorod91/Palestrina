@@ -460,3 +460,17 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 /* Conto alla rovescia di 3 secondi prima che parta il timer */
 .timer-running.counting span { font-size: 140px; color: var(--exercise); animation: count-pop 1s ease-out infinite; }
 @keyframes count-pop { from { transform: scale(1.25); opacity: .4; } 30% { transform: scale(1); opacity: 1; } }
+
+/* Domande per giorno: giorni chiusi, pallino "devi rispondere" */
+.pday.closed { opacity: .45; }
+.pday.closed.on { opacity: 1; }
+.pday { position: relative; }
+.pday.pending::after { content: ''; position: absolute; top: 3px; right: 3px; width: 8px; height: 8px; border-radius: 50%; background: var(--danger); }
+.poll-closed { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 14px; color: var(--muted); }
+.poll-closed .primary { flex: none; margin: 0; padding: 8px 14px; font-size: 15px; }
+.poll-askme { margin: 0 0 8px; font-size: 14px; color: var(--fg); }
+.poll-askme b { color: var(--stand); }
+.tabbar .pending-dot { position: absolute; top: 2px; left: calc(50% + 8px); width: 10px; height: 10px; border-radius: 50%; background: var(--danger); box-shadow: 0 0 0 2px var(--bg); }
+.tabbar button .badge ~ .pending-dot { display: none; }
+.plan-grid th.closed { opacity: .45; }
+.pcell.closed { opacity: .35; }

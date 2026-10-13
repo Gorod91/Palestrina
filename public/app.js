@@ -187,6 +187,7 @@ function render() {
   $('chat-notify').checked = !me.chatMuted;
   chat.setUser({ name: me.name, display: me.display });
   chat.updateBadge(state.chatMeta);
+  chat.updatePending(state.plans);
 }
 
 /** Misure dello schermo per capire eventuali fasce vuote su iPhone (solo utenti debug). */
@@ -285,7 +286,7 @@ function renderToday() {
   const grid = $('plan-grid');
   const head = plans.map((d, i) => {
     const date = new Date(d.day + 'T12:00:00');
-    return `<th>${i ? DAY_SHORT[date.getDay()] : 'Oggi'}<br>${date.getDate()}</th>`;
+    return `<th class="${d.poll ? '' : 'closed'}">${i ? DAY_SHORT[date.getDay()] : 'Oggi'}<br>${date.getDate()}</th>`;
   });
   grid.innerHTML = `<tr><th></th>${head.join('')}</tr>`;
   // io per primo, poi gli altri
@@ -301,10 +302,12 @@ function renderToday() {
     plans.forEach((d) => {
       const p = d.people.find((x) => x.name === name) || {};
       const td = document.createElement('td');
-      const cell = document.createElement(isMe ? 'button' : 'div');
-      cell.className = `pcell ${p.choice || ''}${isMe ? ' me' : ''}`;
+      // Giorno chiuso (nessuno ha chiesto): caselle spente, si apre dalla chat con "Chiedi a tutti"
+      const open = !!d.poll;
+      const cell = document.createElement(isMe && open ? 'button' : 'div');
+      cell.className = `pcell ${p.choice || ''}${isMe && open ? ' me' : ''}${open ? '' : ' closed'}`;
       cell.textContent = p.choice === 'si' ? p.time || '✓' : p.choice === 'forse' ? 'forse' : p.choice === 'no' ? 'no' : '';
-      if (isMe) cell.onclick = () => cyclePlan(d.day, p.choice || '', p.time || '');
+      if (isMe && open) cell.onclick = () => cyclePlan(d.day, p.choice || '', p.time || '');
       td.append(cell);
       tr.append(td);
     });
@@ -740,7 +743,13 @@ async function home() {
   if (fromUrl) history.replaceState(null, '', location.pathname);
   // Mostra subito l'ultimo stato salvato sul telefono, poi lo aggiorna da Apps Script.
   const cached = store.get('state');
-  if (!state && cached && cached.day === new Date().toDateString() && cached.data.me.name === session.name) state = cached.data;
+  if (!state && cached && cached.data && cached.data.me && cached.data.me.name === session.name) {
+    state = cached.data;
+    // Stato di un altro giorno: classifiche e punti vanno bene come anteprima, il resto di oggi no
+    if (cached.day !== new Date().toDateString()) {
+      state = { ...state, poll: null, plans: null, me: { ...state.me, checkedInToday: false, sudometroToday: null } };
+    }
+  }
   if (!state) {
     // Primo avvio senza dati salvati: anello vuoto e "Caricamento" invece di card vuote.
     $('week-ring').innerHTML = ring(0, ...COLORS.move, { size: 132, width: 20 });
@@ -748,8 +757,9 @@ async function home() {
   }
   render();
   selectTab(fromUrl || store.get('tab'));
+  if (state) chat.preload(); // la chat si aggiorna di nascosto mentre arrivano i dati, non dopo
   await refresh();
-  chat.preload(); // la chat si carica di nascosto, così il tab si apre già pieno
+  chat.preload(); // primo avvio: la chat si carica di nascosto, così il tab si apre già pieno
   updateNotifyCard();
   sudometro.preload();
 }
