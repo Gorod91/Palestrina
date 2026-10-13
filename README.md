@@ -104,6 +104,8 @@ Si possono anche inviare a mano: *Actions → Notifiche → Run workflow*.
 
 I valori della foto di riferimento stanno nelle proprietà di Apps Script (chiave `ref_<nome>`), così sopravvivono anche se si reinstalla l'app.
 
+**Ritaglio**: lo scatto viene ritagliato attorno al viso (3:4, con un po' di margine), così miniatura e foto aperta mostrano la stessa cosa.
+
 **Foto su Google Drive**: tutte le foto (riferimento, selfie da sudato, prove di debug) finiscono nella cartella *Palestrina - Foto Sudometro* del Drive di chi ha pubblicato lo script, con una sottocartella per ogni amico. Il foglio Sudometro tiene l'ID del file nella colonna *Foto*.
 Una volta sola, dopo l'aggiornamento: nell'editor di Apps Script esegui **`autorizzaDrive`** e consenti l'accesso a Drive (crea anche la cartella).
 
@@ -115,7 +117,7 @@ I pesi (`WEIGHTS`) e le soglie (`TITLES`) sono in `public/sudometro.js`, da tara
 **Anti-furbizia**: solo fotocamera dal vivo (niente galleria), un check-in e un Sudometro al giorno, controllati da Apps Script.
 
 ### Alias
-Nel tab **Altro → Profilo** ognuno può scegliere un **nome visualizzato** (colonna **E "Alias"** del foglio Utenti), usato in classifica e nelle notifiche. Il nome della colonna A resta quello originale e collega tutti i dati (presenze, foto, cartelle su Drive, debug), quindi non va cambiato. Alias vuoto = si vede il nome originale.
+Nel tab **Impostazioni → Profilo** ognuno può scegliere un **nome visualizzato** (colonna **E "Alias"** del foglio Utenti), usato in classifica e nelle notifiche. Il nome della colonna A resta quello originale e collega tutti i dati (presenze, foto, cartelle su Drive, debug), quindi non va cambiato. Alias vuoto = si vede il nome originale.
 
 ### Modalità debug
 Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il pulsante **Prova subito (debug)**, utile per provare e tarare il Sudometro:
@@ -128,10 +130,11 @@ Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il
 
 Tab **Chat**: messaggi del gruppo (ultimi 7 giorni) e, in cima, la domanda **"Chi va in palestra oggi?"**.
 - Un giorno (oggi o uno dei 6 dopo, nella fila dei giorni) resta **chiuso** finché qualcuno non tocca **"Chiedi a tutti"**: parte la notifica a tutti e da lì si risponde con **Ci sono / Forse / No** e un **orario facoltativo** (ritoccare la risposta la toglie). Chi non ha ancora risposto a una domanda vede un **pallino rosso** sul tab Chat e sul giorno. Chi poi fa check-in risulta "arrivato".
-- **Penalità** nei punti del mese (dettaglio nel pulsante "i" della Classifica): Bidone −10, Cambio all'ultimo −5, Ritardo −2, Check-in senza avvisare −3, Settimana a vuoto −5. Valgono dal giorno in cui sono state introdotte (proprietà PENALTIES_FROM); i cambi di risposta si salvano nel foglio **Cambi**.
-- Nel tab **Oggi** c'è la griglia persone × prossimi 7 giorni: le proprie caselle si toccano per cambiare risposta. Le risposte stanno nel foglio **Piani**, creato da solo.
+- **Penalità** nei punti del mese (dettaglio nel pulsante "i" della Classifica): Bidone −10, Cambio all'ultimo −5, Ritardo −2 (check-in più di mezz'ora dopo l'orario detto), Check-in senza avvisare −3, Settimana a vuoto −5; il totale del mese può andare sotto zero. Valgono dal giorno in cui sono state introdotte (proprietà PENALTIES_FROM); i cambi di risposta si salvano nel foglio **Cambi**.
+- **Vedi la settimana** apre, sotto la fila dei giorni, una riga per persona con le risposte dei 7 giorni: le proprie caselle si toccano per passare a Ci sono → Forse → No → niente. Le risposte stanno nel foglio **Piani**, creato da solo.
+- Ogni domanda compare anche nella chat, evidenziata ("Marco chiede: chi va in palestra domani?"), con i pulsanti per rispondere al volo.
 - In chat compaiono anche gli **eventi**: check-in, Sudometro (con la foto), **premiazioni della settimana** (domenica alle 19) e **premiazioni del mese** (l'ultimo giorno del mese alle 21: Re del mese, MVP, Divano d'oro e Pomodoro del mese).
-- Notifiche: la domanda arriva a tutti; ogni risposta solo a chi l'ha fatta; i messaggi agli altri, al massimo una notifica ogni 5 minuti per persona. Si possono silenziare in **Altro → Notifiche** (la domanda arriva comunque). Toccando la notifica si apre la chat.
+- Notifiche: la domanda arriva a tutti; ogni risposta solo a chi l'ha fatta; i messaggi agli altri, al massimo una notifica ogni 5 minuti per persona. Si possono silenziare in **Impostazioni → Notifiche** (la domanda arriva comunque). Toccando la notifica si apre la chat.
 - Dati nel foglio **Chat**, creato da solo al primo messaggio. L'app controlla i nuovi messaggi ogni 5 secondi solo mentre la chat è aperta.
 
 ## Timer addominali
@@ -141,7 +144,7 @@ Il timer non suona: a fine tempo lo schermo pulsa lentamente in verde (meno di u
 
 ## Check-in automatico (Comandi iOS)
 
-Nell'app, tab **Altro**, sezione **Check-in automatico**: ognuno copia il proprio link personale (`…/exec?action=checkin&code=…`) e crea l'automazione in **Comandi → Automazione → + → Arrivo** → posizione della palestra → **Esegui immediatamente** → azione **Ottieni contenuto dell'URL** con il link.
+Nell'app, tab **Impostazioni**, sezione **Check-in automatico**: ognuno copia il proprio link personale (`…/exec?action=checkin&code=…`) e crea l'automazione in **Comandi → Automazione → + → Arrivo** → posizione della palestra → **Esegui immediatamente** → azione **Ottieni contenuto dell'URL** con il link.
 Nel foglio Presenze, la colonna *Fonte* dice se il check-in è arrivato dall'app o dall'automazione.
 
 ## Sicurezza e privacy

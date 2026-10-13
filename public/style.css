@@ -478,3 +478,21 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 /* Penalità */
 .points .detail-row.minus b, .points .detail-row.minus span { color: var(--danger); }
 .rules.minus em { color: var(--danger); }
+
+/* Settimana del sondaggio: colonne delle presenze sotto ai giorni */
+.pdays.wide, .pweek { grid-template-columns: 52px repeat(7, 1fr); }
+.pweek { display: grid; gap: 4px; margin: -4px 0 8px; align-items: center; }
+.pweek .pname { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pweek .pname.me { color: var(--stand); }
+.pweek .pcell { height: 26px; font-size: 10px; letter-spacing: -.2px; }
+.pweek .pcell.arrived { box-shadow: 0 0 0 1.5px var(--exercise); }
+.week-toggle { display: block; margin: 6px auto 0; padding: 2px 8px; border: 0; background: none; color: var(--stand); font-size: 13px; font-weight: 600; }
+
+/* Domanda in chat, ben visibile e con risposta al volo */
+.event.poll-ev { width: 92%; padding: 10px 12px 8px; border: 1px solid var(--stand); }
+.poll-ev .event-title { color: var(--stand); font-size: 13px; margin-bottom: 2px !important; }
+.poll-ev .poll-q { font-size: 17px; font-weight: 700; color: var(--fg); }
+.poll-ev-choices { display: flex; gap: 6px; margin-top: 8px; }
+.poll-ev-choices[hidden] { display: none; }
+.poll-ev-choices .choice { flex: 1; margin: 0; padding: 7px 0; font-size: 14px; }
+.poll-ev-sum { margin-top: 6px !important; font-size: 12px; color: var(--muted); }

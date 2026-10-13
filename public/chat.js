@@ -30,6 +30,13 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   let loading = false;
   const pending = []; // messaggi inviati ma non ancora salvati in Apps Script
   let selDay = ''; // giorno scelto nella fila dei giorni del sondaggio
+  let weekOpen = (() => {
+    try {
+      return localStorage.getItem('palestrina.weekOpen') === '1';
+    } catch {
+      return false;
+    }
+  })(); // "Vedi la settimana": le presenze di tutti sotto ai giorni
   // Risposte al sondaggio: si vedono subito e partono in ordine in sottofondo (l'ultima vince)
   const outbox = [];
   let sending = false;
@@ -224,9 +231,8 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     }
   }
 
-  // Risposta per il giorno scelto nella fila dei giorni; ritoccare la risposta già data la toglie.
-  function answer(choice, current, time) {
-    const day = selectedDay();
+  // Risposta per un giorno; ritoccare la risposta già data la toglie.
+  function answer(choice, current, time, day = selectedDay()) {
     const c = choice === current ? '' : choice;
     setLocal(day, c, time);
     renderPoll(true);
@@ -295,21 +301,25 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       })
       .join('');
     const label = planLabel(day);
+    const days = strip ? `<div class="pdays${weekOpen ? ' wide' : ''}">${weekOpen ? '<span></span>' : ''}${strip}</div>${weekOpen ? weekGrid(plans) : ''}` : '';
+    const toggle = strip ? `<button class="week-toggle" type="button">${weekOpen ? 'Nascondi la settimana' : 'Vedi la settimana'}</button>` : '';
     if (!poll) {
       // Giorno chiuso: si apre chiedendo a tutti
       card.innerHTML = `
-        ${strip ? `<div class="pdays">${strip}</div>` : ''}
-        <div class="poll-closed"><span>Nessuno ha ancora chiesto chi va in palestra ${label}</span><button id="poll-ask" class="primary small">Chiedi a tutti</button></div>`;
+        ${days}
+        <div class="poll-closed"><span>Nessuno ha ancora chiesto chi va in palestra ${label}</span><button id="poll-ask" class="primary small">Chiedi a tutti</button></div>
+        ${toggle}`;
       card.querySelector('#poll-ask').onclick = () => askDay(day);
     } else {
       card.innerHTML = `
-        ${strip ? `<div class="pdays">${strip}</div>` : ''}
+        ${days}
         ${isPending(plan) ? `<p class="poll-askme"><b></b> ti chiede: ${label} ci sei?</p>` : ''}
         <div class="choices">
           ${CHOICES.map(([k, l]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}">${l}</button>`).join('')}
           <label class="time-wrap${mine.time ? ' filled' : ''}"><input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span></label>
         </div>
-        <p class="poll-names"></p>`;
+        <p class="poll-names"></p>
+        ${toggle}`;
       if (card.querySelector('.poll-askme b')) card.querySelector('.poll-askme b').textContent = poll.byDisplay;
     }
     card.querySelectorAll('[data-day]').forEach((b) => {
@@ -318,6 +328,31 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         renderPoll(true);
       };
     });
+    // Le mie caselle della settimana: un tocco passa a Ci sono → Forse → No → niente (solo nei giorni con la domanda)
+    card.querySelectorAll('[data-cell]').forEach((b) => {
+      b.onclick = () => {
+        const d = plans.find((x) => x.day === b.dataset.cell);
+        if (!d) return;
+        selDay = d.day;
+        if (!d.poll) return renderPoll(true);
+        const p = d.people.find((x) => x.name === me.name) || {};
+        const next = { '': 'si', si: 'forse', forse: 'no', no: '' }[p.choice || ''];
+        setLocal(d.day, next, next ? p.time || '' : '');
+        renderPoll(true);
+        queuePlan(d.day, next, next ? p.time || '' : '');
+      };
+    });
+    const tg = card.querySelector('.week-toggle');
+    if (tg) {
+      tg.onclick = () => {
+        weekOpen = !weekOpen;
+        try {
+          localStorage.setItem('palestrina.weekOpen', weekOpen ? '1' : '0');
+        } catch { /* storage non disponibile */ }
+        renderPoll(true);
+      };
+    }
+    refreshPollEvents();
     if (!poll) return;
     card.querySelectorAll('[data-choice]').forEach((b) => (b.onclick = () => answer(b.dataset.choice, answered.choice, answered.time || '')));
     // Su iPhone "change" arriva a ogni giro della rotella e "blur" non sempre: si salva in silenzio poco dopo
@@ -372,6 +407,71 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     }
   }
 
+  /** Presenze dei 7 giorni, una riga a persona (io per primo), in colonna sotto ai giorni. */
+  function weekGrid(plans) {
+    const people = plans[0].people.slice().sort((a, b) => (b.name === me.name) - (a.name === me.name));
+    const esc = (t) => String(t).replace(/[<&>"]/g, (c) => `&#${c.charCodeAt(0)};`);
+    const rows = people.map((person) => {
+      const mine = person.name === me.name;
+      const cells = plans.map((d) => {
+        const p = d.people.find((x) => x.name === person.name) || {};
+        const c = d.poll ? p.choice || '' : '';
+        const txt = { si: p.time || '✓', forse: '?', no: '✕' }[c] || '';
+        const cls = ['pcell', c, mine && 'me', !d.poll && 'closed', p.arrived && 'arrived'].filter(Boolean).join(' ');
+        return mine ? `<button class="${cls}" data-cell="${d.day}" type="button">${txt}</button>` : `<span class="${cls}" data-day="${d.day}">${txt}</span>`;
+      });
+      return `<span class="pname${mine ? ' me' : ''}">${mine ? 'Tu' : esc(person.display)}</span>${cells.join('')}`;
+    });
+    return `<div class="pweek">${rows.join('')}</div>`;
+  }
+
+  /** La domanda in chat: pulsanti per rispondere subito, finché il giorno è tra i prossimi 7. */
+  function pollEvent(m) {
+    const row = el('div', 'event poll-ev');
+    const day = m.target || m.day;
+    const mineAsk = m.name === me.name;
+    row.dataset.target = day;
+    row.dataset.id = m.id;
+    row.append(el('p', 'event-title', mineAsk ? 'Hai chiesto a tutti' : `${m.display || who(m.name)} chiede`));
+    row.append(el('p', 'poll-q', `Chi va in palestra ${planLabel(day)}?`));
+    const btns = el('div', 'poll-ev-choices');
+    CHOICES.forEach(([k, l]) => {
+      const b = el('button', `choice ${k}`, l);
+      b.type = 'button';
+      b.dataset.evChoice = k;
+      b.onclick = () => {
+        const plan = (data.plans || []).find((d) => d.day === day);
+        const p = (plan && plan.people.find((x) => x.name === me.name)) || {};
+        selDay = day;
+        answer(k, p.choice, p.time || '', day);
+      };
+      btns.append(b);
+    });
+    row.append(btns, el('p', 'poll-ev-sum'));
+    paintPollEvent(row);
+    return row;
+  }
+
+  function paintPollEvent(row) {
+    const plan = (data.plans || []).find((d) => d.day === row.dataset.target);
+    const open = !!(plan && plan.poll);
+    const btns = row.querySelector('.poll-ev-choices');
+    const sum = row.querySelector('.poll-ev-sum');
+    btns.hidden = !open;
+    if (!open) {
+      sum.textContent = '';
+      return;
+    }
+    const mine = plan.people.find((x) => x.name === me.name) || {};
+    btns.querySelectorAll('button').forEach((b) => b.classList.toggle('selected', mine.choice === b.dataset.evChoice));
+    const n = (k) => plan.people.filter((p) => p.choice === k).length;
+    sum.textContent = [n('si') && `${n('si')} ci sono`, n('forse') && `${n('forse')} forse`, n('no') && `${n('no')} no`].filter(Boolean).join(' · ') || 'Ancora nessuna risposta';
+  }
+
+  function refreshPollEvents() {
+    document.querySelectorAll('#chat-list .poll-ev').forEach(paintPollEvent);
+  }
+
   function renderList() {
     const list = $('chat-list');
     list.dataset.rendered = '1';
@@ -401,7 +501,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         return;
       }
       lastSender = '';
-      const ev = eventRow(m);
+      const ev = m.type === 'poll' ? pollEvent(m) : eventRow(m);
       if (isDebug() && ev.classList.contains('event')) ev.append(delButton(m.id));
       list.append(ev);
     });
@@ -413,9 +513,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     const row = el('div', 'event');
     const d = m.data || {};
     const name = m.display || who(m.name);
-    if (m.type === 'poll') {
-      row.append(el('p', 'event-text', `${name} ha chiesto chi va in palestra ${m.target ? planLabel(m.target) : 'oggi'}`));
-    } else if (d.kind === 'checkin') {
+    if (d.kind === 'checkin') {
       const goal = d.count >= d.goal && d.goal ? ' · obiettivo raggiunto' : '';
       row.append(el('p', 'event-text', `${name} ha fatto check-in${d.auto ? ' (automatico)' : ''} · ${d.count}/${d.goal} questa settimana${goal}`));
     } else if (d.kind === 'sudometro') {

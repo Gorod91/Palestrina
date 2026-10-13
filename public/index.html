@@ -35,6 +35,10 @@
     <symbol id="i-send" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
       <path d="M12 19V5M6 11l6-6 6 6"/>
     </symbol>
+    <symbol id="i-gear" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="12" cy="12" r="3.2"/>
+      <path d="M12 2.8l1.6 2.3 2.7-.7.7 2.7 2.6 1-.6 2.7 1.8 2.1-1.8 2.1.6 2.7-2.6 1-.7 2.7-2.7-.7L12 21.2l-1.6-2.3-2.7.7-.7-2.7-2.6-1 .6-2.7L3.2 12l1.8-2.1-.6-2.7 2.6-1 .7-2.7 2.7.7z"/>
+    </symbol>
     <symbol id="i-more" viewBox="0 0 24 24" fill="currentColor">
       <circle cx="5" cy="12" r="2.2"/><circle cx="12" cy="12" r="2.2"/><circle cx="19" cy="12" r="2.2"/>
     </symbol>
@@ -116,13 +120,6 @@
           </div>
         </section>
 
-        <section id="today-card" class="card today" hidden>
-          <p class="label">Chi va in palestra nei prossimi giorni</p>
-          <table id="plan-grid" class="plan-grid"></table>
-          <p class="footnote plan-note">Tocca le tue caselle: ci sono, forse, no, vuota. I giorni spenti si aprono dalla chat con "Chiedi a tutti"; lì si mette anche l'orario.</p>
-          <button id="today-open" class="link left">Apri nella chat</button>
-        </section>
-
         <h2 class="section">Settimana</h2>
         <section class="card week">
           <div id="week-ring" class="week-ring"></div>
@@ -161,6 +158,9 @@
             <ol id="gallery" class="gallery"></ol>
           </section>
         </div>
+
+        <h2 class="section">Albo d'oro</h2>
+        <section class="card list"><ul id="albo" class="rules albo"></ul></section>
       </div>
 
       <div class="tab-panel chat" data-tab="chat" hidden>
@@ -191,6 +191,11 @@
             <button type="submit" id="btn-name" class="primary">Salva</button>
           </form>
         </section>
+
+        <div id="ref-card" hidden>
+          <h2 class="section">Sudometro</h2>
+          <section class="card list"><button id="btn-reref" class="row">Rifai la foto di riferimento</button></section>
+        </div>
 
         <h2 class="section">Check-in automatico</h2>
         <section class="card">
@@ -260,11 +265,11 @@
   </form>
 
   <nav id="tabbar" class="tabbar" hidden>
-    <button data-tab="oggi" class="active"><svg><use href="#i-rings"/></svg>Oggi</button>
+    <button data-tab="oggi" class="active"><svg><use href="#i-rings"/></svg>Home</button>
     <button data-tab="classifica"><svg><use href="#i-chart"/></svg>Classifica</button>
     <button data-tab="chat"><svg><use href="#i-chat"/></svg>Chat</button>
     <button data-tab="timer"><svg><use href="#i-timer"/></svg>Timer</button>
-    <button data-tab="altro"><svg><use href="#i-more"/></svg>Altro</button>
+    <button data-tab="altro"><svg><use href="#i-gear"/></svg>Impostazioni</button>
   </nav>
 
   <!-- Fuori dall'area che scorre: su iPhone lì dentro finirebbe sotto la casella dei messaggi -->
@@ -294,11 +299,11 @@
       <ul class="rules minus">
           <li><div><b>Bidone</b><span>Hai detto "Ci sono" e quel giorno non fai check-in</span></div><em>−10</em></li>
           <li><div><b>Cambio all'ultimo</b><span>Da "Ci sono" a Forse o No (o tolto) a meno di 4 ore dall'orario; senza orario dalle 14 di quel giorno. Non conta se poi vieni</span></div><em>−5</em></li>
-          <li><div><b>Ritardo</b><span>Check-in più di 45 minuti dopo l'orario che avevi detto</span></div><em>−2</em></li>
+          <li><div><b>Ritardo</b><span>Check-in più di mezz'ora dopo l'orario che avevi detto</span></div><em>−2</em></li>
           <li><div><b>Check-in senza avvisare</b><span>Non avevi detto "Ci sono" o "Forse" almeno 1 ora prima del check-in</span></div><em>−3</em></li>
           <li><div><b>Settimana a vuoto</b><span>Nessuna presenza in una settimana intera</span></div><em>−5</em></li>
       </ul>
-      <p class="muted">Il totale del mese non scende sotto zero.</p>
+      <p class="muted">Con le penalità il totale del mese può andare anche sotto zero.</p>
       <h4>Medaglie del mese</h4>
       <ul class="rules medals">
           <li><div><b>Mai saltato</b><span>Obiettivo raggiunto in ogni settimana che inizia nel mese</span></div><em>20</em></li>
@@ -309,8 +314,7 @@
       <p class="muted">Quando qualcuno vince una medaglia compare in chat.</p>
       <h4>Re del mese</h4>
       <p class="muted">L'ultimo giorno del mese alle 21 chi ha più punti diventa Re del mese: annuncio in chat e notifica a tutti, poi il suo nome entra nell'albo d'oro.</p>
-      <h4>Albo d'oro</h4>
-      <ul id="albo" class="rules albo"></ul>
+      <p class="muted">L'albo d'oro è in fondo alla Classifica.</p>
     </div>
   </div>
 

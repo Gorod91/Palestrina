@@ -1,5 +1,5 @@
 // Dati fittizi per gli utenti debug: riempiono classifiche, chat e foto per vedere l'app "piena"
-// senza toccare il foglio. Si attivano da Altro → Sviluppatore.
+// senza toccare il foglio. Si attivano da Impostazioni → Sviluppatore.
 
 const FRIENDS = [
   { name: 'Giulia', goal: 3, color: '#ff9f0a' },

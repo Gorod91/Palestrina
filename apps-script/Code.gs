@@ -596,7 +596,7 @@ function readChatRows() {
       name: String(r[3]),
       type: String(r[4]),
       text: String(r[5]),
-      ref: String(r[6]),
+      ref: r[6] instanceof Date ? dayString(r[6]) : String(r[6]), // il giorno della domanda può arrivare come data
       at: toTime(r[7]),
     }))
     .filter((r) => r.day >= from)
@@ -844,7 +844,7 @@ function chatDelete(user, id) {
     remove.reverse().forEach((row) => sh.deleteRow(row)); // dal fondo, così gli indici restano validi
     // Annullare la domanda toglie anche le risposte di quel giorno
     if (target0 && String(target0[4]) === 'poll') {
-      const day = pollDay({ ref: String(target0[6]), day: toDay(target0[1]) });
+      const day = pollDay({ ref: toDay(target0[6]), day: toDay(target0[1]) });
       const pi = sheet('piani');
       const rowsPi = [];
       pi.getDataRange().getValues().forEach((r, i) => {
@@ -967,8 +967,8 @@ const POINTS = {
   cambioUltimo: -5, // da "ci sono" a forse/no (o tolto) a meno di 4 ore dall'orario, senza poi venire
   cambioOre: 4,
   cambioSenzaOrario: '14:00', // senza orario contano i cambi di quel giorno dalle 14 in poi
-  ritardo: -2, // check-in più di 45 minuti dopo l'orario detto
-  ritardoMinuti: 45,
+  ritardo: -2, // check-in più di mezz'ora dopo l'orario detto
+  ritardoMinuti: 30,
   settimanaVuota: -5, // nessuna presenza in una settimana intera
   senzaAvviso: -3, // check-in senza aver detto "ci sono" o "forse" almeno 1 ora prima
   avvisoMinuti: 60,
@@ -1091,8 +1091,7 @@ function computePoints(month) {
         g.pts += it.pts;
       });
       const detail = Object.keys(groups).map((k) => groups[k]);
-      // il totale del mese non scende sotto zero
-      return { name: t.name, display: t.display, total: Math.max(0, detail.reduce((a, g) => a + g.pts, 0)), detail };
+      return { name: t.name, display: t.display, total: detail.reduce((a, g) => a + g.pts, 0), detail };
     })
     .sort((a, b) => b.total - a.total || a.display.localeCompare(b.display));
 }

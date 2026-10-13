@@ -79,7 +79,7 @@ export async function takeSelfie(hint, { live = false, reference = null } = {}) 
   if (live) liveLoop(video, reference, () => open);
 
   const result = await new Promise((resolve) => {
-    $('btn-shoot').onclick = () => resolve(capture(video));
+    $('btn-shoot').onclick = () => resolve(capture(video, 960)); // più grande: dopo il ritaglio sul viso resta nitida
     $('btn-cancel').onclick = () => resolve(null);
   });
 
@@ -104,6 +104,7 @@ function capture(video, max = 640) {
 /** JPEG in base64 (senza prefisso data:) da salvare su Drive: lato lungo al massimo 480 px e qualità 0,72
  *  (circa 30-40 KB), così le foto si caricano in fretta. L'analisi usa comunque lo scatto più grande. */
 export function toJpegBase64(canvas, quality = 0.72, max = 480) {
+  canvas = faceCrop(canvas);
   const scale = Math.min(1, max / Math.max(canvas.width, canvas.height));
   let out = canvas;
   if (scale < 1) {
@@ -113,6 +114,33 @@ export function toJpegBase64(canvas, quality = 0.72, max = 480) {
     out.getContext('2d').drawImage(canvas, 0, 0, out.width, out.height);
   }
   return out.toDataURL('image/jpeg', quality).split(',')[1];
+}
+
+// Riquadro del viso trovato dall'ultima analisi di ogni scatto
+const faceBoxes = new WeakMap();
+
+/** Ritaglio 3:4 attorno al viso con un po' di margine (spazio in più sopra per i capelli),
+ *  così miniatura e foto aperta mostrano la stessa cosa. Senza viso trovato resta lo scatto intero. */
+function faceCrop(canvas) {
+  const b = faceBoxes.get(canvas);
+  if (!b) return canvas;
+  const { width: W, height: H } = canvas;
+  let w = b.w * 1.8;
+  let h = b.h * 1.75;
+  if (w / h < 3 / 4) w = (h * 3) / 4;
+  else h = (w * 4) / 3;
+  const fit = Math.min(1, W / w, H / h); // non più grande dello scatto
+  w *= fit;
+  h *= fit;
+  const cx = b.x + b.w / 2;
+  const cy = b.y + b.h / 2 - b.h * 0.12;
+  const x = Math.min(Math.max(0, cx - w / 2), W - w);
+  const y = Math.min(Math.max(0, cy - h / 2), H - h);
+  const out = document.createElement('canvas');
+  out.width = Math.round(w);
+  out.height = Math.round(h);
+  out.getContext('2d').drawImage(canvas, x, y, w, h, 0, 0, out.width, out.height);
+  return out;
 }
 
 /** Analizza la fotocamera di continuo e mostra parametri e zone misurate. */
@@ -192,6 +220,11 @@ async function analyzeDetailed(canvas) {
   const lm = res.faceLandmarks[0];
 
   const { width, height } = canvas;
+  const xs = lm.map((p) => p.x * width);
+  const ys = lm.map((p) => p.y * height);
+  const bx = Math.min(...xs);
+  const by = Math.min(...ys);
+  faceBoxes.set(canvas, { x: bx, y: by, w: Math.max(...xs) - bx, h: Math.max(...ys) - by });
   const data = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, width, height).data;
   const faceWidth = Math.hypot((lm[FACE_RIGHT].x - lm[FACE_LEFT].x) * width, (lm[FACE_RIGHT].y - lm[FACE_LEFT].y) * height);
   const radius = Math.max(3, Math.round(faceWidth * 0.05));

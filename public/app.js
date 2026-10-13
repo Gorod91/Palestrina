@@ -92,7 +92,7 @@ function toast(msg, ms = 3500) {
   toastTimer = setTimeout(() => ($('toast').hidden = true), ms);
 }
 
-const TAB_TITLES = { oggi: 'Oggi', classifica: 'Classifica', chat: 'Chat', timer: 'Timer', altro: 'Altro' };
+const TAB_TITLES = { oggi: 'Home', classifica: 'Classifica', chat: 'Chat', timer: 'Timer', altro: 'Impostazioni' };
 
 function show(screen) {
   ['install', 'config', 'login', 'home'].forEach((s) => ($(`screen-${s}`).hidden = s !== screen));
@@ -177,7 +177,7 @@ function render() {
 
   renderSudometro();
   renderGallery();
-  renderToday();
+  $('ref-card').hidden = !me.reference;
   $('debug-mode-card').hidden = !me.debug;
   $('debug-mode').checked = debugOn();
   $('fake-mode').checked = fakeOn();
@@ -210,7 +210,6 @@ function renderViewportDebug() {
   ].join('\n');
 }
 
-/** Tab Oggi: chi ha detto che va in palestra oggi. */
 /** Re in carica: l'ultimo dell'albo d'oro, con la corona accanto al nome fino al prossimo. */
 function isKing(name) {
   const albo = (state && state.albo) || [];
@@ -276,77 +275,6 @@ function renderAlbo() {
   });
 }
 
-const DAY_SHORT = ['Do', 'Lu', 'Ma', 'Me', 'Gi', 'Ve', 'Sa'];
-const NEXT_CHOICE = { '': 'si', si: 'forse', forse: 'no', no: '' };
-
-/** Griglia persone × prossimi 7 giorni; le proprie caselle si toccano per cambiare risposta. */
-function renderToday() {
-  const plans = state.plans || [];
-  $('today-card').hidden = !plans.length;
-  if (!plans.length) return;
-  const grid = $('plan-grid');
-  const head = plans.map((d, i) => {
-    const date = new Date(d.day + 'T12:00:00');
-    return `<th class="${d.poll ? '' : 'closed'}">${i ? DAY_SHORT[date.getDay()] : 'Oggi'}<br>${date.getDate()}</th>`;
-  });
-  grid.innerHTML = `<tr><th></th>${head.join('')}</tr>`;
-  // io per primo, poi gli altri
-  const names = plans[0].people.map((p) => p.name).sort((a, b) => (a === state.me.name ? -1 : b === state.me.name ? 1 : 0));
-  names.forEach((name) => {
-    const tr = document.createElement('tr');
-    const isMe = name === state.me.name;
-    const person = plans[0].people.find((p) => p.name === name);
-    const th = document.createElement('td');
-    th.className = 'n';
-    th.textContent = person.display;
-    tr.append(th);
-    plans.forEach((d) => {
-      const p = d.people.find((x) => x.name === name) || {};
-      const td = document.createElement('td');
-      // Giorno chiuso (nessuno ha chiesto): caselle spente, si apre dalla chat con "Chiedi a tutti"
-      const open = !!d.poll;
-      const cell = document.createElement(isMe && open ? 'button' : 'div');
-      cell.className = `pcell ${p.choice || ''}${isMe && open ? ' me' : ''}${open ? '' : ' closed'}`;
-      cell.textContent = p.choice === 'si' ? p.time || '✓' : p.choice === 'forse' ? 'forse' : p.choice === 'no' ? 'no' : '';
-      if (isMe && open) cell.onclick = () => cyclePlan(d.day, p.choice || '', p.time || '');
-      td.append(cell);
-      tr.append(td);
-    });
-    grid.append(tr);
-  });
-}
-
-/** Tocco su una mia casella: cambia subito, l'invio parte in sottofondo (in ordine, per giorno conta l'ultimo). */
-const planOutbox = [];
-let planSending = false;
-function cyclePlan(day, choice, time) {
-  const next = NEXT_CHOICE[choice];
-  const t = next === 'si' || next === 'forse' ? time : '';
-  const plan = (state.plans || []).find((d) => d.day === day);
-  const p = plan && plan.people.find((x) => x.name === state.me.name);
-  if (p) Object.assign(p, { choice: next || null, time: t });
-  renderToday();
-  const i = planOutbox.findIndex((x) => x.day === day);
-  if (i >= 0) planOutbox.splice(i, 1);
-  planOutbox.push({ day, choice: next, time: t });
-  flushPlans();
-}
-
-async function flushPlans() {
-  if (planSending) return;
-  planSending = true;
-  while (planOutbox.length) {
-    try {
-      await api('planSet', planOutbox.shift());
-    } catch (err) {
-      toast(err.message);
-      planOutbox.length = 0;
-    }
-  }
-  planSending = false;
-  await refresh();
-  chat.reload();
-}
 
 const photoCache = new Map(); // id → Promise<url>
 const PHOTO_STORE = 'palestrina-foto'; // le foto non cambiano mai: restano sul telefono dopo il primo caricamento
@@ -513,10 +441,6 @@ function renderSudometro() {
     if (lastDebug) el.querySelector('#debug-out').textContent = lastDebug;
   }
 
-  el.insertAdjacentHTML('beforeend', '<button id="btn-reref" class="link">Rifai la foto di riferimento</button>');
-  el.querySelector('#btn-reref').onclick = () => {
-    if (confirm('Rifare la foto di riferimento? Quella vecchia verrà sostituita.')) takeReference();
-  };
 }
 
 // ---------- Azioni ----------
@@ -782,7 +706,11 @@ $('btn-points-info').addEventListener('click', () => ($('points-info').hidden = 
 $('points-info').addEventListener('click', (e) => {
   if (e.target === $('points-info') || e.target.closest('.sheet-close')) $('points-info').hidden = true;
 });
-$('today-open').addEventListener('click', () => selectTab('chat'));
+$('btn-reref').addEventListener('click', () => {
+  if (!confirm('Rifare la foto di riferimento? Quella vecchia verrà sostituita.')) return;
+  selectTab('oggi'); // il risultato si vede nel Sudometro della Home
+  takeReference();
+});
 $('fake-mode').addEventListener('change', async (e) => {
   store.set('fakeData', e.target.checked);
   toast(e.target.checked ? 'Dati fittizi attivi: niente viene salvato' : 'Dati veri');
