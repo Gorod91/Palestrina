@@ -111,7 +111,7 @@ Una volta sola, dopo l'aggiornamento: nell'editor di Apps Script esegui **`autor
 
 **Sudometro della settimana**: nell'app, i selfie da sudato della settimana in ordine di punteggio, visibili a tutto il gruppo. Le foto restano private nel Drive: l'app le chiede ad Apps Script con il codice personale, e lo script restituisce solo i file elencati nel foglio Sudometro (niente foto di riferimento, niente prove di debug, nessun altro file del Drive).
 
-Titoli: sotto 20 "Fresco come una rosa", poi "Appena tiepido", "Si comincia a sudare", da 60 "Pomodoro maturo", da 85 "Lavatrice in centrifuga".
+Titoli: sotto 20 "Fresco come una rosa", poi "Appena tiepido", "Si comincia a sudare", da 60 "Pomodoro maturo", da 85 "Lava incandescente".
 I pesi (`WEIGHTS`) e le soglie (`TITLES`) sono in `public/sudometro.js`, da tarare sui primi selfie veri. Nel foglio, la colonna *Dettagli* registra i valori grezzi di ogni componente.
 
 **Anti-furbizia**: solo fotocamera dal vivo (niente galleria), un check-in e un Sudometro al giorno, controllati da Apps Script.

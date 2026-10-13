@@ -13,7 +13,7 @@ export const WEIGHTS = {
 };
 
 export const TITLES = [
-  [85, 'Lavatrice in centrifuga'],
+  [85, 'Lava incandescente'],
   [60, 'Pomodoro maturo'],
   [40, 'Si comincia a sudare'],
   [20, 'Appena tiepido'],
