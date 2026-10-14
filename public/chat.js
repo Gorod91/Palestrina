@@ -92,7 +92,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
 
   function apply(r) {
     if (!r || r.same) return;
-    if (outbox.length || sending || asking) return; // azioni ancora da inviare: vale quello che vede l'utente
+    if (outbox.length || sending || asking || sfidaSending) return; // azioni ancora da inviare: vale quello che vede l'utente
     v = r.v;
     data = r;
     saveCache(r);
@@ -521,17 +521,63 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   // ---------- Sfide (card in chat) ----------
 
   let listDeferred = false;
+  let sfidaSending = 0;
   const sfidaDrafts = {}; // numeri scritti e non ancora inviati, per sfida
 
-  async function sfidaDo(body, btn) {
-    if (btn) btn.disabled = true;
+  /** Cambia subito la card (senza aspettare il server): quello che il server farà con questa azione. */
+  function sfidaLocal(s, body) {
+    const mine = () => {
+      let p = s.people.find((x) => x.name === me.name);
+      if (!p) {
+        p = { name: me.name, display: me.display, in: false, value: null, by: '', contested: 0, annulled: false, record: null };
+        s.people.push(p);
+      }
+      return p;
+    };
+    const target = s.people.find((x) => x.name === body.target);
+    if (body.op === 'join') mine().in = body.value;
+    if (body.op === 'value') mine().value = body.value;
+    if (body.op === 'winner' && target) s.winner = { name: target.name, display: target.display, by: me.name, byDisplay: me.display, conf: '' };
+    if (body.op === 'confirm') {
+      if (body.target === '__winner' && s.winner) s.winner.conf = me.display;
+      else if (target) target.by = me.display;
+    }
+    if (body.op === 'contest') {
+      if (body.target === '__winner') {
+        s.winner = null;
+        s.winnerContests += 1;
+        if (s.winnerContests >= 2) s.noWinner = true;
+      } else if (target) {
+        target.contested += 1;
+        if (target.contested >= 2) target.annulled = true;
+        else target.value = null;
+      }
+    }
+  }
+
+  async function sfidaDo(body) {
+    const s = (data.sfide || []).find((x) => x.id === body.id);
+    if (!s) return;
+    const before = JSON.stringify(data.sfide);
+    sfidaLocal(s, body);
+    s.saving = (s.saving || 0) + 1;
+    sfidaSending++;
+    renderList();
     try {
       const r = await api('sfida', body);
-      v = -1;
-      apply(r);
+      sfidaSending--;
+      if (r.sfideOnly) {
+        data.sfide = r.sfide; // il resto della chat lo aggiorna il prossimo giro
+        if (!sfidaSending) renderList();
+      } else {
+        v = -1;
+        apply(r);
+      }
     } catch (err) {
+      sfidaSending--;
+      data.sfide = JSON.parse(before); // torna com'era
+      renderList();
       toast(err.message);
-      if (btn) btn.disabled = false;
     }
   }
 
@@ -543,7 +589,14 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       return row;
     }
     row.append(el('p', 'event-title', s.state === 'conclusa' ? `Sfida conclusa: ${s.label}` : `Sfida! ${s.label}`));
+    const names = s.invited.map((x) => x.display);
+    row.append(el('p', 'sfida-between', `Tra ${names.length > 1 ? `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}` : names.join('')}`));
     row.append(el('p', 'event-text', s.desc));
+    if (s.saving) {
+      const sv = el('p', 'sfida-saving');
+      sv.innerHTML = `${bicep()}<span>Salvo…</span>`;
+      row.append(sv);
+    }
     const how = el('button', 'sfida-how', 'Come funziona');
     how.type = 'button';
     how.onclick = () => openNews('sfide');
@@ -571,7 +624,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       [['in', 'Ci sto', true], ['out', 'Passo', false]].forEach(([k, l, val]) => {
         const btn = el('button', `choice ${k === 'in' ? 'si' : 'no'}${meP && meP.in === val ? ' selected' : ''}`, l);
         btn.type = 'button';
-        btn.onclick = () => sfidaDo({ id: s.id, op: 'join', value: val }, btn);
+        btn.onclick = () => sfidaDo({ id: s.id, op: 'join', value: val });
         b.append(btn);
       });
       row.append(b);
@@ -587,7 +640,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         btn.type = 'button';
         btn.onclick = () => {
           if (op === 'contest' && !confirm('Contestare questo risultato? Alla seconda contestazione vale solo la partecipazione.')) return;
-          sfidaDo({ id: s.id, op, target }, btn);
+          sfidaDo({ id: s.id, op, target });
         };
         b.append(btn);
       });
@@ -606,7 +659,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         ins.forEach((p) => {
           const btn = el('button', 'choice', p.display);
           btn.type = 'button';
-          btn.onclick = () => confirm(`Ha vinto ${p.display}?`) && sfidaDo({ id: s.id, op: 'winner', target: p.name }, btn);
+          btn.onclick = () => confirm(`Ha vinto ${p.display}?`) && sfidaDo({ id: s.id, op: 'winner', target: p.name });
           b.append(btn);
         });
         row.append(b);
@@ -643,7 +696,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         if (!confirm(`Confermi ${n} ${s.label.toLowerCase()}?`)) return;
         delete sfidaDrafts[s.id];
         input.blur();
-        sfidaDo({ id: s.id, op: 'value', value: n }, btn);
+        sfidaDo({ id: s.id, op: 'value', value: n });
       };
       row.append(el('p', 'sfida-hint', meP.record ? `Il tuo record: ${meP.record}. Per vincere superalo più degli altri.` : 'Prima volta: questo numero sarà il tuo record (calibrazione, vale la partecipazione).'));
       row.append(f);

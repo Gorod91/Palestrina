@@ -542,3 +542,6 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 .sfida-form .primary.small { flex: none; }
 .sfida-how { display: inline-block; margin: 4px 0 0; padding: 0; border: 0; background: none; color: var(--stand); font-size: 13px; }
 .act-as { max-width: 55%; padding: 6px 8px; border: 0; border-radius: 8px; background: var(--card-2); color: var(--fg); font-size: 15px; }
+.sfida-between { margin: 2px 0 2px !important; font-size: 14px; font-weight: 700; color: var(--fg); }
+.sfida-saving { display: flex; align-items: center; gap: 6px; margin-top: 6px !important; font-size: 13px; color: var(--muted); }
+.sfida-saving .bicep { width: 22px; height: 22px; color: #ff9f0a; --bicep-bg: var(--card); }

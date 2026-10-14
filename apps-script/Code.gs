@@ -817,7 +817,8 @@ function buildNotifications(event, name) {
     const to = (names, title, body) => subs.filter((x) => names.includes(x.name)).map((x) => ({ subscription: x.sub, title, body, tab: 'chat' }));
     const parts = sfidaParts(s);
     const first = sfide()[0] && sfide()[0].id === id;
-    if (what === 'reveal') return subs.filter((x) => !s.data.invited.includes(x.name)).map((x) => ({ subscription: x.sub, title: 'Sorpresa svelata: le sfide!', body: 'Quando siete in palestra insieme si apre una sfida. Tocca per scoprire come funziona.', tab: 'chat' }));
+    const between = s.data.invited.map(dn).join(', ').replace(/, ([^,]*)$/, ' e $1');
+    if (what === 'reveal') return subs.filter((x) => !s.data.invited.includes(x.name)).map((x) => ({ subscription: x.sub, title: 'Sorpresa svelata: le sfide!', body: `Prima sfida, ${def.label}, tra ${between}. Tocca per scoprire come funziona.`, tab: 'chat' }));
     if (what === 'open' && first) return to(s.data.invited, `Sorpresa! Prima sfida: ${def.label}`, 'Ecco la funzione speciale: le sfide. Tocca per scoprire come funziona e partecipare.');
     if (what === 'open') return to(s.data.invited, `Sfida! ${def.label}`, `${def.desc}. Tocca per partecipare.`);
     if (what === 'invite') return to([actor], `Sfida in corso: ${def.label}`, `${def.desc}. Tocca per partecipare.`);
@@ -1372,8 +1373,11 @@ function sfidaAction(user, req) {
   if (ended) {
     addChatEvent('', { kind: 'sfidaFine', id: ended });
     dispatch('sfida', `${ended}|end|${user.name}`);
-  } else if (notify) dispatch('sfida', `${req.id}|${notify}|${user.name}`);
-  return chatState(user, -1);
+    return chatState(user, -1); // c'è un evento nuovo in chat: serve tutto
+  }
+  if (notify) dispatch('sfida', `${req.id}|${notify}|${user.name}`);
+  // Risposta leggera: solo le sfide (la chat la ricarica il prossimo aggiornamento, se serve)
+  return { sfideOnly: true, sfide: sfideForChat(dayString(new Date())) };
 }
 
 function sfidaComplete(s) {
