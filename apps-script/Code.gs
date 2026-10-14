@@ -1525,8 +1525,9 @@ function computePoints(month) {
       if (!came) {
         if (day < today && plan && plan.choice === 'si') pen('bidone', 'Bidone', P.bidone, day);
         else {
-          // Cambio all'ultimo: da "ci sono" ad altro a meno di 4 ore dall'orario (senza orario: dalle 14 di quel giorno)
-          const late = myCambi.some((c) => c.day === day && c.from === 'si' && c.to !== 'si' && c.at >= `${day} ${c.timeBefore ? hhmmMinus(c.timeBefore, P.cambioOre * 60) : P.cambioSenzaOrario}`);
+          // Cambio all'ultimo: da "ci sono" ad altro a meno di 4 ore dall'orario (senza orario: dalle 14 di quel giorno).
+          // Conta solo se la risposta finale non è più "ci sono": un ripensamento subito annullato non vale.
+          const late = !(plan && plan.choice === 'si') && myCambi.some((c) => c.day === day && c.from === 'si' && c.to !== 'si' && c.at >= `${day} ${c.timeBefore ? hhmmMinus(c.timeBefore, P.cambioOre * 60) : P.cambioSenzaOrario}`);
           if (late) pen('cambio', 'Cambio all\'ultimo', P.cambioUltimo, day);
         }
         continue;
