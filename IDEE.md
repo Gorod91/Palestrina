@@ -6,6 +6,10 @@ Cose di cui abbiamo parlato ma che non sono ancora nell'app.
 
 In futuro: rivedere/ampliare l'elenco delle sfide (oggi Plank, Barchetta, Addominali, Squat, Affondi).
 
+## "Cin": telefoni che si toccano (per casi futuri)
+
+Due telefoni che si urtano registrano un picco dell'accelerometro nello stesso istante; il server abbina i due colpi (stessa frazione di secondo) e sa che le due persone erano davvero insieme. Usi possibili: confermare il risultato di una sfida al posto del "✓ Confermo", dare il bonus amici solo se ci si è incontrati davvero, dire "Ci sto" a una sfida con un brindisi. Limiti: app aperta e schermo acceso, un tocco per dare il permesso al movimento (iOS).
+
 ## Mese a squadre (gennaio, per ora)
 
 Un mese "speciale" con regole diverse dal solito, da rilasciare come novità dormiente a fine dicembre:
