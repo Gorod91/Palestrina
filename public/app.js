@@ -660,6 +660,32 @@ async function enableNotifications() {
   updateNotifyCard();
 }
 
+// ---------- Aggiornamento automatico ----------
+
+// A ogni pubblicazione GitHub scrive la versione qui sotto e in version.json: se non coincidono l'app si ricarica.
+const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || 'dev';
+
+/** Mai ricaricare mentre qualcuno scrive, fa una foto, aspetta un'azione o ha il timer in corso. */
+function busyNow() {
+  const input = $('chat-input');
+  return !!document.querySelector('.with-bicep') || !$('camera').hidden || !!(input && (input.value.trim() || document.activeElement === input)) || !$('timer-running').hidden;
+}
+
+async function checkUpdate() {
+  if (APP_VERSION === 'dev') return;
+  try {
+    const res = await fetch(`version.json?t=${Date.now()}`, { cache: 'no-store' });
+    const { v } = await res.json();
+    if (!v || v === APP_VERSION || busyNow()) return;
+    // Se dopo la ricarica la pagina è ancora vecchia (CDN non ancora aggiornata) non si riprova subito
+    const last = store.get('reloadFor');
+    if (last && last.v === v && Date.now() - last.at < 120000) return;
+    store.set('reloadFor', { v, at: Date.now() });
+    toast('Aggiornamento…', 2000);
+    setTimeout(() => location.reload(), 400);
+  } catch { /* offline: si riprova alla prossima apertura */ }
+}
+
 // ---------- Cambio di giorno ----------
 
 /** Stato di un altro giorno: classifiche e punti vanno bene come anteprima, il resto di oggi no. */
@@ -790,6 +816,7 @@ $('btn-browser').addEventListener('click', () => {
 });
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return;
+  checkUpdate();
   syncDay();
   if (session && state) refresh().then(() => chat.preload());
 });
@@ -827,4 +854,5 @@ async function start() {
   // Chiede a iOS di non cancellare i dati salvati (codice, selfie riposato).
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   start();
+  checkUpdate();
 })();

@@ -24,6 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
+      - name: Versione (per l'aggiornamento automatico dell'app)
+        run: |
+          V="${GITHUB_SHA::7}"
+          sed -i "s/<meta name=\"app-version\" content=\"dev\">/<meta name=\"app-version\" content=\"$V\">/" public/index.html
+          grep -q "content=\"$V\"" public/index.html
+          printf '{"v":"%s"}\n' "$V" > public/version.json
       - uses: actions/upload-pages-artifact@v3
         with:
           path: public
