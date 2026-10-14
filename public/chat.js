@@ -371,14 +371,18 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       const t = timeInput.value;
       if (t === sent) return;
       sent = t;
-      const c = answered.choice || 'si';
+      // La risposta attuale si rilegge adesso: nel frattempo può essere cambiata (o arrivati dati nuovi dal server)
+      const now = ((data.plans || []).find((d) => d.day === day) || { people: [] }).people.find((p) => p.name === me.name) || {};
+      const c = now.choice || 'si';
       setLocal(day, c, t);
       queuePlan(day, c, t);
       if (!focused()) renderPoll(true);
     };
+    // Mentre la rotella gira non si salva: si salva alla chiusura (blur) o dopo qualche secondo fermi,
+    // così i passaggi intermedi (17:28 → 19:28 → 19:15) non diventano cambi e notifiche.
     timeInput.onchange = () => {
       clearTimeout(timer);
-      timer = setTimeout(saveTime, 600);
+      timer = setTimeout(saveTime, focused() ? 4000 : 600);
     };
     timeInput.onblur = () => setTimeout(() => {
       saveTime();

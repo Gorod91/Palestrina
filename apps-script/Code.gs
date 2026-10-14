@@ -1051,6 +1051,7 @@ function planSet(user, day, choice, time) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   let changed = false;
+  let notify = true;
   try {
     const sh = sheet('piani');
     const values = sh.getDataRange().getValues();
@@ -1066,15 +1067,53 @@ function planSet(user, day, choice, time) {
       changed = true;
     }
     if (changed) {
-      sheet('cambi').appendRow([now, d, user.name, before.choice, c, before.time, at]);
+      if (!logChange(now, d, user.name, before, c, at)) notify = false; // ripensamento annullato: niente da dire
       bumpChat();
     }
   } finally {
     lock.releaseLock();
   }
-  // Avvisa chi ha fatto la domanda per quel giorno
-  if (changed && c) dispatch('answer', user.name);
+  // Avvisa chi ha fatto la domanda per quel giorno, al massimo una volta ogni pochi minuti per persona e giorno
+  const key = `answerNotify_${user.name}_${d}`;
+  if (changed && c && notify && Date.now() - Number(props.getProperty(key) || 0) > ANSWER_NOTIFY_MS) {
+    props.setProperty(key, String(Date.now()));
+    dispatch('answer', user.name);
+  }
   return chatState(user, -1);
+}
+
+const CHANGE_MERGE_MIN = 3; // cambi della stessa persona per lo stesso giorno così ravvicinati diventano uno solo
+const ANSWER_NOTIFY_MS = 3 * 60000;
+
+/**
+ * Storico dei cambi (per le penalità). Se l'ultimo cambio della stessa persona per lo stesso giorno è di pochi
+ * minuti fa, lo aggiorna invece di aggiungerne uno (tocchi sbagliati, rotella dell'orario); se alla fine non è
+ * cambiato niente lo toglie. Restituisce false se il cambio si è annullato.
+ */
+function logChange(now, day, name, before, choice, time) {
+  const sh = sheet('cambi');
+  const values = sh.getDataRange().getDisplayValues();
+  let i = values.length - 1;
+  while (i > 0 && !(values[i][2] === name && values[i][1] === day)) i--;
+  const minutesAgo = i > 0 ? (parseStamp(now) - parseStamp(values[i][0])) / 60000 : Infinity;
+  if (i > 0 && minutesAgo >= 0 && minutesAgo <= CHANGE_MERGE_MIN && values[i][4] === before.choice) {
+    const from = values[i][3];
+    const timeFrom = values[i][5];
+    if (from === choice && timeFrom === time) {
+      sh.deleteRow(i + 1);
+      return false;
+    }
+    sh.getRange(i + 1, 1, 1, 7).setValues([[now, day, name, from, choice, timeFrom, time]]);
+    return true;
+  }
+  sh.appendRow([now, day, name, before.choice, choice, before.time, time]);
+  return true;
+}
+
+/** "yyyy-MM-dd HH:mm" → millisecondi (solo per differenze). */
+function parseStamp(t) {
+  const m = String(t).match(/^(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d)/);
+  return m ? Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]) : NaN;
 }
 
 /** Solo utenti debug: cancella un messaggio o un evento. Se è la domanda di oggi, la annulla con tutte le risposte. */
