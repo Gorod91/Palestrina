@@ -540,3 +540,4 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 .sfida-form { display: flex; gap: 8px; margin-top: 6px; }
 .sfida-form input { flex: 1; margin: 0; padding: 10px 12px; font-size: 16px; text-transform: none; letter-spacing: 0; }
 .sfida-form .primary.small { flex: none; }
+.sfida-how { display: inline-block; margin: 4px 0 0; padding: 0; border: 0; background: none; color: var(--stand); font-size: 13px; }

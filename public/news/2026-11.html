@@ -69,17 +69,11 @@
   .rows b { color: var(--muted); }
   .rows em { color: var(--lime); }
   .rows em.red { color: #ff453a; }
-  /* Sfide */
+  /* Sorpresa */
   .eyebrow.orange { color: #ff9f0a; }
-  .duel { margin: 30px 0 18px; padding: 18px; border-radius: 22px; background: #1c1c1e; border: 1px solid #ff9f0a88; }
-  .duel-t { font-size: 24px; font-weight: 800; color: #ff9f0a; }
-  .duel-d { margin-top: 4px; font-size: 16px; color: var(--muted); }
-  .duel-b { display: flex; gap: 8px; margin-top: 14px; }
-  .duel-b span { flex: 1; padding: 10px 0; border-radius: 12px; background: #2c2c2e; text-align: center; font-weight: 700; }
-  .duel-b span.in { background: var(--lime); color: #000; }
-  .types { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
-  .types span { padding: 7px 14px; border-radius: 999px; background: #ff9f0a22; color: #ff9f0a; font-size: 15px; font-weight: 700; }
-  .hl { color: var(--lime); }
+  .mystery { align-self: center; margin: 30px 0; font-size: 200px; font-weight: 900; line-height: 1; background: linear-gradient(135deg, var(--lime), var(--cyan) 55%, var(--pink)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .slide.on .mystery { animation: pop .8s cubic-bezier(.2, .8, .2, 1) .8s both, wobble 2.4s ease-in-out 1.8s infinite; }
+  @keyframes wobble { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg) scale(1.04); } 75% { transform: rotate(8deg) scale(1.04); } }
   .rules { list-style: none; padding: 0; display: grid; gap: 10px; font-size: 17px; color: #d1d1d6; }
   .rules li::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%; background: var(--cyan); vertical-align: middle; }
   .hint { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 16px); text-align: center; font-size: 14px; color: var(--muted); }
@@ -93,22 +87,8 @@
     <div class="glow"></div>
     <p class="eyebrow" data-a style="--d:.2">Novità</p>
     <h1 data-a style="--d:.5;--anim:pop">Novembre.</h1>
-    <p class="lead" data-a style="--d:1.1">Arrivano le sfide.<br>Più modi di fare punti. E uno per perderli.</p>
+    <p class="lead" data-a style="--d:1.1">Più modi di fare punti. Uno per perderli.<br>E una sorpresa.</p>
     <p class="hint" data-a style="--d:2">Tocca per continuare</p>
-  </section>
-
-  <section class="slide">
-    <p class="eyebrow orange" data-a style="--d:0">Sfide</p>
-    <h2 data-a style="--d:.1">Siete in palestra insieme?<br>Sfidatevi.</h2>
-    <div class="duel" data-a style="--d:.7;--anim:pop">
-      <p class="duel-t">Sfida! Plank</p>
-      <p class="duel-d">Vince chi resiste di più</p>
-      <p class="duel-b"><span class="in">Ci sto</span><span>Passo</span></p>
-    </div>
-    <div class="types">
-      <span data-a style="--d:1.2;--anim:pop">Plank</span><span data-a style="--d:1.3;--anim:pop">Barchetta</span><span data-a style="--d:1.4;--anim:pop">Addominali</span><span data-a style="--d:1.5;--anim:pop">Squat</span><span data-a style="--d:1.6;--anim:pop">Affondi</span>
-    </div>
-    <p class="lead" data-a style="--d:2">Addominali, squat e affondi: vince chi batte di più il proprio record. Un altro conferma. <b class="hl">+5</b> a chi vince, <b class="hl">+2</b> a chi partecipa.</p>
   </section>
 
   <section class="slide">
@@ -150,10 +130,17 @@
   </section>
 
   <section class="slide">
+    <div class="glow"></div>
+    <p class="eyebrow orange" data-a style="--d:0">E poi…</p>
+    <h2 data-a style="--d:.2">C'è anche<br>una sorpresa.</h2>
+    <p class="mystery" data-a style="--d:.8;--anim:pop">?</p>
+    <p class="lead" data-a style="--d:1.6">Una funzione speciale. Si svelerà la prima volta che due di voi andranno in palestra insieme.</p>
+  </section>
+
+  <section class="slide">
     <p class="eyebrow" data-a style="--d:.1">Cosa cambia</p>
     <div class="rows">
       <p class="rh" data-a style="--d:.3"><span></span><span>Prima</span><span>Ora</span></p>
-      <p data-a style="--d:.45;--anim:left"><span>Vincere una sfida</span><b>–</b><em>+5</em></p>
       <p data-a style="--d:.6;--anim:left"><span>Fare la domanda e poi andare</span><b>0</b><em>+3</em></p>
       <p data-a style="--d:.9;--anim:left"><span>Ingresso oltre l'obiettivo</span><b>10</b><em>13</em></p>
       <p data-a style="--d:1.2;--anim:left"><span>Dire "no" e poi venire</span><b>−3</b><em class="red">−4</em></p>

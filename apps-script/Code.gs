@@ -241,7 +241,7 @@ const NEWS = [
     from: '2026-11-01',
     features: ['apripista', 'oltre', 'falsoNo', 'sfide'],
     title: 'Novità di novembre',
-    body: 'Arrivano le sfide in palestra, e poi Apripista, Oltre l\'obiettivo e Falso no. Tocca per vedere.',
+    body: 'Apripista, Oltre l\'obiettivo, Falso no… e una sorpresa. Tocca per vedere.',
   },
 ];
 
@@ -704,7 +704,7 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
-    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), falsoNo: featureOn('falsoNo'), sfide: featureOn('sfide') },
+    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), falsoNo: featureOn('falsoNo'), sfide: featureOn('sfide') && sfide().length > 0 }, // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
@@ -808,6 +808,9 @@ function buildNotifications(event, name) {
     const def = SFIDE[s.type];
     const to = (names, title, body) => subs.filter((x) => names.includes(x.name)).map((x) => ({ subscription: x.sub, title, body, tab: 'chat' }));
     const parts = sfidaParts(s);
+    const first = sfide()[0] && sfide()[0].id === id;
+    if (what === 'reveal') return subs.filter((x) => !s.data.invited.includes(x.name)).map((x) => ({ subscription: x.sub, title: 'Sorpresa svelata: le sfide!', body: 'Quando siete in palestra insieme si apre una sfida. Tocca per scoprire come funziona.', tab: 'chat' }));
+    if (what === 'open' && first) return to(s.data.invited, `Sorpresa! Prima sfida: ${def.label}`, 'Ecco la funzione speciale: le sfide. Tocca per scoprire come funziona e partecipare.');
     if (what === 'open') return to(s.data.invited, `Sfida! ${def.label}`, `${def.desc}. Tocca per partecipare.`);
     if (what === 'invite') return to([actor], `Sfida in corso: ${def.label}`, `${def.desc}. Tocca per partecipare.`);
     if (what === 'remind') return to(sfidaPending(s), `Sfida ${def.label}: mancano conferme`, 'Conferma i risultati entro mezzanotte, o valgono solo come partecipazione.');
@@ -1269,14 +1272,19 @@ function maybeOpenSfida(user) {
       if (!others.length) return;
       const prev = sfide().slice(-1)[0];
       const types = Object.keys(SFIDE).filter((t) => !prev || t !== prev.type);
-      const type = types[Math.floor(Math.random() * types.length)];
+      // La prima sfida in assoluto è la rivelazione della sorpresa: sempre Plank, facile per capire il meccanismo
+      const type = prev ? types[Math.floor(Math.random() * types.length)] : 'plank';
       const id = newId();
       sheet('sfide').appendRow([id, today, now, type, 'aperta', JSON.stringify({ invited: others.concat(user.name), people: {}, winner: null, winnerContests: 0, noWinner: false, reminded: false })]);
       forget('sfide');
-      event = { id, what: 'open', type };
+      event = { id, what: 'open', type, first: !prev };
     }
   } finally {
     lock.releaseLock();
+  }
+  if (event && event.first) {
+    addChatEvent('', { kind: 'news', id: 'sfide', title: 'Sorpresa svelata: le sfide!', body: 'Quando siete in palestra insieme si apre una sfida. Tocca per scoprire come funziona.' });
+    dispatch('sfida', `${event.id}|reveal|`);
   }
   if (event && event.what === 'open') addChatEvent('', { kind: 'sfida', id: event.id, type: event.type });
   if (event) dispatch('sfida', `${event.id}|${event.what}|${user.name}`);

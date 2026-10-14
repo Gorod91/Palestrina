@@ -1,0 +1,192 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Le sfide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..900&display=swap" rel="stylesheet">
+<style>
+  :root { --fg: #f5f5f7; --muted: #8e8e93; --lime: #a6ff00; --cyan: #3be0ff; --pink: #ff2d6b; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: #000; color: var(--fg); font-family: Inter, -apple-system, system-ui, sans-serif; overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .bars { position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 16px; right: 64px; display: flex; gap: 6px; z-index: 3; }
+  .bars i { flex: 1; height: 3px; border-radius: 3px; background: #ffffff33; overflow: hidden; }
+  .bars i b { display: block; height: 100%; width: 0; background: var(--fg); transition: width .4s; }
+  .bars i.done b { width: 100%; }
+  .close { position: fixed; top: calc(env(safe-area-inset-top) + 2px); right: 12px; z-index: 3; width: 40px; height: 40px; border: 0; border-radius: 50%; background: #ffffff1f; color: var(--fg); font-size: 22px; }
+  .slide { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: calc(env(safe-area-inset-top) + 60px) 28px calc(env(safe-area-inset-bottom) + 48px); opacity: 0; pointer-events: none; transition: opacity .5s; }
+  .slide.on { opacity: 1; }
+  .eyebrow { margin-bottom: 12px; font-size: 14px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--lime); }
+  h1 { font-size: clamp(52px, 16.5vw, 110px); font-weight: 900; letter-spacing: -.05em; line-height: .95; margin: 14px 0 18px; background: linear-gradient(90deg, var(--lime), var(--cyan) 55%, var(--pink)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  h2 { font-size: clamp(34px, 10vw, 52px); font-weight: 800; letter-spacing: -.035em; line-height: 1.05; }
+  .lead { font-size: 22px; font-weight: 300; line-height: 1.35; color: #d1d1d6; }
+  .glow { position: absolute; inset: auto -20% -30% -20%; height: 60%; background: radial-gradient(ellipse at 50% 100%, #a6ff0033, transparent 65%); pointer-events: none; }
+  /* Animazioni: ripartono ogni volta che la slide si accende */
+  .slide [data-a] { opacity: 0; }
+  .slide.on [data-a] { animation: var(--anim, rise) .8s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--d, 0) * 1s); }
+  @keyframes rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { 0% { opacity: 0; transform: scale(.3); } 60% { opacity: 1; transform: scale(1.12); } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes left { from { opacity: 0; transform: translateX(-60px); } to { opacity: 1; transform: none; } }
+  @keyframes right { from { opacity: 0; transform: translateX(60px); } to { opacity: 1; transform: none; } }
+  /* Slide 2 */
+  .scene { display: flex; flex-direction: column; gap: 16px; margin: 34px 0 30px; }
+  .bubble { align-self: flex-start; max-width: 86%; padding: 14px 18px; border-radius: 22px 22px 22px 6px; background: #2c2c2e; font-size: 19px; }
+  .bubble small { display: block; font-size: 13px; font-weight: 700; color: var(--cyan); margin-bottom: 4px; }
+  .check { align-self: flex-end; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-radius: 20px; background: #1c1c1e; border: 1px solid #a6ff0055; font-size: 18px; }
+  .check span { display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--lime); color: #000; font-weight: 900; }
+  .plus { align-self: center; font-size: 120px; font-weight: 900; letter-spacing: -.05em; color: var(--lime); text-shadow: 0 0 60px #a6ff0088; line-height: 1; }
+  /* Slide 3 */
+  .cmp { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 28px 0 22px; }
+  .cmp div { padding: 18px 16px; border-radius: 22px; background: #1c1c1e; }
+  .cmp p { font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .cmp b { display: block; font-size: 44px; font-weight: 900; letter-spacing: -.04em; margin: 8px 0 4px; }
+  .cmp span { font-size: 15px; color: #d1d1d6; line-height: 1.35; }
+  .cmp .new { border: 1px solid #a6ff0066; background: linear-gradient(160deg, #1d2a06, #1c1c1e 70%); }
+  .cmp .new b { color: var(--lime); }
+  /* Slide 3: la settimana, con la linea dell'obiettivo dopo il secondo ingresso */
+  .week { display: flex; align-items: center; gap: 6px; margin: 40px 0 34px; }
+  .week span { position: relative; flex: 1; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: #1c1c1e; color: var(--muted); font-size: 15px; font-weight: 700; }
+  .week span.in { background: var(--cyan); color: #000; }
+  .week span.extra { background: var(--lime); box-shadow: 0 0 30px #a6ff00aa; }
+  .week span b { position: absolute; top: -34px; left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: 900; color: var(--lime); }
+  .week i { flex: none; width: 3px; height: 56px; border-radius: 2px; background: var(--fg); }
+  .cmp { row-gap: 10px; }
+  .cmp b { font-size: 38px; }
+  /* Falso no */
+  .eyebrow.red { color: #ff453a; }
+  .check.sneaky { border-color: #ff453a66; }
+  .check.sneaky span { background: #ff453a; color: #fff; }
+  .plus.minus { color: #ff453a; text-shadow: 0 0 60px #ff453a88; }
+  /* Cosa cambia: prima → ora */
+  .rows { display: grid; gap: 10px; margin: 26px 0 24px; }
+  .rows p { display: grid; grid-template-columns: 1fr 56px 56px; align-items: center; gap: 8px; padding: 16px; border-radius: 18px; background: #1c1c1e; }
+  .rows p.rh { padding: 0 16px; background: none; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .rows p.rh span:not(:first-child) { text-align: center; }
+  .rows span { font-size: 16px; line-height: 1.3; color: #d1d1d6; }
+  .rows b, .rows em { text-align: center; font-style: normal; font-size: 26px; font-weight: 900; letter-spacing: -.03em; }
+  .rows b { color: var(--muted); }
+  .rows em { color: var(--lime); }
+  .rows em.red { color: #ff453a; }
+  /* Sorpresa */
+  .eyebrow.orange { color: #ff9f0a; }
+  .mystery { align-self: center; margin: 30px 0; font-size: 200px; font-weight: 900; line-height: 1; background: linear-gradient(135deg, var(--lime), var(--cyan) 55%, var(--pink)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .slide.on .mystery { animation: pop .8s cubic-bezier(.2, .8, .2, 1) .8s both, wobble 2.4s ease-in-out 1.8s infinite; }
+  @keyframes wobble { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg) scale(1.04); } 75% { transform: rotate(8deg) scale(1.04); } }
+  /* Sfide */
+  .types { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 8px; }
+  .types span { padding: 7px 14px; border-radius: 999px; background: #ff9f0a22; color: #ff9f0a; font-size: 15px; font-weight: 700; }
+  .duel { margin: 26px 0 22px; padding: 18px; border-radius: 22px; background: #1c1c1e; border: 1px solid #ff9f0a88; }
+  .duel-t { font-size: 24px; font-weight: 800; color: #ff9f0a; }
+  .duel-d { margin-top: 4px; font-size: 16px; color: var(--muted); }
+  .duel-b { display: flex; gap: 8px; margin-top: 14px; }
+  .duel-b span { flex: 1; padding: 10px 0; border-radius: 12px; background: #2c2c2e; text-align: center; font-weight: 700; }
+  .duel-b span.in { background: var(--lime); color: #000; }
+  .bars2 { display: grid; gap: 14px; margin: 30px 0 26px; }
+  .bars2 p { display: grid; grid-template-columns: 70px 1fr; align-items: center; gap: 10px; font-size: 16px; font-weight: 700; }
+  .bars2 i { display: block; height: 18px; border-radius: 9px; background: #2c2c2e; overflow: hidden; }
+  .bars2 b { display: block; height: 100%; border-radius: 9px; background: var(--cyan); transform-origin: left; }
+  .bars2 .win b { background: var(--lime); box-shadow: 0 0 24px #a6ff0088; }
+  .slide.on .bars2 b { animation: hold 2.6s cubic-bezier(.3, .6, .3, 1) .6s both; }
+  @keyframes hold { from { transform: scaleX(0); } }
+  .vs { display: grid; gap: 10px; margin: 26px 0 22px; }
+  .vs p { display: grid; grid-template-columns: 1fr auto; align-items: center; padding: 14px 16px; border-radius: 18px; background: #1c1c1e; }
+  .vs span { font-size: 16px; color: #d1d1d6; line-height: 1.3; }
+  .vs span small { display: block; font-size: 13px; color: var(--muted); }
+  .vs em { font-style: normal; font-size: 30px; font-weight: 900; letter-spacing: -.03em; color: var(--muted); }
+  .vs .win { border: 1px solid #a6ff0066; background: linear-gradient(160deg, #1d2a06, #1c1c1e 70%); }
+  .vs .win em { color: var(--lime); }
+  .rules { list-style: none; padding: 0; display: grid; gap: 10px; font-size: 17px; color: #d1d1d6; }
+  .rules li::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%; background: var(--cyan); vertical-align: middle; }
+  .hint { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 16px); text-align: center; font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="bars"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
+  <button class="close" aria-label="Chiudi">×</button>
+
+  <section class="slide">
+    <div class="glow"></div>
+    <p class="eyebrow orange" data-a style="--d:.2">Sorpresa svelata</p>
+    <h1 data-a style="--d:.5;--anim:pop">Le sfide.</h1>
+    <p class="lead" data-a style="--d:1.1">Siete in palestra insieme?<br>Sfidatevi.</p>
+    <p class="hint" data-a style="--d:2">Tocca per continuare</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow orange" data-a style="--d:0">Come nasce</p>
+    <h2 data-a style="--d:.1">Due check-in vicini.<br>Una sfida.</h2>
+    <div class="duel" data-a style="--d:.7;--anim:pop">
+      <p class="duel-t">Sfida! Plank</p>
+      <p class="duel-d">Vince chi resiste di più</p>
+      <p class="duel-b"><span class="in">Ci sto</span><span>Passo</span></p>
+    </div>
+    <p class="lead" data-a style="--d:1.5">Quando due o più di voi fanno check-in a meno di un'ora, in chat si apre una sfida a caso. Avete un'ora per dire "Ci sto".</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow orange" data-a style="--d:0">Resistenza</p>
+    <h2 data-a style="--d:.1">Chi resiste di più,<br>vince.</h2>
+    <div class="types"><span data-a style="--d:.5;--anim:pop">Plank</span><span data-a style="--d:.65;--anim:pop">Barchetta</span></div>
+    <div class="bars2">
+      <p data-a style="--d:.5"><span>Voi</span><i><b style="width:92%"></b></i></p>
+      <p class="win" data-a style="--d:.6"><span>Rizzo</span><i><b style="width:100%"></b></i></p>
+      <p data-a style="--d:.7"><span>Ceppo</span><i><b style="width:71%"></b></i></p>
+    </div>
+    <p class="lead" data-a style="--d:2.2">Fino allo sfinimento. Uno di voi dichiara chi ha vinto, un altro conferma.</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow orange" data-a style="--d:0">Ripetizioni</p>
+    <h2 data-a style="--d:.1">Contro il vostro<br>record.</h2>
+    <div class="types"><span data-a style="--d:.5;--anim:pop">Addominali</span><span data-a style="--d:.6;--anim:pop">Squat</span><span data-a style="--d:.7;--anim:pop">Affondi</span></div>
+    <div class="vs">
+      <p class="win" data-a style="--d:1;--anim:left"><span>Ceppo: 42<small>record 35</small></span><em>120%</em></p>
+      <p data-a style="--d:1.3;--anim:left"><span>Rizzo: 60<small>record 70</small></span><em>86%</em></p>
+    </div>
+    <p class="lead" data-a style="--d:1.9">Vince chi supera di più il proprio record degli ultimi 60 giorni. Non il più forte: chi migliora. La prima volta fissa il record.</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow" data-a style="--d:.1">Le regole</p>
+    <div class="rows">
+      <p data-a style="--d:.4;--anim:left"><span>Vincere una sfida</span><b></b><em>+5</em></p>
+      <p data-a style="--d:.6;--anim:left"><span>Partecipare</span><b></b><em>+2</em></p>
+    </div>
+    <ul class="rules">
+      <li data-a style="--d:1">Ogni risultato lo conferma un altro partecipante</li>
+      <li data-a style="--d:1.3">Contestato due volte? Vale solo la partecipazione</li>
+      <li data-a style="--d:1.6">A mezzanotte quello che non è confermato vale come partecipazione</li>
+    </ul>
+  </section>
+
+  <section class="slide">
+    <div class="glow"></div>
+    <p class="eyebrow orange" data-a style="--d:.2">La prima sfida</p>
+    <h1 data-a style="--d:.5;--anim:pop">Plank.</h1>
+    <p class="lead" data-a style="--d:1.1">Adesso. Chi resiste di più?</p>
+    <p class="hint" data-a style="--d:2">Tocca per chiudere e rispondere in chat</p>
+  </section>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const bars = [...document.querySelectorAll('.bars i')];
+  let i = 0;
+  function close() {
+    if (window.parent !== window) window.parent.postMessage({ palestrinaNews: 'close' }, '*');
+    else history.back();
+  }
+  function go(n) {
+    if (n >= slides.length) return close();
+    i = Math.max(0, n);
+    slides.forEach((s, k) => s.classList.toggle('on', k === i));
+    bars.forEach((b, k) => b.classList.toggle('done', k <= i));
+  }
+  document.querySelector('.close').addEventListener('click', (e) => { e.stopPropagation(); close(); });
+  document.addEventListener('click', (e) => go(e.clientX < innerWidth * 0.3 ? i - 1 : i + 1));
+  addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === ' ') go(i + 1); if (e.key === 'ArrowLeft') go(i - 1); if (e.key === 'Escape') close(); });
+  go(0);
+</script>
+</body>
+</html>

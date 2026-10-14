@@ -544,6 +544,10 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     }
     row.append(el('p', 'event-title', s.state === 'conclusa' ? `Sfida conclusa: ${s.label}` : `Sfida! ${s.label}`));
     row.append(el('p', 'event-text', s.desc));
+    const how = el('button', 'sfida-how', 'Come funziona');
+    how.type = 'button';
+    how.onclick = () => openNews('sfide');
+    row.append(how);
     const meP = s.people.find((p) => p.name === me.name);
     const invited = s.invited.some((x) => x.name === me.name);
     const ins = s.people.filter((p) => p.in);
