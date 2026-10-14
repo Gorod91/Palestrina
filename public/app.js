@@ -472,6 +472,7 @@ async function refresh() {
 }
 
 async function checkin() {
+  if (!confirm('Confermi il check-in? Sei in palestra adesso?')) return;
   await withBusy($('btn-checkin'), 'Check-in…', async () => {
     try {
       const r = await api('checkin');
