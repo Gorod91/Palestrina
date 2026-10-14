@@ -235,9 +235,9 @@ const NEWS = [
     id: '2026-11',
     month: '2026-10',
     from: '2026-11-01',
-    features: ['apripista'],
+    features: ['apripista', 'oltre'],
     title: 'Novità di novembre',
-    body: 'Apripista: chi chiede per primo "chi va in palestra?" e poi ci va prende +3 punti. Tocca per vedere.',
+    body: '+3 punti a chi chiede per primo "chi va in palestra?" e poi ci va, e per ogni ingresso oltre l\'obiettivo della settimana. Tocca per vedere.',
   },
 ];
 
@@ -688,7 +688,7 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
-    features: { apripista: featureOn('apripista') },
+    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre') },
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
@@ -1413,6 +1413,7 @@ const POINTS = {
   branco: 10,
   pomodoro: 10,
   apripista: 3, // novità di novembre 2026: primo a chiedere "chi va in palestra?" per un giorno e poi check-in
+  oltre: 3, // novità di novembre 2026: ogni ingresso della settimana oltre l'obiettivo
   // Penalità
   bidone: -10, // "ci sono" e poi niente check-in quel giorno
   cambioUltimo: -5, // da "ci sono" a forse/no (o tolto) a meno di 4 ore dall'orario, senza poi venire
@@ -1497,6 +1498,15 @@ function computePoints(month) {
       let n = 1;
       while (countInWeek(pres, u.name, addDays(w, -7 * n)) >= u.goal) n++;
       if (n > 1) add('serie', 'Settimane di fila', Math.min(P.seriePerSettimana * (n - 1), P.serieMax));
+    }
+    // Oltre l'obiettivo: ogni ingresso della settimana dopo quelli dell'obiettivo
+    if (featureOn('oltre')) {
+      const from = featureFrom('oltre');
+      for (let w = weekKey(monthStart); w <= addDays(monthStart, 31); w = addDays(w, 7)) {
+        mine.filter((r) => weekKey(r.day) === w).map((r) => r.day).slice(u.goal).forEach((day) => {
+          if (inMonth(day) && day >= from) add('oltre', 'Oltre l\'obiettivo', P.oltre);
+        });
+      }
     }
     // Penalità (da quando esistono)
     const today = dayString(new Date());

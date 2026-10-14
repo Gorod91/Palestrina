@@ -18,7 +18,7 @@
   .close { position: fixed; top: calc(env(safe-area-inset-top) + 2px); right: 12px; z-index: 3; width: 40px; height: 40px; border: 0; border-radius: 50%; background: #ffffff1f; color: var(--fg); font-size: 22px; }
   .slide { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: calc(env(safe-area-inset-top) + 60px) 28px calc(env(safe-area-inset-bottom) + 48px); opacity: 0; pointer-events: none; transition: opacity .5s; }
   .slide.on { opacity: 1; }
-  .eyebrow { font-size: 14px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--lime); }
+  .eyebrow { margin-bottom: 12px; font-size: 14px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--lime); }
   h1 { font-size: clamp(52px, 16.5vw, 110px); font-weight: 900; letter-spacing: -.05em; line-height: .95; margin: 14px 0 18px; background: linear-gradient(90deg, var(--lime), var(--cyan) 55%, var(--pink)); -webkit-background-clip: text; background-clip: text; color: transparent; }
   h2 { font-size: clamp(34px, 10vw, 52px); font-weight: 800; letter-spacing: -.035em; line-height: 1.05; }
   .lead { font-size: 22px; font-weight: 300; line-height: 1.35; color: #d1d1d6; }
@@ -45,24 +45,34 @@
   .cmp span { font-size: 15px; color: #d1d1d6; line-height: 1.35; }
   .cmp .new { border: 1px solid #a6ff0066; background: linear-gradient(160deg, #1d2a06, #1c1c1e 70%); }
   .cmp .new b { color: var(--lime); }
+  /* Slide 3: la settimana, con la linea dell'obiettivo dopo il secondo ingresso */
+  .week { display: flex; align-items: center; gap: 6px; margin: 40px 0 34px; }
+  .week span { position: relative; flex: 1; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: #1c1c1e; color: var(--muted); font-size: 15px; font-weight: 700; }
+  .week span.in { background: var(--cyan); color: #000; }
+  .week span.extra { background: var(--lime); box-shadow: 0 0 30px #a6ff00aa; }
+  .week span b { position: absolute; top: -34px; left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: 900; color: var(--lime); }
+  .week i { flex: none; width: 3px; height: 56px; border-radius: 2px; background: var(--fg); }
+  .cmp { row-gap: 10px; }
+  .cmp b { font-size: 38px; }
   .rules { list-style: none; padding: 0; display: grid; gap: 10px; font-size: 17px; color: #d1d1d6; }
   .rules li::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%; background: var(--cyan); vertical-align: middle; }
   .hint { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 16px); text-align: center; font-size: 14px; color: var(--muted); }
 </style>
 </head>
 <body>
-  <div class="bars"><i><b></b></i><i><b></b></i><i><b></b></i></div>
+  <div class="bars"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
   <button class="close" aria-label="Chiudi">×</button>
 
   <section class="slide">
     <div class="glow"></div>
-    <p class="eyebrow" data-a style="--d:.2">Novità di novembre</p>
-    <h1 data-a style="--d:.5;--anim:pop">Apripista.</h1>
-    <p class="lead" data-a style="--d:1.1">Chi rompe il ghiaccio, viene premiato.</p>
+    <p class="eyebrow" data-a style="--d:.2">Novità</p>
+    <h1 data-a style="--d:.5;--anim:pop">Novembre.</h1>
+    <p class="lead" data-a style="--d:1.1">Due nuovi modi di fare punti.<br>Chi rompe il ghiaccio. E chi non si ferma.</p>
     <p class="hint" data-a style="--d:2">Tocca per continuare</p>
   </section>
 
   <section class="slide">
+    <p class="eyebrow" data-a style="--d:0">Apripista</p>
     <h2 data-a style="--d:.1">Chiedete per primi.<br>Poi andate.</h2>
     <div class="scene">
       <p class="bubble" data-a style="--d:.7;--anim:left"><small>Voi</small>Chi va in palestra giovedì?</p>
@@ -73,15 +83,32 @@
   </section>
 
   <section class="slide">
+    <p class="eyebrow" data-a style="--d:0">Oltre l'obiettivo</p>
+    <h2 data-a style="--d:.1">L'obiettivo è il minimo.<br>Il resto vale di più.</h2>
+    <div class="week">
+      <span data-a style="--d:.6;--anim:pop" class="in">L</span>
+      <span data-a style="--d:.75;--anim:pop">M</span>
+      <span data-a style="--d:.9;--anim:pop" class="in">M</span>
+      <i data-a style="--d:1.3"></i>
+      <span data-a style="--d:1.05;--anim:pop">G</span>
+      <span data-a style="--d:1.9;--anim:pop" class="in extra">V<b>+3</b></span>
+      <span data-a style="--d:1.2;--anim:pop">S</span>
+      <span data-a style="--d:1.25;--anim:pop">D</span>
+    </div>
+    <p class="lead" data-a style="--d:2.6">Obiettivo 2 a settimana: dal terzo ingresso, ognuno vale 3 punti in più.</p>
+  </section>
+
+  <section class="slide">
     <p class="eyebrow" data-a style="--d:.1">Cosa cambia</p>
     <div class="cmp">
-      <div data-a style="--d:.4;--anim:left"><p>Prima</p><b>0</b><span>punti per chi faceva la domanda</span></div>
-      <div class="new" data-a style="--d:.8;--anim:right"><p>Da novembre</p><b>+3</b><span>se fate la domanda e poi andate</span></div>
+      <div data-a style="--d:.4;--anim:left"><p>Prima</p><b>0</b><span>per chi faceva la domanda</span></div>
+      <div class="new" data-a style="--d:.7;--anim:right"><p>Da novembre</p><b>+3</b><span>se la fate per primi e poi andate</span></div>
+      <div data-a style="--d:1;--anim:left"><p>Prima</p><b>10</b><span>per ogni ingresso, sempre</span></div>
+      <div class="new" data-a style="--d:1.3;--anim:right"><p>Da novembre</p><b>13</b><span>per ogni ingresso oltre l'obiettivo</span></div>
     </div>
     <ul class="rules">
-      <li data-a style="--d:1.3">Vale solo per il primo che chiede</li>
-      <li data-a style="--d:1.6">Una volta per giorno</li>
-      <li data-a style="--d:1.9">Conta il check-in del giorno della domanda</li>
+      <li data-a style="--d:1.8">Apripista: solo il primo che chiede, una volta per giorno</li>
+      <li data-a style="--d:2.1">Tutto il resto resta com'è</li>
     </ul>
     <p class="hint" data-a style="--d:2.6">Tocca per chiudere</p>
   </section>

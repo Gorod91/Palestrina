@@ -5,3 +5,5 @@
 - Risposte all'utente in italiano, di lunghezza media.
 - Codici personali, ADMIN_SECRET, token e `.clasprc.json` non vanno mai scritti nel repo né letti se non serve.
 - Novità dormienti: aggiungerle in `NEWS` (`apps-script/Code.gs`), controllare la funzione con `featureOn('nome')` (punti da `featureFrom`), slide brevi in `public/news/<id>.html` nello stile della presentazione (vedi `public/news/2026-11.html`). Provarle con la modalità prova → "Simula il rilascio delle novità".
+- **Slide delle novità: usare sempre lo stile di `public/news/2026-11.html`**: a storia (barre in alto, tocco per avanzare, × per chiudere), sfondo nero, Inter, titoli grandi con gradiente lime/azzurro/rosa, animazioni che partono a ogni slide, 3-4 slide brevi con un'ultima "Cosa cambia" (prima / da ora). Dare del "voi".
+- Obiettivo settimanale: oggi 2 ingressi per tutti (colonna C del foglio Utenti).

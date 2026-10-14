@@ -192,6 +192,7 @@ function render() {
   $('test-mode').checked = testOn();
   $('test-tools').hidden = !testOn();
   $('rule-apripista').hidden = !(state.features && state.features.apripista);
+  $('rule-oltre').hidden = !(state.features && state.features.oltre);
   $('viewport-card').hidden = !debugOn();
   if (debugOn()) renderViewportDebug();
   $('chat-notify').checked = !me.chatMuted;
