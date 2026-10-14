@@ -806,7 +806,7 @@ function renderAdmin() {
 $('btn-admin').addEventListener('click', openAdmin);
 
 // Margini in alto su iPhone (debug): per trovare dove iOS smette di sfocare. Salvati solo su questo telefono.
-const IOS_MARGINS = { 'ios-top': 28, 'ios-chat': 36 };
+const IOS_MARGINS = { 'ios-top': 0, 'ios-chat': 22 };
 function applyIosMargins() {
   Object.keys(IOS_MARGINS).forEach((k) => {
     const v = store.get(k);
