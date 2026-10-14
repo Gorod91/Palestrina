@@ -223,6 +223,12 @@
         </section>
         <p class="footnote">La domanda "chi va in palestra oggi?" arriva comunque a tutti.</p>
 
+        <div id="admin-card" hidden>
+          <h2 class="section">Admin</h2>
+          <section class="card list"><button id="btn-admin" class="row">Registro admin</button></section>
+          <p class="footnote">Annulla o ripristina check-in, Sudometro, messaggi, risposte e penalità di tutti, e aggiungi check-in dimenticati. Nessuna notifica parte.</p>
+        </div>
+
         <div id="debug-mode-card" hidden>
           <h2 class="section">Sviluppatore</h2>
           <section class="card list">
@@ -283,6 +289,21 @@
   <div id="timer-alarm" class="timer-alarm" hidden>
     <p class="alarm-title">Tempo!</p>
     <p>Tocca per fermare</p>
+  </div>
+
+  <!-- Registro admin -->
+  <div id="admin-sheet" class="sheet" hidden>
+    <div class="sheet-card" role="dialog" aria-labelledby="admin-title">
+      <div class="sheet-head"><h3 id="admin-title">Registro admin</h3><button class="sheet-close" aria-label="Chiudi">×</button></div>
+      <div id="admin-filters" class="admin-filters"></div>
+      <form id="admin-add" class="admin-add" hidden>
+        <select id="admin-add-name"></select>
+        <input id="admin-add-day" type="date">
+        <input id="admin-add-time" type="time" value="18:00">
+        <button type="submit" class="primary small">Aggiungi check-in</button>
+      </form>
+      <div id="admin-list"></div>
+    </div>
   </div>
 
   <!-- Foto a tutto schermo -->

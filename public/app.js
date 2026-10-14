@@ -179,6 +179,7 @@ function render() {
   renderGallery();
   $('ref-card').hidden = !me.reference;
   $('debug-mode-card').hidden = !me.debug;
+  $('admin-card').hidden = !me.admin;
   $('debug-mode').checked = debugOn();
   $('fake-mode').checked = fakeOn();
   document.body.classList.toggle('fake-data', fakeOn());
@@ -659,6 +660,140 @@ async function enableNotifications() {
   }
   updateNotifyCard();
 }
+
+// ---------- Registro admin ----------
+
+const ADMIN_FILTERS = [
+  ['tutto', 'Tutto'], ['presenza', 'Check-in'], ['sudometro', 'Sudometro'], ['chat', 'Chat'],
+  ['piano', 'Risposte'], ['penalita', 'Penalità'], ['annullati', 'Annullati'], ['aggiungi', 'Aggiungi check-in'],
+];
+let adminData = null;
+let adminFilter = 'tutto';
+
+const escHtml = (t) => String(t ?? '').replace(/[<&>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+/** "2026-10-14 06:29 Francesco" → "Annullato il 14/10 alle 06:29 da Francesco" */
+const undoneWhen = (at) => {
+  const [d, t, ...who] = String(at).split(' ');
+  return `Annullato il ${d.slice(8, 10)}/${d.slice(5, 7)} alle ${t}${who.length ? ' da ' + who.join(' ') : ''}`;
+};
+const dayTitle = (d) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+
+async function openAdmin() {
+  $('admin-sheet').hidden = false;
+  $('admin-list').innerHTML = `<div class="loading">${bicep()}<p>Carico il registro…</p></div>`;
+  renderAdminFilters();
+  await loadAdmin();
+}
+
+async function loadAdmin() {
+  try {
+    adminData = await realApi('adminLog');
+    renderAdmin();
+  } catch (err) {
+    $('admin-list').innerHTML = `<p class="muted">Errore: ${escHtml(err.message)}</p>`;
+  }
+}
+
+function renderAdminFilters() {
+  $('admin-filters').innerHTML = ADMIN_FILTERS.map(([k, label]) => `<button data-f="${k}" class="${k === adminFilter ? 'on' : ''}">${label}</button>`).join('');
+}
+
+function renderAdmin() {
+  if (!adminData) return;
+  const add = adminFilter === 'aggiungi';
+  $('admin-add').hidden = !add;
+  if (add) {
+    $('admin-add-name').innerHTML = adminData.users.map((u) => `<option value="${escHtml(u.name)}">${escHtml(u.display)}</option>`).join('');
+    const today = new Date();
+    const iso = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    $('admin-add-day').max = iso;
+    if (!$('admin-add-day').value) $('admin-add-day').value = iso;
+    $('admin-list').innerHTML = '<p class="muted">Il check-in aggiunto non manda notifiche e non compare in chat, ma conta per punti e classifiche.</p>';
+    return;
+  }
+  if (adminFilter === 'annullati') {
+    $('admin-list').innerHTML = adminData.undone.length
+      ? adminData.undone.map((u) => `<div class="admin-item"><div><b>${escHtml(u.text)}</b><span>${escHtml(undoneWhen(u.at))}</span></div><button class="restore" data-restore="${escHtml(u.id)}">Ripristina</button></div>`).join('')
+      : '<p class="muted">Nessuna azione annullata.</p>';
+    return;
+  }
+  const items = adminData.items.filter((i) => adminFilter === 'tutto' || i.kind === adminFilter);
+  let lastDay = '';
+  $('admin-list').innerHTML = items.length
+    ? items.map((i, n) => {
+        const head = i.day !== lastDay ? `<h4 class="admin-day">${escHtml(dayTitle(i.day))}</h4>` : '';
+        lastDay = i.day;
+        const label = i.kind === 'penalita' ? 'Condona' : 'Annulla';
+        return `${head}<div class="admin-item"><div><b>${escHtml(i.display)}${i.time ? ' · ' + escHtml(i.time) : ''}</b><span>${escHtml(i.text)}</span></div><button data-undo="${n}">${label}</button></div>`;
+      }).join('')
+    : '<p class="muted">Niente negli ultimi 31 giorni.</p>';
+  adminData.shown = items;
+}
+
+$('btn-admin').addEventListener('click', openAdmin);
+$('admin-sheet').addEventListener('click', async (e) => {
+  if (e.target === $('admin-sheet') || e.target.closest('.sheet-close')) {
+    $('admin-sheet').hidden = true;
+    return;
+  }
+  const f = e.target.closest('[data-f]');
+  if (f) {
+    adminFilter = f.dataset.f;
+    renderAdminFilters();
+    renderAdmin();
+    return;
+  }
+  const undo = e.target.closest('[data-undo]');
+  if (undo) {
+    const it = adminData.shown[Number(undo.dataset.undo)];
+    const what = it.kind === 'penalita' ? 'Condonare' : 'Annullare';
+    if (!confirm(`${what}?\n${it.display}: ${it.text}\n\nSi può ripristinare dal filtro "Annullati". Nessuna notifica.`)) return;
+    await withBusy(undo, '', async () => {
+      try {
+        const r = await realApi('adminUndo', { kind: it.kind, key: it.key });
+        toast(r.text ? `Annullato: ${r.text}` : 'Annullato');
+      } catch (err) {
+        toast(`Errore: ${err.message}`);
+      }
+      await loadAdmin();
+    });
+    refresh().then(() => chat.reload());
+    return;
+  }
+  const restore = e.target.closest('[data-restore]');
+  if (restore) {
+    if (!confirm('Ripristinare questa azione?')) return;
+    await withBusy(restore, '', async () => {
+      try {
+        await realApi('adminRestore', { id: restore.dataset.restore });
+        toast('Ripristinato');
+      } catch (err) {
+        toast(`Errore: ${err.message}`);
+      }
+      await loadAdmin();
+    });
+    refresh().then(() => chat.reload());
+  }
+});
+$('admin-add').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const name = $('admin-add-name').value;
+  const day = $('admin-add-day').value;
+  const time = $('admin-add-time').value;
+  if (!confirm(`Aggiungere un check-in a ${name}, ${day} alle ${time}?`)) return;
+  await withBusy($('admin-add').querySelector('button'), 'Aggiungo…', async () => {
+    try {
+      await realApi('adminAddCheckin', { name, day, time });
+      toast('Check-in aggiunto');
+      adminFilter = 'presenza';
+      renderAdminFilters();
+    } catch (err) {
+      toast(`Errore: ${err.message}`);
+    }
+    await loadAdmin();
+  });
+  refresh();
+});
 
 // ---------- Aggiornamento automatico ----------
 

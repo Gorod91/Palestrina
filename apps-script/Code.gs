@@ -22,10 +22,14 @@ const SHEETS = {
   piani: { name: 'Piani', header: ['Giorno', 'Nome', 'Risposta', 'Orario', 'Aggiornato'] },
   // Storico dei cambi di risposta, per le penalità (cambio all'ultimo, check-in senza avviso)
   cambi: { name: 'Cambi', header: ['Quando', 'Giorno', 'Nome', 'Da', 'A', 'Orario prima', 'Orario dopo'] },
+  // Azioni annullate dall'admin: le righe tolte restano qui (Dati, JSON) e si possono ripristinare
+  annullati: { name: 'Annullati', header: ['ID', 'Quando', 'Tipo', 'Descrizione', 'Dati', 'Ripristinato'] },
 };
 const DEFAULT_GOAL = 3;
 // Utenti con il pulsante di debug, oltre a quelli con "sì" nella colonna D di Utenti.
 const DEBUG_USERS = ['Francesco'];
+// Admin: può annullare e ripristinare le azioni di tutti (registro admin nelle Impostazioni).
+const ADMIN_USERS = ['Francesco'];
 const TZ = Session.getScriptTimeZone();
 const props = PropertiesService.getScriptProperties();
 
@@ -276,6 +280,15 @@ function doPost(e) {
         return json(saveSudometro(user, req));
       case 'subscribe':
         return json(saveSubscription(user, req.subscription));
+      case 'adminLog':
+      case 'adminUndo':
+      case 'adminRestore':
+      case 'adminAddCheckin':
+        if (!user.admin) return json({ error: 'Solo per l\'admin' });
+        if (req.action === 'adminLog') return json(adminLog());
+        if (req.action === 'adminUndo') return json(adminUndo(user, req.kind, req.key));
+        if (req.action === 'adminRestore') return json(adminRestore(req.id));
+        return json(adminAddCheckin(req.name, req.day, req.time));
       default:
         return json({ error: 'Azione sconosciuta' });
     }
@@ -513,6 +526,7 @@ function buildState(user) {
       alias: user.alias,
       goal: user.goal,
       debug: user.debug,
+      admin: user.admin,
       checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
       sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title, photoId: mySudoToday.photoId } : null,
       reference: getReference(user),
@@ -905,6 +919,203 @@ function chatDelete(user, id) {
   return chatState(user, -1);
 }
 
+// ---------- Admin: annullare e ripristinare le azioni di tutti ----------
+
+const ADMIN_DAYS = 31;
+const shortDay = (d) => `${String(d).slice(8, 10)}/${String(d).slice(5, 7)}`;
+// Fogli che si possono riordinare dopo un ripristino (colonne di data e ora)
+const SORT_COLUMNS = { presenze: [1, 2], sudometro: [1, 2], chat: [2, 3], cambi: [1] };
+
+/** Penalità condonate dall'admin: "tipo|nome|giorno" → true. */
+function condoni() {
+  return memo('condoni', () => {
+    const list = safeJson(props.getProperty('CONDONI') || '[]');
+    const out = {};
+    (Array.isArray(list) ? list : []).forEach((k) => (out[k] = true));
+    return out;
+  });
+}
+
+function setCondono(key, on) {
+  const list = Object.keys(condoni()).filter((k) => k !== key);
+  if (on) list.push(key);
+  props.setProperty('CONDONI', JSON.stringify(list));
+  forget('condoni');
+}
+
+/** Tutto quello che l'admin può annullare negli ultimi 31 giorni, più le azioni già annullate. */
+function adminLog() {
+  const from = addDays(dayString(new Date()), -(ADMIN_DAYS - 1));
+  const dn = displayNames();
+  const items = [];
+  const push = (it) => items.push({ ...it, display: dn(it.name) });
+  rows('presenze').filter((r) => r.day >= from).forEach((r) => push({ kind: 'presenza', key: `${r.day}|${r.time}|${r.name}`, day: r.day, time: r.time, name: r.name, text: 'Check-in' }));
+  sheetRaw('sudometro').getDataRange().getDisplayValues().slice(1).forEach((r) => {
+    if (r[6] || r[0] < from) return; // prove di debug escluse
+    push({ kind: 'sudometro', key: `${r[0]}|${r[1]}|${r[2]}`, day: r[0], time: r[1], name: r[2], text: `Sudometro ${r[3]} · ${r[4]}`, photoId: r[7] || '' });
+  });
+  sheetRaw('chat').getDataRange().getDisplayValues().slice(1).forEach((r) => {
+    if (r[1] < from) return;
+    const type = r[4];
+    if (type === 'msg') push({ kind: 'chat', key: r[0], day: r[1], time: r[2], name: r[3], text: `Messaggio: ${r[5]}` });
+    if (type === 'poll') push({ kind: 'chat', key: r[0], day: r[1], time: r[2], name: r[3], text: `Domanda: ${r[5]} (con le risposte)` });
+    if (type === 'event') {
+      const data = safeJson(r[5]) || {};
+      if (data.kind === 'checkin' || data.kind === 'sudometro') return; // si annullano con il check-in o il Sudometro
+      push({ kind: 'chat', key: r[0], day: r[1], time: r[2], name: r[3] || 'Palestrina', text: `Evento in chat: ${data.kind || '?'}` });
+    }
+  });
+  rows('piani').filter((r) => r.day >= from).forEach((r) => push({ kind: 'piano', key: `${r.day}|${r.name}`, day: r.day, time: r.time || '', name: r.name, text: `Risposta per il ${shortDay(r.day)}: ${CHOICE_LABELS[r.choice] || r.choice}${r.time ? ' alle ' + r.time : ''}` }));
+  const months = [from.slice(0, 7), dayString(new Date()).slice(0, 7)].filter((m, i, a) => a.indexOf(m) === i);
+  months.forEach((m) => computePoints(m).forEach((t) => (t.penalties || []).forEach((p) => {
+    if (p.day >= from) push({ kind: 'penalita', key: `${p.key}|${t.name}|${p.day}`, day: p.day, time: '', name: t.name, text: `Penalità: ${p.label} (${p.pts})` });
+  })));
+  const undone = sheetRaw('annullati').getDataRange().getDisplayValues().slice(1)
+    .filter((r) => !r[5])
+    .map((r) => ({ id: r[0], at: r[1], kind: r[2], text: r[3] }))
+    .reverse();
+  items.sort((a, b) => (a.day + a.time < b.day + b.time ? 1 : -1));
+  return { items, undone, users: allUsers().map((u) => ({ name: u.name, display: u.display })) };
+}
+
+/** Righe (1-based, con valori mostrati) di un foglio che soddisfano `match`. */
+function findRows(key, match) {
+  const out = [];
+  sheetRaw(key).getDataRange().getDisplayValues().forEach((r, i) => {
+    if (i > 0 && match(r)) out.push({ row: i + 1, values: r });
+  });
+  return out;
+}
+
+/** Annulla un'azione: le righe coinvolte passano nel foglio Annullati. Nessuna notifica. */
+function adminUndo(admin, kind, key) {
+  const k = String(key || '');
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const take = []; // { sheet, row, values }
+    const photos = [];
+    let text = '';
+    let condono = '';
+    const add = (sheetKey, list) => list.forEach((x) => take.push({ sheet: sheetKey, ...x }));
+    const chatEvents = (day, name, eventKind) => findRows('chat', (r) => r[4] === 'event' && r[1] === day && r[3] === name && (safeJson(r[5]) || {}).kind === eventKind);
+    if (kind === 'presenza') {
+      const [day, time, name] = k.split('|');
+      const found = findRows('presenze', (r) => r[0] === day && r[1] === time && r[2] === name);
+      if (!found.length) return { error: 'Check-in non trovato' };
+      add('presenze', found);
+      // l'evento in chat va via solo se non resta un altro check-in di quel giorno
+      const others = findRows('presenze', (r) => r[0] === day && r[2] === name).length - found.length;
+      if (!others) add('chat', chatEvents(day, name, 'checkin'));
+      text = `Check-in di ${name}, ${shortDay(day)} ${time}`;
+    } else if (kind === 'sudometro') {
+      const [day, time, name] = k.split('|');
+      const found = findRows('sudometro', (r) => !r[6] && r[0] === day && r[1] === time && r[2] === name);
+      if (!found.length) return { error: 'Sudometro non trovato' };
+      add('sudometro', found);
+      add('chat', chatEvents(day, name, 'sudometro'));
+      found.forEach((f) => f.values[7] && photos.push(f.values[7]));
+      text = `Sudometro di ${name}, ${shortDay(day)} ${time} (${found[0].values[3]})`;
+    } else if (kind === 'chat') {
+      const found = findRows('chat', (r) => r[0] === k);
+      if (!found.length) return { error: 'Messaggio non trovato' };
+      const r = found[0].values;
+      add('chat', found);
+      if (r[4] === 'poll') {
+        add('chat', findRows('chat', (x) => x[4] === 'answer' && x[6] === k));
+        const day = pollDay({ ref: r[6], day: r[1] });
+        add('piani', findRows('piani', (x) => x[0] === day));
+      }
+      text = `${r[4] === 'poll' ? 'Domanda' : r[4] === 'event' ? 'Evento' : 'Messaggio'} di ${r[3] || 'Palestrina'}, ${shortDay(r[1])} ${r[2]}: ${String(r[5]).slice(0, 60)}`;
+    } else if (kind === 'piano') {
+      const [day, name] = k.split('|');
+      const found = findRows('piani', (r) => r[0] === day && r[1] === name);
+      if (!found.length) return { error: 'Risposta non trovata' };
+      add('piani', found);
+      text = `Risposta di ${name} per il ${shortDay(day)}: ${CHOICE_LABELS[found[0].values[2]] || found[0].values[2]}`;
+    } else if (kind === 'penalita') {
+      const [pk, name, day] = k.split('|');
+      if (condoni()[k]) return { error: 'Già condonata' };
+      setCondono(k, true);
+      condono = k;
+      text = `Penalità condonata a ${name}: ${pk}, ${shortDay(day)}`;
+    } else {
+      return { error: 'Tipo non valido' };
+    }
+    // Dal fondo di ogni foglio, così gli indici restano validi
+    take.slice().sort((a, b) => b.row - a.row).forEach((t) => sheet(t.sheet).deleteRow(t.row));
+    photos.forEach((id) => {
+      try {
+        DriveApp.getFileById(id).setTrashed(true);
+      } catch (err) {
+        console.error('Foto non spostata nel cestino', err);
+      }
+    });
+    const data = { rows: take.map((t) => ({ sheet: t.sheet, values: t.values })), photos, condono };
+    const id = newId();
+    sheet('annullati').appendRow([id, Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm') + ' ' + admin.name, kind, text, JSON.stringify(data), '']);
+    if (take.some((t) => t.sheet === 'chat' || t.sheet === 'piani')) bumpChat();
+    return { ok: true, id, text };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Rimette al loro posto le righe di un'azione annullata. */
+function adminRestore(id) {
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const found = findRows('annullati', (r) => r[0] === String(id || ''));
+    if (!found.length) return { error: 'Azione non trovata' };
+    if (found[0].values[5]) return { error: 'Già ripristinata' };
+    const data = safeJson(found[0].values[4]) || {};
+    const touched = {};
+    (data.rows || []).forEach((r) => {
+      const sh = sheet(r.sheet);
+      sh.appendRow(r.values.slice(0, SHEETS[r.sheet].header.length));
+      touched[r.sheet] = true;
+    });
+    Object.keys(touched).forEach((key) => {
+      const cols = SORT_COLUMNS[key];
+      const sh = sheet(key);
+      if (cols && sh.getLastRow() > 2) sh.getRange(2, 1, sh.getLastRow() - 1, SHEETS[key].header.length).sort(cols.map((c) => ({ column: c, ascending: true })));
+    });
+    (data.photos || []).forEach((pid) => {
+      try {
+        DriveApp.getFileById(pid).setTrashed(false);
+      } catch (err) {
+        console.error('Foto non ripristinata', err);
+      }
+    });
+    if (data.condono) setCondono(data.condono, false);
+    sheet('annullati').getRange(found[0].row, 6).setValue(Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm'));
+    if (touched.chat || touched.piani) bumpChat();
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Check-in aggiunto a mano (anche per giorni passati): senza notifiche e senza evento in chat. */
+function adminAddCheckin(name, day, time) {
+  const user = allUsers().find((u) => u.name === name);
+  if (!user) return { error: 'Utente non trovato' };
+  if (!/^\d{4}-\d\d-\d\d$/.test(String(day)) || String(day) > dayString(new Date())) return { error: 'Giorno non valido' };
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(time))) return { error: 'Orario non valido' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    if (rows('presenze').some((r) => r.day === day && r.name === name)) return { error: 'Quel giorno ha già un check-in' };
+    const sh = sheet('presenze');
+    sh.appendRow([day, time, name, 'admin']);
+    if (sh.getLastRow() > 2) sh.getRange(2, 1, sh.getLastRow() - 1, SHEETS.presenze.header.length).sort([{ column: 1, ascending: true }, { column: 2, ascending: true }]);
+    return { ok: true };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ---------- Foto su Drive ----------
 
 /** Salva un JPEG (base64) nella cartella dell'utente. Un errore non blocca il resto. */
@@ -1056,6 +1267,7 @@ function computePoints(month) {
   const piani = {};
   rows('piani').forEach((r) => (piani[r.day + '|' + r.name] = r));
   const cambi = rows('cambi');
+  const condoned = condoni();
   const monthStart = month + '-01';
   const mondays = [];
   for (let d = monthStart; inMonth(d); d = addDays(d, 1)) if (weekKey(d) === d) mondays.push(d);
@@ -1089,35 +1301,41 @@ function computePoints(month) {
     // Penalità (da quando esistono)
     const today = dayString(new Date());
     const penFrom = penaltiesFrom();
+    const penalties = [];
+    const pen = (key, label, pts, day) => {
+      if (condoned[`${key}|${u.name}|${day}`]) return;
+      add(key, label, pts);
+      penalties.push({ key, label, pts, day });
+    };
     const myCambi = cambi.filter((c) => c.name === u.name);
     for (let day = monthStart; inMonth(day) && day <= today; day = addDays(day, 1)) {
       if (day < penFrom) continue;
       const plan = piani[day + '|' + u.name];
       const came = first[u.name + '|' + day];
       if (!came) {
-        if (day < today && plan && plan.choice === 'si') add('bidone', 'Bidone', P.bidone);
+        if (day < today && plan && plan.choice === 'si') pen('bidone', 'Bidone', P.bidone, day);
         else {
           // Cambio all'ultimo: da "ci sono" ad altro a meno di 4 ore dall'orario (senza orario: dalle 14 di quel giorno)
           const late = myCambi.some((c) => c.day === day && c.from === 'si' && c.to !== 'si' && c.at >= `${day} ${c.timeBefore ? hhmmMinus(c.timeBefore, P.cambioOre * 60) : P.cambioSenzaOrario}`);
-          if (late) add('cambio', 'Cambio all\'ultimo', P.cambioUltimo);
+          if (late) pen('cambio', 'Cambio all\'ultimo', P.cambioUltimo, day);
         }
         continue;
       }
-      if (plan && plan.choice === 'si' && plan.time && minutes(came.time) > minutes(plan.time) + P.ritardoMinuti) add('ritardo', 'Ritardo', P.ritardo);
+      if (plan && plan.choice === 'si' && plan.time && minutes(came.time) > minutes(plan.time) + P.ritardoMinuti) pen('ritardo', 'Ritardo', P.ritardo, day);
       const told = myCambi.filter((c) => c.day === day && (c.to === 'si' || c.to === 'forse')).map((c) => c.at).sort()[0];
-      if (!told || told > `${day} ${hhmmMinus(came.time, P.avvisoMinuti)}`) add('avviso', 'Check-in senza avvisare', P.senzaAvviso);
+      if (!told || told > `${day} ${hhmmMinus(came.time, P.avvisoMinuti)}`) pen('avviso', 'Check-in senza avvisare', P.senzaAvviso, day);
     }
     // Settimana a vuoto: settimane finite (domenica nel mese) senza presenze, per chi c'era già
     const firstEver = mine.length ? mine[0].day : null;
     for (let w = weekKey(monthStart); w <= addDays(monthStart, 31); w = addDays(w, 7)) {
       const sunday = addDays(w, 6);
       if (!inMonth(sunday) || sunday >= today || w < penFrom || !firstEver || firstEver >= w) continue;
-      if (countInWeek(pres, u.name, w) === 0) add('vuota', 'Settimana a vuoto', P.settimanaVuota);
+      if (countInWeek(pres, u.name, w) === 0) pen('vuota', 'Settimana a vuoto', P.settimanaVuota, w);
     }
     if (early >= P.mattinieroVolte) add('mattiniero', 'Mattiniero', P.mattiniero, true);
     if (friends >= P.brancoVolte) add('branco', 'Branco', P.branco, true);
     if (mondays.length && mondays.every((w) => countInWeek(pres, u.name, w) >= u.goal)) add('maiSaltato', 'Mai saltato', P.maiSaltato, true);
-    return { name: u.name, display: u.display, items };
+    return { name: u.name, display: u.display, items, penalties };
   });
 
   const top = sudo.reduce((m, r) => Math.max(m, r.score), -1);
@@ -1137,7 +1355,7 @@ function computePoints(month) {
         g.pts += it.pts;
       });
       const detail = Object.keys(groups).map((k) => groups[k]);
-      return { name: t.name, display: t.display, total: detail.reduce((a, g) => a + g.pts, 0), detail };
+      return { name: t.name, display: t.display, total: detail.reduce((a, g) => a + g.pts, 0), detail, penalties: t.penalties };
     })
     .sort((a, b) => b.total - a.total || a.display.localeCompare(b.display));
 }
@@ -1278,6 +1496,7 @@ function readUsers() {
       debug: DEBUG_USERS.includes(String(r[0]).trim()) || r[3] === true || /^(s[iì]|x|true|1)$/i.test(String(r[3]).trim()),
       // Colonna E: alias scelto dall'utente. Il nome in colonna A resta la chiave di tutti i dati.
       alias: String(r[4] || '').trim(),
+      admin: ADMIN_USERS.includes(String(r[0]).trim()),
     }))
     .map((u) => ({ ...u, display: u.alias || u.name }));
 }

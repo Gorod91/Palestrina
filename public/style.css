@@ -496,3 +496,21 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 .poll-ev-choices[hidden] { display: none; }
 .poll-ev-choices .choice { flex: 1; margin: 0; padding: 7px 0; font-size: 14px; }
 .poll-ev-sum { margin-top: 6px !important; font-size: 12px; color: var(--muted); }
+
+/* Registro admin */
+.admin-filters { display: flex; gap: 6px; overflow-x: auto; margin: 14px -18px 10px; padding: 0 18px; scrollbar-width: none; }
+.admin-filters::-webkit-scrollbar { display: none; }
+.admin-filters button { flex: none; padding: 7px 13px; border: 0; border-radius: 999px; background: var(--card-2); color: var(--fg); font-size: 14px; }
+.admin-filters button.on { background: var(--fg); color: var(--bg); }
+.admin-add { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+.admin-add select, .admin-add input { width: 100%; margin: 0; padding: 10px; border: 0; border-radius: 10px; background: var(--card-2); color: var(--fg); font-size: 15px; text-transform: none; letter-spacing: 0; }
+.admin-add select { grid-column: 1 / -1; }
+.admin-add button { grid-column: 1 / -1; width: 100%; }
+.admin-day { margin: 16px 0 4px; font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.admin-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--card-2); }
+.admin-item div { flex: 1; min-width: 0; }
+.admin-item b { display: block; font-size: 15px; }
+.admin-item span { display: block; font-size: 14px; color: var(--muted); overflow-wrap: anywhere; }
+.admin-item button { flex: none; padding: 7px 12px; border: 0; border-radius: 999px; background: var(--card-2); color: var(--danger); font-size: 14px; }
+.admin-item button.restore { color: var(--exercise); }
+.admin-item button.with-bicep { display: inline-flex; align-items: center; }
