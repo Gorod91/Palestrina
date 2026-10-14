@@ -191,6 +191,7 @@ function render() {
   document.body.classList.toggle('test-mode', testOn());
   $('test-mode').checked = testOn();
   $('test-tools').hidden = !testOn();
+  $('rule-apripista').hidden = !(state.features && state.features.apripista);
   $('viewport-card').hidden = !debugOn();
   if (debugOn()) renderViewportDebug();
   $('chat-notify').checked = !me.chatMuted;
@@ -578,7 +579,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
-const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN });
+const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews });
 
 // ---------- Tab ----------
 
@@ -669,6 +670,21 @@ async function enableNotifications() {
   }
   updateNotifyCard();
 }
+
+// ---------- Novità (slide a tutto schermo) ----------
+
+function openNews(id) {
+  if (!/^[\w-]+$/.test(String(id))) return;
+  $('news-frame').src = `news/${id}.html`;
+  $('news').hidden = false;
+}
+function closeNews() {
+  $('news').hidden = true;
+  $('news-frame').src = 'about:blank';
+}
+window.addEventListener('message', (e) => {
+  if (e.origin === location.origin && e.data && e.data.palestrinaNews === 'close') closeNews();
+});
 
 // ---------- Registro admin ----------
 
@@ -762,6 +778,7 @@ $('btn-test-reset').addEventListener('click', () => {
   if (confirm('Riallineare la prova ai dati veri? Tutto quello fatto in prova viene cancellato.')) testAction($('btn-test-reset'), 'Riallineo…', ['testReset'], 'Prova riallineata ai dati veri');
 });
 $('btn-test-weekly').addEventListener('click', () => testAction($('btn-test-weekly'), 'Invio…', ['testRecap', { kind: 'weekly' }], 'Recap della settimana simulato'));
+$('btn-test-news').addEventListener('click', () => testAction($('btn-test-news'), 'Rilascio…', ['testRecap', { kind: 'news' }], 'Novità rilasciate nella prova: guarda la chat'));
 $('btn-test-monthly').addEventListener('click', () => testAction($('btn-test-monthly'), 'Invio…', ['testRecap', { kind: 'monthly' }], 'Premiazioni del mese simulate'));
 $('admin-sheet').addEventListener('click', async (e) => {
   if (e.target === $('admin-sheet') || e.target.closest('.sheet-close')) {

@@ -141,7 +141,7 @@ function autorizzaDrive() {
   Logger.log('Cartella foto: ' + photosRoot().getUrl());
 }
 
-const TRIGGERS_VERSION = '3';
+const TRIGGERS_VERSION = '4';
 
 /**
  * Recap ogni domenica alle 19 e premiazioni del mese l'ultimo giorno del mese alle 21 (fuso orario dello script).
@@ -155,7 +155,7 @@ function ensureTriggers(force) {
     .forEach((t) => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('sendWeeklyRecap').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(19).create();
   // Apps Script non ha "ultimo giorno del mese": controllo ogni sera alle 21
-  ScriptApp.newTrigger('eveningCheck').timeBased().everyDays(1).atHour(21).create();
+  ScriptApp.newTrigger('eveningCheck').timeBased().everyDays(1).atHour(21).nearMinute(5).create();
   props.setProperty('TRIGGERS_VERSION', TRIGGERS_VERSION);
 }
 
@@ -221,7 +221,65 @@ function computeRecap(from, to) {
 /** Ogni sera alle 21: se domani è il primo del mese, premiazioni del mese e Re del mese. */
 function eveningCheck() {
   const today = dayString(new Date());
-  if (addDays(today, 1).slice(8) === '01') sendMonthlyRecap();
+  if (addDays(today, 1).slice(8) !== '01') return;
+  sendMonthlyRecap();
+  releaseNews(today.slice(0, 7)); // le novità si sbloccano subito dopo l'incoronazione del Re
+}
+
+// ---------- Novità dormienti ----------
+// Una novità resta invisibile finché non viene rilasciata: l'ultimo giorno di `month`, subito dopo le premiazioni
+// del mese (eveningCheck, verso le 21:05), con le slide in chat (public/news/<id>.html) e una notifica a tutti.
+// I punti nuovi contano dal giorno `from`. In modalità prova si rilascia in anticipo e contano da subito.
+const NEWS = [
+  {
+    id: '2026-11',
+    month: '2026-10',
+    from: '2026-11-01',
+    features: ['apripista'],
+    title: 'Novità di novembre',
+    body: 'Apripista: chi chiede per primo "chi va in palestra?" e poi ci va prende +3 punti. Tocca per vedere.',
+  },
+];
+
+function releasedNews() {
+  return memo('news', () => {
+    const list = safeJson(props.getProperty('NEWS_RELEASED') || '[]');
+    return Array.isArray(list) ? list : [];
+  });
+}
+
+function featureOn(feature) {
+  return NEWS.some((n) => n.features.includes(feature) && releasedNews().includes(n.id));
+}
+
+/** Da che giorno contano i punti di una funzione (in prova da subito). */
+function featureFrom(feature) {
+  const n = NEWS.find((x) => x.features.includes(feature));
+  return TEST || !n ? '' : n.from;
+}
+
+/** Rilascia le novità di un mese (tutte quelle in attesa se month è vuoto): evento in chat e notifica. */
+function releaseNews(month) {
+  NEWS.filter((n) => (!month || n.month === month) && !releasedNews().includes(n.id)).forEach((n) => {
+    props.setProperty('NEWS_RELEASED', JSON.stringify(releasedNews().concat(n.id)));
+    forget('news');
+    addChatEvent('', { kind: 'news', id: n.id, title: n.title, body: n.body });
+    dispatch('news', n.id);
+  });
+}
+
+/** Paracadute se il trigger delle 21 non è partito: rilascia dopo le premiazioni, o comunque dalle 23 o dal mese dopo. */
+function ensureNews() {
+  const today = dayString(new Date());
+  const lastDay = addDays(today, 1).slice(8) === '01';
+  const hour = Number(Utilities.formatDate(new Date(), TZ, 'HH'));
+  const monthly = safeJson(props.getProperty('LAST_MONTHLY') || '{}') || {};
+  NEWS.forEach((n) => {
+    if (releasedNews().includes(n.id)) return;
+    const late = today.slice(0, 7) > n.month;
+    const due = today.slice(0, 7) === n.month && lastDay && (monthly.key === n.month || hour >= 23);
+    if (late || due) releaseNews(n.month);
+  });
 }
 
 function weekRecap() {
@@ -295,6 +353,11 @@ function doPost(e) {
       console.error('Trigger non aggiornati', err);
     }
     ensureReset();
+    try {
+      ensureNews();
+    } catch (err) {
+      console.error('Novità non rilasciate', err);
+    }
     const user = findUserByCode(req.code);
     if (!user) return json({ error: 'Codice non valido' });
     if (req.test === true && user.admin) {
@@ -344,6 +407,10 @@ function doPost(e) {
         if (req.kind === 'monthly') {
           props.deleteProperty('LAST_MONTHLY'); // nella prova le premiazioni del mese si possono rifare
           sendMonthlyRecap();
+        } else if (req.kind === 'news') {
+          props.deleteProperty('NEWS_RELEASED'); // nella prova il rilascio si può ripetere
+          forget('news');
+          releaseNews('');
         } else sendWeeklyRecap();
         return json({ ok: true });
       case 'setTimer': {
@@ -621,6 +688,7 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
+    features: { apripista: featureOn('apripista') },
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
@@ -717,6 +785,12 @@ function buildNotifications(event, name) {
     return subs.filter((s) => s.name === poll.name).map((s) => ({ subscription: s.sub, title, body: `Chi va in palestra ${dayLabel(last.day)}?`, tab: 'chat' }));
   }
 
+  if (event === 'news') {
+    const n = NEWS.find((x) => x.id === name);
+    if (!n) return [];
+    return subs.map((s) => ({ subscription: s.sub, title: n.title, body: n.body, tab: 'chat' }));
+  }
+
   if (event === 'recap') {
     const body = recapText(weekRecap(), 'della settimana');
     return subs.map((s) => ({ subscription: s.sub, title: 'Premiazioni della settimana', body, tab: 'chat' }));
@@ -781,6 +855,19 @@ function newId() {
 /** Giorno a cui si riferisce una domanda: Rif (domande per i giorni dopo) o il giorno in cui è stata fatta. */
 function pollDay(r) {
   return /^\d{4}-\d\d-\d\d$/.test(r.ref) ? r.ref : r.day;
+}
+
+/** Tutte le domande "chi va in palestra?" (non solo quelle degli ultimi giorni): la prima per ogni giorno. */
+function allPolls() {
+  return memo('chat:polls', () => {
+    const out = {};
+    sheetRaw('chat').getDataRange().getValues().slice(1).forEach((r) => {
+      if (String(r[4]) !== 'poll') return;
+      const day = pollDay({ ref: r[6] instanceof Date ? dayString(r[6]) : String(r[6]), day: toDay(r[1]) });
+      if (!out[day]) out[day] = { day, name: String(r[3]) };
+    });
+    return Object.keys(out).map((k) => out[k]);
+  });
 }
 
 function pollFor(day) {
@@ -1325,6 +1412,7 @@ const POINTS = {
   mattiniero: 10,
   branco: 10,
   pomodoro: 10,
+  apripista: 3, // novità di novembre 2026: primo a chiedere "chi va in palestra?" per un giorno e poi check-in
   // Penalità
   bidone: -10, // "ci sono" e poi niente check-in quel giorno
   cambioUltimo: -5, // da "ci sono" a forse/no (o tolto) a meno di 4 ore dall'orario, senza poi venire
@@ -1396,6 +1484,12 @@ function computePoints(month) {
       if (r.time && r.time < P.mattinieroPrima) early++;
     });
     sudo.filter((r) => r.name === u.name).forEach((r) => add('sudometro', 'Sudometro', r.score > 66 ? 3 : r.score > 33 ? 2 : 1));
+    if (featureOn('apripista')) {
+      const from = featureFrom('apripista');
+      allPolls().forEach((q) => {
+        if (q.name === u.name && inMonth(q.day) && q.day >= from && first[u.name + '|' + q.day]) add('apripista', 'Apripista', P.apripista);
+      });
+    }
     // Settimane di fila: il bonus arriva nel giorno in cui si raggiunge l'obiettivo
     for (let w = weekKey(monthStart); w <= addDays(monthStart, 31); w = addDays(w, 7)) {
       const days = mine.filter((r) => weekKey(r.day) === w).map((r) => r.day);

@@ -4,13 +4,13 @@ name: Notifiche
 # oppure a mano da Actions → Notifiche → Run workflow.
 on:
   repository_dispatch:
-    types: [checkin, sudometro, recap, monthly, test, chat, poll, answer]
+    types: [checkin, sudometro, recap, monthly, test, chat, poll, answer, news]
   workflow_dispatch:
     inputs:
       event:
         description: Evento
         type: choice
-        options: [recap, monthly, test, checkin, sudometro, chat, poll, answer]
+        options: [recap, monthly, test, checkin, sudometro, chat, poll, answer, news]
         default: recap
       name:
         description: Nome (per test, checkin, sudometro)

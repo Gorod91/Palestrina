@@ -236,6 +236,7 @@
           <section id="test-tools" class="card list" hidden>
             <button id="btn-test-weekly" class="row">Simula il recap della settimana</button>
             <button id="btn-test-monthly" class="row">Simula le premiazioni del mese</button>
+            <button id="btn-test-news" class="row">Simula il rilascio delle novità</button>
             <button id="btn-test-reset" class="row destructive">Riallinea la prova ai dati veri</button>
           </section>
         </div>
@@ -327,6 +328,7 @@
           <li><div><b>Presenza</b><span>Un check-in al giorno</span></div><em>10</em></li>
           <li><div><b>Sudometro</b><span>In base al punteggio: fino a 33, fino a 66, oltre</span></div><em>1 · 2 · 3</em></li>
           <li><div><b>Bonus amici</b><span>Check-in a meno di un'ora da quello di un altro, una volta al giorno</span></div><em>3</em></li>
+          <li id="rule-apripista" hidden><div><b>Apripista</b><span>Primo a chiedere "chi va in palestra?" per un giorno, e quel giorno fai check-in</span></div><em>3</em></li>
           <li><div><b>Settimane di fila</b><span>Per ogni settimana consecutiva con l'obiettivo raggiunto, oltre la prima</span></div><em>+5, max 20</em></li>
           <li><div><b>Rientro</b><span>Dopo più di 10 giorni senza palestra la presenza vale doppio</span></div><em>10</em></li>
       </ul>
@@ -352,6 +354,9 @@
       <p class="muted">L'albo d'oro è in fondo alla Classifica.</p>
     </div>
   </div>
+
+  <!-- Novità: slide a tutto schermo (public/news/<id>.html) -->
+  <div id="news" class="news-viewer" hidden><iframe id="news-frame" title="Novità" src="about:blank"></iframe></div>
 
   <div id="viewer" class="viewer" hidden>
     <div class="viewer-pair">

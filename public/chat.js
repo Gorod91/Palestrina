@@ -21,7 +21,7 @@ const CHOICES = [
   ['no', 'No'],
 ];
 
-export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown }) {
+export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown, openNews }) {
   let me = null; // { name, display }
   let v = 0; // versione dei dati in Apps Script
   let data = null; // { messages, poll, names }
@@ -529,6 +529,14 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       row.classList.add('award');
       row.append(el('p', 'event-title', 'Medaglia vinta'));
       row.append(el('p', 'event-text', `${name}: ${d.title} (+${d.pts} punti)`));
+    } else if (d.kind === 'news') {
+      // Novità sbloccate: le slide si aprono a tutto schermo
+      row.classList.add('award', 'news');
+      row.append(el('p', 'event-title', d.title || 'Novità'));
+      row.append(el('p', 'event-text', d.body || ''));
+      const btn = el('button', 'primary small', 'Guarda le novità');
+      btn.addEventListener('click', () => openNews(d.id));
+      row.append(btn);
     } else if (d.kind === 'weekly' || d.kind === 'monthly') {
       row.classList.add('award');
       row.append(el('p', 'event-title', d.kind === 'weekly' ? 'Premiazioni della settimana' : `Premiazioni di ${d.month}`));

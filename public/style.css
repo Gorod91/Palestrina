@@ -516,3 +516,8 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 .admin-item button { flex: none; padding: 7px 12px; border: 0; border-radius: 999px; background: var(--card-2); color: var(--danger); font-size: 14px; }
 .admin-item button.restore { color: var(--exercise); }
 .admin-item button.with-bicep { display: inline-flex; align-items: center; }
+
+/* Novità: slide a tutto schermo e card in chat */
+.news-viewer { position: fixed; inset: 0; z-index: 40; background: #000; }
+.news-viewer iframe { width: 100%; height: 100%; border: 0; display: block; }
+.event.news .primary.small { margin-top: 10px; }

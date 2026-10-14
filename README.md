@@ -140,6 +140,12 @@ Solo admin, in **Impostazioni → Admin → Modalità prova** (in alto compare l
 
 Con la prova attiva ci sono anche **Simula il recap della settimana**, **Simula le premiazioni del mese** e **Riallinea la prova ai dati veri** (cancella fogli e proprietà di prova). Il check-in automatico di Comandi resta sempre vero.
 
+### Novità dormienti
+
+Le funzioni nuove si preparano "dormienti": si aggiungono in `NEWS` in `Code.gs` (id, mese di rilascio, giorno da cui contano i punti, funzioni coinvolte, titolo e testo della notifica) con le slide in `public/news/<id>.html`. Restano invisibili finché, l'ultimo giorno del mese, subito dopo le premiazioni del mese (trigger delle 21, verso le 21:05), il server le rilascia: evento **Novità** in chat con il tasto *Guarda le novità* (slide a tutto schermo) e notifica a tutti. Se il trigger non parte, il rilascio avviene alla prima apertura dell'app dopo le 23 o nei giorni successivi. In modalità prova il tasto **Simula il rilascio delle novità** le mostra in anticipo, e i loro punti contano da subito.
+
+Prima novità: **Apripista** (novembre 2026, +3 punti): chi fa per primo la domanda "chi va in palestra?" per un giorno e quel giorno fa check-in.
+
 ### Aggiornamento automatico
 
 A ogni pubblicazione la GitHub Action scrive il commit nel meta `app-version` di `index.html` e in `version.json`. Quando l'app si apre o torna in primo piano confronta le due versioni e, se è vecchia, si ricarica da sola (non mentre si scrive, si usa la fotocamera, c'è un'azione in corso o il timer è attivo).
