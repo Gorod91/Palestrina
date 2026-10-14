@@ -235,7 +235,7 @@ body.keyboard { bottom: auto; height: var(--app-h, 100%); }
 body.keyboard .tabbar { display: none; }
 /* Sondaggio: casella compatta fissa in cima alla chat */
 /* In chat il titolo sparisce e il sondaggio sta in cima, fuori dall'area che scorre */
-.chat-top { flex: none; padding: 6px max(16px, calc((100% - 480px) / 2)) 6px; background: var(--bg); }
+.chat-top { flex: none; padding: 6px max(16px, calc((100% - 480px) / 2)) 6px; background: transparent; }
 body:not(.chat-mode) .chat-top { display: none; }
 body.chat-mode header.top { display: none; }
 body.chat-mode #scroller { padding-top: 0; }
@@ -323,8 +323,11 @@ body.keyboard .composer { padding-bottom: 8px; }
 .msg.pending .sending { display: inline-block; margin-left: 8px; vertical-align: -5px; color: #000; }
 .msg.pending .bicep { width: 24px; height: 23px; }
 
-/* Sfondo della chat in stile WhatsApp, con disegnini a tema palestra (chat-bg.svg si ripete) */
-body.chat-mode #scroller { background: #0b0b0c url("chat-bg.svg") repeat; background-size: 400px 400px; }
+/* Sfondo della chat in stile WhatsApp, con disegnini a tema palestra (chat-bg.svg si ripete).
+   Sta su tutta la pagina, anche dietro al calendario. Il file è dichiarato 1200×1200 e mostrato a 400:
+   Safari lo disegna alla risoluzione dello schermo invece di ingrandirlo sgranato. */
+body.chat-mode { background: #0b0b0c url("chat-bg.svg") repeat; background-size: 400px 400px; }
+body.chat-mode #scroller { background: none; }
 
 /* Modalità debug: cancellare messaggi e annullare il sondaggio */
 .del { margin-left: 8px; padding: 0; width: 22px; height: 22px; border: 0; border-radius: 50%; background: rgba(255, 69, 58, .2); color: var(--danger); font-size: 16px; line-height: 22px; text-align: center; vertical-align: middle; flex: none; }
