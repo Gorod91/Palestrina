@@ -1,7 +1,6 @@
 import * as sudometro from './sudometro.js';
 import { initTimer, setTimerAccount } from './timer.js';
 import { createChat, answersList, bicep } from './chat.js';
-import { initBattito } from './battito.js';
 import { fakeState, fakeChat, fakePhoto } from './fake.js';
 
 const cfg = window.APP_CONFIG;
@@ -186,7 +185,6 @@ function render() {
   $('ref-card').hidden = !me.reference;
   $('debug-mode-card').hidden = !me.debug;
   $('admin-card').hidden = !me.admin;
-  $('btn-battito').hidden = !me.admin; // beta: solo admin
   $('debug-mode').checked = debugOn();
   $('fake-mode').checked = fakeOn();
   document.body.classList.toggle('fake-data', fakeOn());
@@ -856,7 +854,7 @@ const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).c
 /** Mai ricaricare mentre qualcuno scrive, fa una foto, aspetta un'azione o ha il timer in corso. */
 function busyNow() {
   const input = $('chat-input');
-  return !!document.querySelector('.with-bicep') || !$('camera').hidden || !$('pulse').hidden || !!(input && (input.value.trim() || document.activeElement === input)) || !$('timer-running').hidden;
+  return !!document.querySelector('.with-bicep') || !$('camera').hidden || !!(input && (input.value.trim() || document.activeElement === input)) || !$('timer-running').hidden;
 }
 
 async function checkUpdate() {
@@ -984,11 +982,6 @@ if ('serviceWorker' in navigator) {
 $('avatar').addEventListener('click', () => selectTab('altro'));
 syncDay();
 document.querySelectorAll('.tabbar button').forEach((b) => b.addEventListener('click', () => selectTab(b.dataset.tab)));
-try {
-  initBattito();
-} catch (err) {
-  console.error('Battito non disponibile', err);
-}
 try {
   initTimer();
 } catch (err) {

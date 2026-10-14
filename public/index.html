@@ -227,7 +227,6 @@
           <h2 class="section">Admin</h2>
           <section class="card list">
             <button id="btn-admin" class="row">Registro admin</button>
-            <button id="btn-battito" class="row">Battito (beta)</button>
             <label class="row switch-row">
               <span>Modalità prova</span>
               <input id="test-mode" type="checkbox" class="switch">
@@ -355,34 +354,6 @@
       <h4>Re del mese</h4>
       <p class="muted">L'ultimo giorno del mese alle 21 chi ha più punti diventa Re del mese: annuncio in chat e notifica a tutti, poi il suo nome entra nell'albo d'oro.</p>
       <p class="muted">L'albo d'oro è in fondo alla Classifica.</p>
-    </div>
-  </div>
-
-  <!-- Battito (beta, solo admin): misura con la fotocamera -->
-  <div id="pulse" class="pulse" hidden>
-    <button id="pulse-close" class="pulse-close" aria-label="Chiudi">×</button>
-    <div id="pulse-choose" class="pulse-step">
-      <p class="pulse-eyebrow">Beta</p>
-      <h2>Battito</h2>
-      <p class="muted">Misura i battiti al minuto con la fotocamera. Niente viene salvato.</p>
-      <button class="primary" data-pulse-mode="dito">Dito sulla fotocamera</button>
-      <p class="footnote">Più preciso. Copri la fotocamera posteriore col polpastrello, senza premere; se la torcia non si accende, mettiti sotto una luce forte.</p>
-      <button class="secondary" data-pulse-mode="viso">Viso, senza toccare</button>
-      <p class="footnote">Fotocamera frontale, fronte al centro dell'ovale, tanta luce e nessun movimento.</p>
-    </div>
-    <div id="pulse-measure" class="pulse-step" hidden>
-      <div class="pulse-cam"><video id="pulse-video" playsinline muted autoplay></video><i class="pulse-oval"></i></div>
-      <p class="pulse-bpm"><b id="pulse-bpm">--</b> bpm</p>
-      <canvas id="pulse-wave" class="pulse-wave"></canvas>
-      <div class="pulse-progress"><i id="pulse-bar"></i></div>
-      <p id="pulse-hint" class="pulse-hint"></p>
-      <p class="muted small-text"><span id="pulse-quality"></span> <span id="pulse-torch"></span></p>
-    </div>
-    <div id="pulse-result" class="pulse-step" hidden>
-      <p class="pulse-eyebrow">Risultato</p>
-      <p class="pulse-big"><b id="pulse-result-bpm"></b> bpm</p>
-      <p id="pulse-result-text" class="pulse-hint"></p>
-      <button id="pulse-again" class="primary">Rimisura</button>
     </div>
   </div>
 

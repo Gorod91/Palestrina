@@ -130,10 +130,6 @@ Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il
 
 Solo per chi è in `ADMIN_USERS` (in `Code.gs`, oggi Francesco): in **Impostazioni → Admin → Registro admin** ci sono check-in, Sudometro, messaggi, domande, risposte e penalità degli ultimi 31 giorni di tutti. Ogni voce si può **annullare** (le penalità si **condonano**) e ogni annullamento si può **ripristinare** dal filtro *Annullati*: le righe tolte restano nel foglio **Annullati** e le foto vanno nel cestino di Drive. Si possono anche aggiungere check-in dimenticati, pure per giorni passati. Nessuna di queste azioni manda notifiche.
 
-### Battito (beta)
-
-Solo admin, in **Impostazioni → Admin → Battito (beta)** (`public/battito.js`). Misura i bpm con la fotocamera, tutto sul telefono e senza salvare niente: **dito** sulla fotocamera posteriore (torcia accesa se il telefono lo permette, altrimenti serve una luce forte) oppure **viso** con la fotocamera frontale (variazione del verde sulla fronte). Il segnale viene ripulito e la frequenza si trova con l'autocorrelazione; dopo circa 20 secondi di segnale buono mostra il risultato.
-
 ### Modalità prova
 
 Solo admin, in **Impostazioni → Admin → Modalità prova** (in alto compare la scritta blu **PROVA**). Le richieste girano davvero su Apps Script, ma:
