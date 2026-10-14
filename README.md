@@ -151,7 +151,7 @@ Le funzioni nuove si preparano "dormienti": si aggiungono in `NEWS` in `Code.gs`
 Novità di novembre 2026 (dal 1° novembre):
 - **Apripista**: chi fa per primo la domanda "chi va in palestra?" per un giorno e quel giorno fa check-in;
 - **Oltre l'obiettivo**: ogni ingresso della settimana dopo quelli dell'obiettivo (con obiettivo 2: dal terzo in poi).
-- **Falso no** (−5): hai detto "no" per quel giorno e fai check-in, senza aver cambiato risposta almeno un'ora prima; sostituisce il −3 di "Check-in senza avvisare".
+- **Falso no** (−4): hai detto "no" per quel giorno e fai check-in, senza aver cambiato risposta almeno un'ora prima; sostituisce il −3 di "Check-in senza avvisare".
 
 ### Aggiornamento automatico
 

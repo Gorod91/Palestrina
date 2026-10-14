@@ -237,7 +237,7 @@ const NEWS = [
     from: '2026-11-01',
     features: ['apripista', 'oltre', 'falsoNo'],
     title: 'Novità di novembre',
-    body: '+3 a chi chiede per primo "chi va in palestra?" e poi va, +3 per ogni ingresso oltre l\'obiettivo, -5 a chi dice no e poi viene. Tocca per vedere.',
+    body: '+3 a chi chiede per primo "chi va in palestra?" e poi va, +3 per ogni ingresso oltre l\'obiettivo, -4 a chi dice no e poi viene. Tocca per vedere.',
   },
 ];
 
@@ -1462,7 +1462,7 @@ const POINTS = {
   ritardoMinuti: 30,
   settimanaVuota: -5, // nessuna presenza in una settimana intera
   senzaAvviso: -3, // check-in senza aver detto "ci sono" o "forse" almeno 1 ora prima
-  falsoNo: -5, // novità di novembre 2026: detto "no" e poi check-in (salvo cambio almeno 1 ora prima); sostituisce senzaAvviso
+  falsoNo: -4, // novità di novembre 2026: detto "no" e poi check-in (salvo cambio almeno 1 ora prima); sostituisce senzaAvviso
   avvisoMinuti: 60,
 };
 
