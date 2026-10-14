@@ -24,6 +24,8 @@ const SHEETS = {
   cambi: { name: 'Cambi', header: ['Quando', 'Giorno', 'Nome', 'Da', 'A', 'Orario prima', 'Orario dopo'] },
   // Azioni annullate dall'admin: le righe tolte restano qui (Dati, JSON) e si possono ripristinare
   annullati: { name: 'Annullati', header: ['ID', 'Quando', 'Tipo', 'Descrizione', 'Dati', 'Ripristinato'] },
+  // Sfide tra chi è in palestra (novità di novembre 2026); Dati = JSON con partecipanti, risultati e conferme
+  sfide: { name: 'Sfide', header: ['ID', 'Giorno', 'Aperta', 'Tipo', 'Stato', 'Dati'] },
 };
 const DEFAULT_GOAL = 3;
 // Utenti con il pulsante di debug, oltre a quelli con "sì" nella colonna D di Utenti.
@@ -38,7 +40,7 @@ const realProps = PropertiesService.getScriptProperties();
 // al primo uso) e con le proprietà copiate alla prima scrittura (prova_…). Le notifiche arrivano solo a chi prova.
 let TEST = false;
 let TESTER = '';
-const TEST_SHEETS = ['presenze', 'sudometro', 'chat', 'piani', 'cambi', 'annullati'];
+const TEST_SHEETS = ['presenze', 'sudometro', 'chat', 'piani', 'cambi', 'annullati', 'sfide'];
 const TEST_PREFIX = 'prova_';
 const TEST_DELETED = '__eliminata__';
 const props = {
@@ -141,7 +143,7 @@ function autorizzaDrive() {
   Logger.log('Cartella foto: ' + photosRoot().getUrl());
 }
 
-const TRIGGERS_VERSION = '4';
+const TRIGGERS_VERSION = '5';
 
 /**
  * Recap ogni domenica alle 19 e premiazioni del mese l'ultimo giorno del mese alle 21 (fuso orario dello script).
@@ -149,13 +151,15 @@ const TRIGGERS_VERSION = '4';
  */
 function ensureTriggers(force) {
   if (!force && props.getProperty('TRIGGERS_VERSION') === TRIGGERS_VERSION) return;
-  const handlers = ['sendWeeklyRecap', 'sendMonthlyRecap', 'eveningCheck'];
+  const handlers = ['sendWeeklyRecap', 'sendMonthlyRecap', 'eveningCheck', 'sfideTick'];
   ScriptApp.getProjectTriggers()
     .filter((t) => handlers.includes(t.getHandlerFunction()))
     .forEach((t) => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('sendWeeklyRecap').timeBased().onWeekDay(ScriptApp.WeekDay.SUNDAY).atHour(19).create();
   // Apps Script non ha "ultimo giorno del mese": controllo ogni sera alle 21
   ScriptApp.newTrigger('eveningCheck').timeBased().everyDays(1).atHour(21).nearMinute(5).create();
+  // Sfide: promemoria delle conferme e chiusura di quelle di ieri
+  ScriptApp.newTrigger('sfideTick').timeBased().everyHours(1).create();
   props.setProperty('TRIGGERS_VERSION', TRIGGERS_VERSION);
 }
 
@@ -235,9 +239,9 @@ const NEWS = [
     id: '2026-11',
     month: '2026-10',
     from: '2026-11-01',
-    features: ['apripista', 'oltre', 'falsoNo'],
+    features: ['apripista', 'oltre', 'falsoNo', 'sfide'],
     title: 'Novità di novembre',
-    body: '+3 a chi chiede per primo "chi va in palestra?" e poi va, +3 per ogni ingresso oltre l\'obiettivo, -4 a chi dice no e poi viene. Tocca per vedere.',
+    body: 'Arrivano le sfide in palestra, e poi Apripista, Oltre l\'obiettivo e Falso no. Tocca per vedere.',
   },
 ];
 
@@ -365,6 +369,11 @@ function doPost(e) {
       TESTER = user.name;
       MEMO = {};
     }
+    try {
+      closeOldSfide();
+    } catch (err) {
+      console.error('Sfide non chiuse', err);
+    }
 
     switch (req.action) {
       case 'login':
@@ -391,6 +400,8 @@ function doPost(e) {
         return json(pollAnswer(user, req.choice, req.time));
       case 'planSet':
         return json(planSet(user, req.day, req.choice, req.time));
+      case 'sfida':
+        return json(sfidaAction(user, req));
       case 'chatDelete':
         return json(chatDelete(user, req.id));
       case 'chatMute':
@@ -490,6 +501,11 @@ function checkin(user, source) {
   addChatEvent(user.name, { kind: 'checkin', count, goal: user.goal, auto: source === 'automatico' });
   announceAchievements(user);
   dispatch('checkin', user.name);
+  try {
+    maybeOpenSfida(user);
+  } catch (err) {
+    console.error('Sfida non aperta', err);
+  }
   return { ok: true, alreadyToday: false };
 }
 
@@ -688,7 +704,7 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
-    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), falsoNo: featureOn('falsoNo') },
+    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), falsoNo: featureOn('falsoNo'), sfide: featureOn('sfide') },
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
@@ -783,6 +799,32 @@ function buildNotifications(event, name) {
     if (!poll || poll.name === name) return [];
     const title = `${dn(name)}: ${CHOICE_LABELS[last.choice] || last.choice}${last.time ? ' alle ' + last.time : ''}`;
     return subs.filter((s) => s.name === poll.name).map((s) => ({ subscription: s.sub, title, body: `Chi va in palestra ${dayLabel(last.day)}?`, tab: 'chat' }));
+  }
+
+  if (event === 'sfida') {
+    const [id, what, actor] = String(name).split('|');
+    const s = sfide().find((x) => x.id === id);
+    if (!s) return [];
+    const def = SFIDE[s.type];
+    const to = (names, title, body) => subs.filter((x) => names.includes(x.name)).map((x) => ({ subscription: x.sub, title, body, tab: 'chat' }));
+    const parts = sfidaParts(s);
+    if (what === 'open') return to(s.data.invited, `Sfida! ${def.label}`, `${def.desc}. Tocca per partecipare.`);
+    if (what === 'invite') return to([actor], `Sfida in corso: ${def.label}`, `${def.desc}. Tocca per partecipare.`);
+    if (what === 'remind') return to(sfidaPending(s), `Sfida ${def.label}: mancano conferme`, 'Conferma i risultati entro mezzanotte, o valgono solo come partecipazione.');
+    if (what === 'end') {
+      const r = s.data.result || { winners: [] };
+      return to(parts, `Sfida conclusa: ${def.label}`, r.winners.length ? `Vince ${r.winners.map(dn).join(', ')} (+${POINTS.sfidaVinta}). Partecipare vale +${POINTS.sfida}.` : `Nessun vincitore. Partecipare vale +${POINTS.sfida}.`);
+    }
+    if (what === 'result') {
+      const others = parts.filter((n) => n !== actor);
+      if (def.kind === 'durata') {
+        const w = s.data.winner;
+        return w ? to(others, `${dn(actor)}: ha vinto ${dn(w.name)}`, `Sfida ${def.label}. Confermi? Tocca per rispondere.`) : [];
+      }
+      const p = s.data.people[actor];
+      return p && p.value !== null ? to(others, `${dn(actor)}: ${p.value} ${def.label.toLowerCase()}`, 'Confermi? Tocca per rispondere.') : [];
+    }
+    return [];
   }
 
   if (event === 'news') {
@@ -970,6 +1012,7 @@ function buildChatState(version, today) {
     plans: plansSummary(presenze),
     names: Object.fromEntries(allUsers().map((u) => [u.name, u.display])),
     refPhotos: refPhotoIds(),
+    sfide: sfideForChat(today),
   };
 }
 
@@ -1150,12 +1193,321 @@ function chatDelete(user, id) {
   return chatState(user, -1);
 }
 
+// ---------- Sfide (novità di novembre 2026) ----------
+// Quando almeno due persone fanno check-in a meno di un'ora l'una dall'altra si apre una sfida a caso.
+// Chi ha fatto check-in può dire "Ci sto" o "Passo" entro un'ora dall'apertura.
+// - Plank e Barchetta (a durata): un partecipante dichiara chi ha vinto, un altro conferma.
+// - Addominali, Squat, Affondi (a ripetizioni): ognuno scrive le sue, un altro conferma; vince chi supera di più
+//   il proprio record degli ultimi 60 giorni (la prima volta è calibrazione: solo partecipazione).
+// Basta una conferma; un risultato contestato si corregge una volta, alla seconda contestazione vale solo la
+// partecipazione. Si chiude quando tutto è confermato o a mezzanotte (il non confermato vale come partecipazione).
+// Punti: +5 a chi vince, +2 agli altri partecipanti.
+const SFIDE = {
+  plank: { label: 'Plank', kind: 'durata', desc: 'Fino allo sfinimento: vince chi resiste di più' },
+  barchetta: { label: 'Barchetta', kind: 'durata', desc: 'Seduti, solo il sedere a terra, gambe e braccia sollevate: vince chi resiste di più' },
+  addominali: { label: 'Addominali', kind: 'ripetizioni', desc: 'Fino allo sfinimento: vince chi supera di più il proprio record' },
+  squat: { label: 'Squat', kind: 'ripetizioni', desc: 'Fino allo sfinimento: vince chi supera di più il proprio record' },
+  affondi: { label: 'Affondi', kind: 'ripetizioni', desc: 'Fino allo sfinimento, gambe alternate (conta ogni gamba): vince chi supera di più il proprio record' },
+};
+const SFIDA_WINDOW_MIN = 60; // per unirsi, e distanza minima tra due sfide
+const SFIDA_RECORD_DAYS = 60;
+const SFIDA_REMIND_MIN = 120;
+
+const hhmmToMin = (t) => {
+  const [h, m] = String(t).split(':').map(Number);
+  return h * 60 + (m || 0);
+};
+const nowHHmm = () => Utilities.formatDate(new Date(), TZ, 'HH:mm');
+
+function sfide() {
+  return memo('sfide:list', () =>
+    sheetRaw('sfide')
+      .getDataRange()
+      .getDisplayValues()
+      .slice(1)
+      .filter((r) => r[0])
+      .map((r) => ({ id: r[0], day: r[1], at: r[2], type: r[3], state: r[4], data: safeJson(r[5]) || {} }))
+  );
+}
+
+function saveSfida(s) {
+  const found = findRows('sfide', (r) => r[0] === s.id);
+  if (!found.length) return;
+  sheet('sfide').getRange(found[0].row, 5, 1, 2).setValues([[s.state, JSON.stringify(s.data)]]);
+  forget('sfide');
+}
+
+const sfidaParts = (s) => Object.keys(s.data.people || {}).filter((n) => s.data.people[n].in);
+const sfidaJoinOpen = (s) => s.state === 'aperta' && s.day === dayString(new Date()) && hhmmToMin(nowHHmm()) - hhmmToMin(s.at) <= SFIDA_WINDOW_MIN;
+
+/** Dopo un check-in: apre una sfida, o invita chi arriva mentre ce n'è una aperta. */
+function maybeOpenSfida(user) {
+  if (!featureOn('sfide')) return;
+  const today = dayString(new Date());
+  if (today < featureFrom('sfide')) return;
+  const now = nowHHmm();
+  let event = null;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    const list = sfide().filter((s) => s.day === today);
+    const open = list.find((s) => sfidaJoinOpen(s));
+    if (open) {
+      if (!open.data.invited.includes(user.name)) {
+        open.data.invited.push(user.name);
+        saveSfida(open);
+        bumpChat();
+        event = { id: open.id, what: 'invite' };
+      }
+    } else {
+      const last = list[list.length - 1];
+      if (last && hhmmToMin(now) - hhmmToMin(last.at) < SFIDA_WINDOW_MIN) return;
+      const others = rows('presenze')
+        .filter((r) => r.day === today && r.name !== user.name && Math.abs(hhmmToMin(r.time) - hhmmToMin(now)) <= SFIDA_WINDOW_MIN)
+        .map((r) => r.name)
+        .filter((n, i, a) => a.indexOf(n) === i);
+      if (!others.length) return;
+      const prev = sfide().slice(-1)[0];
+      const types = Object.keys(SFIDE).filter((t) => !prev || t !== prev.type);
+      const type = types[Math.floor(Math.random() * types.length)];
+      const id = newId();
+      sheet('sfide').appendRow([id, today, now, type, 'aperta', JSON.stringify({ invited: others.concat(user.name), people: {}, winner: null, winnerContests: 0, noWinner: false, reminded: false })]);
+      forget('sfide');
+      event = { id, what: 'open', type };
+    }
+  } finally {
+    lock.releaseLock();
+  }
+  if (event && event.what === 'open') addChatEvent('', { kind: 'sfida', id: event.id, type: event.type });
+  if (event) dispatch('sfida', `${event.id}|${event.what}|${user.name}`);
+}
+
+/** Azioni sulla card della sfida: join, value, winner, confirm, contest. */
+function sfidaAction(user, req) {
+  if (!featureOn('sfide')) return { error: 'Sfide non ancora attive' };
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  let notify = null;
+  let ended = null;
+  try {
+    const s = sfide().find((x) => x.id === String(req.id || ''));
+    if (!s) return { error: 'Sfida non trovata' };
+    if (s.state !== 'aperta') return { error: 'La sfida è già conclusa' };
+    const def = SFIDE[s.type];
+    const d = s.data;
+    const me = d.people[user.name];
+    const isPart = !!(me && me.in);
+    const op = String(req.op || '');
+    if (op === 'join') {
+      if (!d.invited.includes(user.name)) return { error: 'Puoi unirti solo se hai fatto check-in' };
+      if (!sfidaJoinOpen(s)) return { error: 'Troppo tardi per unirsi' };
+      if (me && (me.entered || (d.winner && d.winner.by === user.name))) return { error: 'Hai già partecipato' };
+      d.people[user.name] = { in: req.value === true, value: null, by: null, contested: 0, annulled: false, entered: false };
+    } else if (op === 'value') {
+      if (def.kind !== 'ripetizioni' || !isPart) return { error: 'Non puoi scrivere un risultato qui' };
+      const v = Math.round(Number(req.value));
+      if (!(v >= 0 && v <= 2000)) return { error: 'Numero non valido' };
+      if (me.by) return { error: 'Il tuo risultato è già confermato' };
+      if (me.annulled) return { error: 'Il tuo risultato è stato contestato due volte: vale la partecipazione' };
+      Object.assign(me, { value: v, entered: true });
+      notify = 'result';
+    } else if (op === 'winner') {
+      if (def.kind !== 'durata' || !isPart) return { error: 'Non puoi dichiarare il vincitore' };
+      const w = String(req.target || '');
+      if (!(d.people[w] && d.people[w].in)) return { error: 'Il vincitore deve essere un partecipante' };
+      if (d.noWinner) return { error: 'Vincitore contestato due volte: vale la partecipazione' };
+      if (d.winner) return { error: 'Il vincitore è già stato dichiarato' };
+      d.winner = { name: w, by: user.name, conf: null };
+      notify = 'result';
+    } else if (op === 'confirm' || op === 'contest') {
+      if (!isPart) return { error: 'Solo chi partecipa può confermare' };
+      const target = String(req.target || '');
+      if (target === '__winner') {
+        if (!d.winner || d.winner.conf) return { error: 'Niente da confermare' };
+        if (d.winner.by === user.name) return { error: 'Non puoi confermare la tua dichiarazione' };
+        if (op === 'confirm') d.winner.conf = user.name;
+        else {
+          d.winnerContests = (d.winnerContests || 0) + 1;
+          d.winner = null;
+          if (d.winnerContests >= 2) d.noWinner = true;
+        }
+      } else {
+        const p = d.people[target];
+        if (!p || !p.in || p.value === null || p.by || p.annulled) return { error: 'Niente da confermare' };
+        if (target === user.name) return { error: 'Il tuo risultato lo conferma un altro' };
+        if (op === 'confirm') p.by = user.name;
+        else {
+          p.contested++;
+          if (p.contested >= 2) p.annulled = true;
+          else p.value = null;
+        }
+      }
+    } else {
+      return { error: 'Azione non valida' };
+    }
+    if (sfidaComplete(s)) {
+      concludeSfida(s);
+      ended = s.id;
+    } else saveSfida(s);
+    bumpChat();
+  } finally {
+    lock.releaseLock();
+  }
+  if (ended) {
+    addChatEvent('', { kind: 'sfidaFine', id: ended });
+    dispatch('sfida', `${ended}|end|${user.name}`);
+  } else if (notify) dispatch('sfida', `${req.id}|${notify}|${user.name}`);
+  return chatState(user, -1);
+}
+
+function sfidaComplete(s) {
+  const parts = sfidaParts(s);
+  if (parts.length < 2) return false;
+  if (SFIDE[s.type].kind === 'durata') return s.data.noWinner || !!(s.data.winner && s.data.winner.conf);
+  return parts.every((n) => {
+    const p = s.data.people[n];
+    return p.annulled || (p.value !== null && p.by);
+  });
+}
+
+/** Record di una persona in una sfida a ripetizioni: miglior risultato confermato degli ultimi 60 giorni (null = calibrazione). */
+function sfidaRecord(name, type, day, excludeId) {
+  const from = addDays(day, -SFIDA_RECORD_DAYS);
+  let best = null;
+  sfide().forEach((s) => {
+    if (s.id === excludeId || s.type !== type || s.state !== 'conclusa' || s.day < from || s.day > day) return;
+    const p = (s.data.people || {})[name];
+    if (p && p.in && !p.annulled && p.by && p.value !== null && (best === null || p.value > best)) best = p.value;
+  });
+  return best;
+}
+
+function sfidaResult(s) {
+  const d = s.data;
+  const parts = sfidaParts(s);
+  const out = { points: {}, winners: [], records: [], calib: [], pct: {} };
+  if (SFIDE[s.type].kind === 'durata') {
+    if (!d.noWinner && d.winner && d.winner.conf && parts.includes(d.winner.name)) out.winners = [d.winner.name];
+    parts.forEach((n) => (out.points[n] = out.winners.includes(n) ? POINTS.sfidaVinta : POINTS.sfida));
+    return out;
+  }
+  const eligible = [];
+  parts.forEach((n) => {
+    const p = d.people[n];
+    if (p.annulled || p.value === null || !p.by) return;
+    const rec = sfidaRecord(n, s.type, s.day, s.id);
+    if (rec === null || rec === 0) {
+      out.calib.push(n);
+      out.records.push({ name: n, value: p.value, first: true });
+      return;
+    }
+    const pct = p.value / rec;
+    out.pct[n] = Math.round(pct * 100);
+    eligible.push({ n, pct });
+    if (p.value > rec) out.records.push({ name: n, value: p.value });
+  });
+  if (eligible.length === 1 && eligible[0].pct >= 1) out.winners = [eligible[0].n];
+  if (eligible.length > 1) {
+    const max = Math.max(...eligible.map((e) => e.pct));
+    out.winners = eligible.filter((e) => e.pct === max).map((e) => e.n);
+  }
+  parts.forEach((n) => {
+    if (d.people[n].entered) out.points[n] = out.winners.includes(n) ? POINTS.sfidaVinta : POINTS.sfida;
+  });
+  return out;
+}
+
+function concludeSfida(s) {
+  s.state = 'conclusa';
+  s.data.result = sfidaResult(s);
+  saveSfida(s);
+}
+
+/** A mezzanotte (o alla prima richiesta dopo): chiude le sfide dei giorni passati. */
+function closeOldSfide() {
+  if (!featureOn('sfide')) return;
+  const today = dayString(new Date());
+  const old = sfide().filter((s) => s.state === 'aperta' && s.day < today);
+  if (!old.length) return;
+  const lock = LockService.getScriptLock();
+  lock.waitLock(10000);
+  try {
+    old.forEach((s) => concludeSfida(s));
+    bumpChat();
+  } finally {
+    lock.releaseLock();
+  }
+  old.forEach((s) => sfidaParts(s).length && addChatEvent('', { kind: 'sfidaFine', id: s.id }));
+}
+
+/** Ogni ora: chiude le sfide di ieri e, 2 ore dopo l'apertura, ricorda le conferme mancanti. */
+function sfideTick() {
+  MEMO = {};
+  closeOldSfide();
+  if (!featureOn('sfide')) return;
+  const today = dayString(new Date());
+  sfide()
+    .filter((s) => s.state === 'aperta' && s.day === today && !s.data.reminded && hhmmToMin(nowHHmm()) - hhmmToMin(s.at) >= SFIDA_REMIND_MIN)
+    .forEach((s) => {
+      s.data.reminded = true;
+      saveSfida(s);
+      if (sfidaPending(s).length) dispatch('sfida', `${s.id}|remind|`);
+    });
+}
+
+/** Chi deve ancora confermare qualcosa (partecipanti diversi dall'autore). */
+function sfidaPending(s) {
+  const d = s.data;
+  const parts = sfidaParts(s);
+  if (SFIDE[s.type].kind === 'durata') return d.winner && !d.winner.conf ? parts.filter((n) => n !== d.winner.by) : [];
+  const open = parts.filter((n) => d.people[n].value !== null && !d.people[n].by && !d.people[n].annulled);
+  return parts.filter((n) => open.some((o) => o !== n));
+}
+
+/** Le sfide recenti per la chat, con record e percentuali già calcolati. */
+function sfideForChat(today) {
+  if (!featureOn('sfide')) return [];
+  const dn = displayNames();
+  const from = addDays(today, -2);
+  return sfide()
+    .filter((s) => s.day >= from)
+    .map((s) => {
+      const def = SFIDE[s.type];
+      const people = Object.keys(s.data.people || {}).map((n) => {
+        const p = s.data.people[n];
+        const rec = def.kind === 'ripetizioni' ? sfidaRecord(n, s.type, s.day, s.id) : null;
+        return { name: n, display: dn(n), in: p.in, value: p.value, by: p.by ? dn(p.by) : '', contested: p.contested, annulled: p.annulled, record: rec };
+      });
+      const w = s.data.winner;
+      const r = s.data.result;
+      return {
+        id: s.id,
+        day: s.day,
+        at: s.at,
+        type: s.type,
+        label: def.label,
+        kind: def.kind,
+        desc: def.desc,
+        state: s.state,
+        joinOpen: sfidaJoinOpen(s),
+        invited: s.data.invited.map((n) => ({ name: n, display: dn(n) })),
+        people,
+        winner: w ? { name: w.name, display: dn(w.name), by: w.by, byDisplay: dn(w.by), conf: w.conf ? dn(w.conf) : '' } : null,
+        winnerContests: s.data.winnerContests || 0,
+        noWinner: !!s.data.noWinner,
+        result: r
+          ? { winners: r.winners.map(dn), points: Object.keys(r.points).map((n) => ({ display: dn(n), pts: r.points[n] })), records: r.records.map((x) => ({ display: dn(x.name), value: x.value, first: !!x.first })), pct: Object.keys(r.pct || {}).map((n) => ({ display: dn(n), pct: r.pct[n] })) }
+          : null,
+      };
+    });
+}
+
 // ---------- Admin: annullare e ripristinare le azioni di tutti ----------
 
 const ADMIN_DAYS = 31;
 const shortDay = (d) => `${String(d).slice(8, 10)}/${String(d).slice(5, 7)}`;
 // Fogli che si possono riordinare dopo un ripristino (colonne di data e ora)
-const SORT_COLUMNS = { presenze: [1, 2], sudometro: [1, 2], chat: [2, 3], cambi: [1] };
+const SORT_COLUMNS = { presenze: [1, 2], sudometro: [1, 2], chat: [2, 3], cambi: [1], sfide: [2, 3] };
 
 /** Penalità condonate dall'admin: "tipo|nome|giorno" → true. */
 function condoni() {
@@ -1179,7 +1531,7 @@ function adminLog() {
   const from = addDays(dayString(new Date()), -(ADMIN_DAYS - 1));
   const dn = displayNames();
   const items = [];
-  const push = (it) => items.push({ ...it, display: dn(it.name) });
+  const push = (it) => items.push({ ...it, display: it.name ? dn(it.name) : 'Palestrina' });
   rows('presenze').filter((r) => r.day >= from).forEach((r) => push({ kind: 'presenza', key: `${r.day}|${r.time}|${r.name}`, day: r.day, time: r.time, name: r.name, text: 'Check-in' }));
   sheetRaw('sudometro').getDataRange().getDisplayValues().slice(1).forEach((r) => {
     if (r[6] || r[0] < from) return; // prove di debug escluse
@@ -1197,6 +1549,16 @@ function adminLog() {
     }
   });
   rows('piani').filter((r) => r.day >= from).forEach((r) => push({ kind: 'piano', key: `${r.day}|${r.name}`, day: r.day, time: r.time || '', name: r.name, text: `Risposta per il ${shortDay(r.day)}: ${CHOICE_LABELS[r.choice] || r.choice}${r.time ? ' alle ' + r.time : ''}` }));
+  sfide().filter((x) => x.day >= from).forEach((x) => {
+    const def = SFIDE[x.type];
+    const parts = sfidaParts(x);
+    const w = x.data.result && x.data.result.winners.length ? ` · vince ${x.data.result.winners.map(dn).join(', ')}` : '';
+    push({ kind: 'sfida', key: x.id, day: x.day, time: x.at, name: '', text: `Sfida ${def.label} (${x.state}): ${parts.map(dn).join(', ') || 'nessun partecipante'}${w}` });
+    parts.forEach((n) => {
+      const p = x.data.people[n];
+      if (def.kind === 'ripetizioni' && p.entered && !p.annulled) push({ kind: 'sfidaRisultato', key: `${x.id}|${n}`, day: x.day, time: x.at, name: n, text: `Risultato sfida ${def.label}: ${p.value === null ? 'da riscrivere' : p.value}${p.by ? ' (confermato)' : ''}` });
+    });
+  });
   const months = [from.slice(0, 7), dayString(new Date()).slice(0, 7)].filter((m, i, a) => a.indexOf(m) === i);
   months.forEach((m) => computePoints(m).forEach((t) => (t.penalties || []).forEach((p) => {
     if (p.day >= from) push({ kind: 'penalita', key: `${p.key}|${t.name}|${p.day}`, day: p.day, time: '', name: t.name, text: `Penalità: ${p.label} (${p.pts})` });
@@ -1228,6 +1590,7 @@ function adminUndo(admin, kind, key) {
     const photos = [];
     let text = '';
     let condono = '';
+    let sfidaPatch = null;
     const add = (sheetKey, list) => list.forEach((x) => take.push({ sheet: sheetKey, ...x }));
     const chatEvents = (day, name, eventKind) => findRows('chat', (r) => r[4] === 'event' && r[1] === day && r[3] === name && (safeJson(r[5]) || {}).kind === eventKind);
     if (kind === 'presenza') {
@@ -1264,6 +1627,23 @@ function adminUndo(admin, kind, key) {
       if (!found.length) return { error: 'Risposta non trovata' };
       add('piani', found);
       text = `Risposta di ${name} per il ${shortDay(day)}: ${CHOICE_LABELS[found[0].values[2]] || found[0].values[2]}`;
+    } else if (kind === 'sfida') {
+      const found = findRows('sfide', (r) => r[0] === k);
+      if (!found.length) return { error: 'Sfida non trovata' };
+      add('sfide', found);
+      add('chat', findRows('chat', (r) => r[4] === 'event' && ['sfida', 'sfidaFine'].includes((safeJson(r[5]) || {}).kind) && (safeJson(r[5]) || {}).id === k));
+      text = `Sfida ${SFIDE[found[0].values[3]] ? SFIDE[found[0].values[3]].label : ''} del ${shortDay(found[0].values[1])} ${found[0].values[2]}`;
+    } else if (kind === 'sfidaRisultato') {
+      const [sid, name] = k.split('|');
+      const x = sfide().find((y) => y.id === sid);
+      const p = x && x.data.people[name];
+      if (!p || p.annulled) return { error: 'Risultato non trovato' };
+      sfidaPatch = { id: sid, name, prev: JSON.parse(JSON.stringify(p)) };
+      Object.assign(p, { annulled: true });
+      if (x.state === 'conclusa') x.data.result = sfidaResult(x);
+      saveSfida(x);
+      bumpChat();
+      text = `Risultato di ${name} nella sfida ${SFIDE[x.type].label} del ${shortDay(x.day)}: ${p.value}`;
     } else if (kind === 'penalita') {
       const [pk, name, day] = k.split('|');
       if (condoni()[k]) return { error: 'Già condonata' };
@@ -1283,7 +1663,7 @@ function adminUndo(admin, kind, key) {
         console.error('Foto non spostata nel cestino', err);
       }
     });
-    const data = { rows: take.map((t) => ({ sheet: t.sheet, values: t.values })), photos, condono };
+    const data = { rows: take.map((t) => ({ sheet: t.sheet, values: t.values })), photos, condono, sfidaPatch };
     const id = newId();
     sheet('annullati').appendRow([id, Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm') + ' ' + admin.name, kind, text, JSON.stringify(data), '']);
     if (take.some((t) => t.sheet === 'chat' || t.sheet === 'piani')) bumpChat();
@@ -1321,6 +1701,15 @@ function adminRestore(id) {
       }
     });
     if (data.condono) setCondono(data.condono, false);
+    if (data.sfidaPatch) {
+      const x = sfide().find((y) => y.id === data.sfidaPatch.id);
+      if (x) {
+        x.data.people[data.sfidaPatch.name] = data.sfidaPatch.prev;
+        if (x.state === 'conclusa') x.data.result = sfidaResult(x);
+        saveSfida(x);
+        bumpChat();
+      }
+    }
     sheet('annullati').getRange(found[0].row, 6).setValue(Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm'));
     if (touched.chat || touched.piani) bumpChat();
     return { ok: true };
@@ -1453,6 +1842,8 @@ const POINTS = {
   pomodoro: 10,
   apripista: 3, // novità di novembre 2026: primo a chiedere "chi va in palestra?" per un giorno e poi check-in
   oltre: 3, // novità di novembre 2026: ogni ingresso della settimana oltre l'obiettivo
+  sfidaVinta: 5, // novità di novembre 2026: sfida vinta
+  sfida: 2, // novità di novembre 2026: partecipazione a una sfida
   // Penalità
   bidone: -10, // "ci sono" e poi niente check-in quel giorno
   cambioUltimo: -5, // da "ci sono" a forse/no (o tolto) a meno di 4 ore dall'orario, senza poi venire
@@ -1538,6 +1929,15 @@ function computePoints(month) {
       let n = 1;
       while (countInWeek(pres, u.name, addDays(w, -7 * n)) >= u.goal) n++;
       if (n > 1) add('serie', 'Settimane di fila', Math.min(P.seriePerSettimana * (n - 1), P.serieMax));
+    }
+    // Sfide: +5 a chi vince, +2 agli altri partecipanti
+    if (featureOn('sfide')) {
+      const from = featureFrom('sfide');
+      sfide().forEach((x) => {
+        const pts = x.state === 'conclusa' && inMonth(x.day) && x.day >= from && x.data.result ? x.data.result.points[u.name] : 0;
+        if (pts === P.sfidaVinta) add('sfidaVinta', 'Sfide vinte', pts);
+        else if (pts) add('sfida', 'Sfide', pts);
+      });
     }
     // Oltre l'obiettivo: ogni ingresso della settimana dopo quelli dell'obiettivo
     if (featureOn('oltre')) {
@@ -1713,6 +2113,10 @@ function openSheet(key) {
   if (key === 'piani' && !props.getProperty('PIANI_TEXT_FORMAT')) {
     sh.getRange('A:E').setNumberFormat('@'); // giorni e orari restano testo, non date
     props.setProperty('PIANI_TEXT_FORMAT', '1');
+  }
+  if (key === 'sfide' && !props.getProperty('SFIDE_TEXT_FORMAT')) {
+    sh.getRange('A:F').setNumberFormat('@'); // giorni, orari e JSON come testo
+    props.setProperty('SFIDE_TEXT_FORMAT', '1');
   }
   if (key === 'chat' && !props.getProperty('CHAT_TEXT_FORMAT')) {
     // Tutto come testo: un messaggio che inizia con "=" non deve diventare una formula.

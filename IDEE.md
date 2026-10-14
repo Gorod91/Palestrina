@@ -2,18 +2,9 @@
 
 Cose di cui abbiamo parlato ma che non sono ancora nell'app.
 
-## Sfide tra chi è in palestra (deciso, da implementare più avanti)
+## Sfide: fatte (novità di novembre 2026)
 
-Quando almeno 2 persone fanno check-in a meno di un'ora l'una dall'altra, l'app propone in chat una sfida pescata a caso (anche per più di due persone). Chi arriva dopo può aggiungersi; la sfida si chiude un'ora dopo l'apertura. Chi non vuole tocca "Passo".
-
-- **Sfide**, tutte **fino allo sfinimento** (elenco da rivedere più avanti):
-  - **Plank** e **Barchetta** (seduti per terra, solo il sedere appoggiato, gambe e braccia sollevate): vince chi resiste di più. Niente telefono durante la sfida: il risultato si inserisce dopo.
-  - **Addominali**, **Squat**, **Affondi**: ognuno sfida il proprio record; vince chi fa la percentuale più alta rispetto al suo record.
-- **Record**: il miglior risultato degli **ultimi 60 giorni** (sale subito al massimo reale). Se in 60 giorni non hai fatto quella sfida, la volta dopo ricalibri.
-- **Calibrazione**: solo per le sfide contro il proprio record e **solo la prima volta**: il risultato diventa il record, chi calibra prende solo la partecipazione.
-- **Conferma**: il risultato va confermato dagli altri partecipanti.
-- **Attivazione**: novità dormiente (quando, da decidere).
-- **Da decidere**: punti (proposta: +5 al primo, +3 al secondo se si è almeno in 3, +2 a ogni altro partecipante); per Plank e Barchetta senza telefono, cosa si inserisce dopo (la classifica di chi ha ceduto per ultimo, o i tempi).
+In futuro: rivedere/ampliare l'elenco delle sfide (oggi Plank, Barchetta, Addominali, Squat, Affondi).
 
 ## Mese a squadre (gennaio, per ora)
 

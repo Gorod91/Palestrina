@@ -194,6 +194,7 @@ function render() {
   $('rule-apripista').hidden = !(state.features && state.features.apripista);
   $('rule-oltre').hidden = !(state.features && state.features.oltre);
   $('rule-falsono').hidden = !(state.features && state.features.falsoNo);
+  $('rule-sfide').hidden = !(state.features && state.features.sfide);
   $('viewport-card').hidden = !debugOn();
   if (debugOn()) renderViewportDebug();
   $('chat-notify').checked = !me.chatMuted;
@@ -692,7 +693,7 @@ window.addEventListener('message', (e) => {
 
 const ADMIN_FILTERS = [
   ['tutto', 'Tutto'], ['presenza', 'Check-in'], ['sudometro', 'Sudometro'], ['chat', 'Chat'],
-  ['piano', 'Risposte'], ['penalita', 'Penalità'], ['annullati', 'Annullati'], ['aggiungi', 'Aggiungi check-in'],
+  ['piano', 'Risposte'], ['sfida', 'Sfide'], ['penalita', 'Penalità'], ['annullati', 'Annullati'], ['aggiungi', 'Aggiungi check-in'],
 ];
 let adminData = null;
 let adminFilter = 'tutto';
@@ -744,7 +745,7 @@ function renderAdmin() {
       : '<p class="muted">Nessuna azione annullata.</p>';
     return;
   }
-  const items = adminData.items.filter((i) => adminFilter === 'tutto' || i.kind === adminFilter);
+  const items = adminData.items.filter((i) => adminFilter === 'tutto' || i.kind === adminFilter || (adminFilter === 'sfida' && i.kind === 'sfidaRisultato'));
   let lastDay = '';
   $('admin-list').innerHTML = items.length
     ? items.map((i, n) => {
@@ -854,7 +855,7 @@ const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).c
 /** Mai ricaricare mentre qualcuno scrive, fa una foto, aspetta un'azione o ha il timer in corso. */
 function busyNow() {
   const input = $('chat-input');
-  return !!document.querySelector('.with-bicep') || !$('camera').hidden || !!(input && (input.value.trim() || document.activeElement === input)) || !$('timer-running').hidden;
+  return !!document.querySelector('.with-bicep') || !$('camera').hidden || !!(input && (input.value.trim() || document.activeElement === input)) || !!(document.activeElement && document.activeElement.classList.contains('sfida-num')) || !$('timer-running').hidden;
 }
 
 async function checkUpdate() {

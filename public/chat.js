@@ -476,6 +476,12 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   }
 
   function renderList() {
+    // Mentre si scrive il numero di una sfida la lista non si ridisegna (si perderebbe la tastiera): si rifà dopo.
+    if (document.activeElement && document.activeElement.classList.contains('sfida-num')) {
+      listDeferred = true;
+      return;
+    }
+    listDeferred = false;
     const list = $('chat-list');
     list.dataset.rendered = '1';
     list.innerHTML = '';
@@ -512,7 +518,161 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     showPending();
   }
 
+  // ---------- Sfide (card in chat) ----------
+
+  let listDeferred = false;
+  const sfidaDrafts = {}; // numeri scritti e non ancora inviati, per sfida
+
+  async function sfidaDo(body, btn) {
+    if (btn) btn.disabled = true;
+    try {
+      const r = await api('sfida', body);
+      v = -1;
+      apply(r);
+    } catch (err) {
+      toast(err.message);
+      if (btn) btn.disabled = false;
+    }
+  }
+
+  function sfidaCard(d) {
+    const s = (data.sfide || []).find((x) => x.id === d.id);
+    const row = el('div', 'event sfida');
+    if (!s) {
+      row.append(el('p', 'event-title', 'Sfida'), el('p', 'event-text', 'Sfida non più disponibile'));
+      return row;
+    }
+    row.append(el('p', 'event-title', s.state === 'conclusa' ? `Sfida conclusa: ${s.label}` : `Sfida! ${s.label}`));
+    row.append(el('p', 'event-text', s.desc));
+    const meP = s.people.find((p) => p.name === me.name);
+    const invited = s.invited.some((x) => x.name === me.name);
+    const ins = s.people.filter((p) => p.in);
+    const outs = s.people.filter((p) => !p.in);
+    const line = [ins.length && `Ci stanno: ${ins.map((p) => p.display).join(', ')}`, outs.length && `Passano: ${outs.map((p) => p.display).join(', ')}`].filter(Boolean).join(' · ');
+    if (line) row.append(el('p', 'sfida-who', line));
+
+    if (s.state === 'conclusa') {
+      const r = s.result || { winners: [], points: [], records: [], pct: [] };
+      row.append(el('p', 'sfida-win', r.winners.length ? `Vince ${r.winners.join(', ')} · +5` : 'Nessun vincitore'));
+      const others = r.points.filter((x) => x.pts !== 5).map((x) => x.display);
+      if (others.length) row.append(el('p', 'event-text', `Partecipazione +2: ${others.join(', ')}`));
+      if (r.pct.length) row.append(el('p', 'event-text', r.pct.map((x) => `${x.display} ${x.pct}%`).join(' · ')));
+      r.records.forEach((x) => row.append(el('p', 'sfida-rec', x.first ? `Primo record di ${x.display}: ${x.value}` : `Nuovo record di ${x.display}: ${x.value}`)));
+      return row;
+    }
+
+    // Ci sto / Passo
+    if (invited && s.joinOpen && !s.winner && !(meP && meP.in && (meP.value !== null || meP.contested))) {
+      const b = el('div', 'sfida-btns');
+      [['in', 'Ci sto', true], ['out', 'Passo', false]].forEach(([k, l, val]) => {
+        const btn = el('button', `choice ${k === 'in' ? 'si' : 'no'}${meP && meP.in === val ? ' selected' : ''}`, l);
+        btn.type = 'button';
+        btn.onclick = () => sfidaDo({ id: s.id, op: 'join', value: val }, btn);
+        b.append(btn);
+      });
+      row.append(b);
+    } else if (!invited && s.joinOpen) {
+      row.append(el('p', 'event-text', 'Per partecipare fai check-in entro un\'ora dall\'apertura'));
+    }
+
+    const amIn = !!(meP && meP.in);
+    const confirmBtns = (target) => {
+      const b = el('div', 'sfida-btns small');
+      [['confirm', '✓ Confermo', 'si'], ['contest', '✗ Contesto', 'no']].forEach(([op, l, cls]) => {
+        const btn = el('button', `choice ${cls}`, l);
+        btn.type = 'button';
+        btn.onclick = () => {
+          if (op === 'contest' && !confirm('Contestare questo risultato? Alla seconda contestazione vale solo la partecipazione.')) return;
+          sfidaDo({ id: s.id, op, target }, btn);
+        };
+        b.append(btn);
+      });
+      return b;
+    };
+
+    if (s.kind === 'durata') {
+      if (s.noWinner) row.append(el('p', 'event-text', 'Vincitore contestato due volte: vale solo la partecipazione.'));
+      else if (s.winner) {
+        const conf = s.winner.conf ? ` · confermato da ${s.winner.conf}` : ' · da confermare';
+        row.append(el('p', 'sfida-res', `Ha vinto ${s.winner.display} (dice ${s.winner.byDisplay})${conf}`));
+        if (amIn && !s.winner.conf && s.winner.by !== me.name) row.append(confirmBtns('__winner'));
+      } else if (amIn && ins.length >= 2) {
+        row.append(el('p', 'event-text', s.winnerContests ? 'Vincitore contestato: dichiaratelo di nuovo. Chi ha vinto?' : 'Finita? Chi ha vinto?'));
+        const b = el('div', 'sfida-btns wrap');
+        ins.forEach((p) => {
+          const btn = el('button', 'choice', p.display);
+          btn.type = 'button';
+          btn.onclick = () => confirm(`Ha vinto ${p.display}?`) && sfidaDo({ id: s.id, op: 'winner', target: p.name }, btn);
+          b.append(btn);
+        });
+        row.append(b);
+      }
+      return row;
+    }
+
+    // Ripetizioni: risultati di tutti, con conferme
+    ins.forEach((p) => {
+      const r = el('div', 'sfida-row');
+      let txt;
+      if (p.annulled) txt = `${p.display}: contestato due volte, vale la partecipazione`;
+      else if (p.value === null) txt = `${p.display}: ${p.contested ? 'contestato, da riscrivere' : 'deve ancora scrivere'}`;
+      else {
+        const pct = p.record ? ` (${Math.round((p.value / p.record) * 100)}% del record ${p.record})` : ' (prima volta: calibrazione)';
+        txt = `${p.display}: ${p.value}${pct}${p.by ? ` · ✓ ${p.by}` : ' · da confermare'}`;
+      }
+      r.append(el('p', 'sfida-res', txt));
+      if (amIn && p.name !== me.name && p.value !== null && !p.by && !p.annulled) r.append(confirmBtns(p.name));
+      row.append(r);
+    });
+    if (amIn && meP.value === null && !meP.annulled) {
+      const f = el('form', 'sfida-form');
+      const input = el('input', 'sfida-num');
+      Object.assign(input, { type: 'number', inputMode: 'numeric', min: 0, max: 2000, placeholder: 'Quante?', value: sfidaDrafts[s.id] || '' });
+      input.oninput = () => (sfidaDrafts[s.id] = input.value);
+      input.onblur = () => setTimeout(() => listDeferred && render(), 0);
+      const btn = el('button', 'primary small', 'Invia');
+      f.append(input, btn);
+      f.onsubmit = (e) => {
+        e.preventDefault();
+        const n = Number(input.value);
+        if (!(input.value !== '' && n >= 0)) return toast('Scrivi quante ne hai fatte');
+        if (!confirm(`Confermi ${n} ${s.label.toLowerCase()}?`)) return;
+        delete sfidaDrafts[s.id];
+        input.blur();
+        sfidaDo({ id: s.id, op: 'value', value: n }, btn);
+      };
+      row.append(el('p', 'sfida-hint', meP.record ? `Il tuo record: ${meP.record}. Per vincere superalo più degli altri.` : 'Prima volta: questo numero sarà il tuo record (calibrazione, vale la partecipazione).'));
+      row.append(f);
+    }
+    return row;
+  }
+
+  function sfidaEnd(d) {
+    const s = (data.sfide || []).find((x) => x.id === d.id);
+    const row = el('div', 'event award');
+    row.append(el('p', 'event-title', s ? `Sfida conclusa: ${s.label}` : 'Sfida conclusa'));
+    const r = s && s.result;
+    if (r) {
+      row.append(el('p', 'event-text', r.winners.length ? `Vince ${r.winners.join(', ')} (+5)` : 'Nessun vincitore'));
+      const others = r.points.filter((x) => x.pts !== 5).map((x) => x.display);
+      if (others.length) row.append(el('p', 'event-text', `Partecipazione +2: ${others.join(', ')}`));
+      r.records.filter((x) => !x.first).forEach((x) => row.append(el('p', 'event-text', `Nuovo record di ${x.display}: ${x.value}`)));
+    }
+    return row;
+  }
+
   function eventRow(m) {
+    const d0 = m.data || {};
+    if (d0.kind === 'sfida') {
+      const card = sfidaCard(d0);
+      card.append(el('span', 'time', m.time));
+      return card;
+    }
+    if (d0.kind === 'sfidaFine') {
+      const card = sfidaEnd(d0);
+      card.append(el('span', 'time', m.time));
+      return card;
+    }
     const row = el('div', 'event');
     const d = m.data || {};
     const name = m.display || who(m.name);
