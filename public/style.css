@@ -133,9 +133,8 @@ input::placeholder { color: #636366; }
   display: grid; grid-template-columns: repeat(4, 1fr);
   background: rgba(22, 22, 24, .82); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
   border-top: .5px solid var(--line);
-  /* Icone 12 pt più in basso, come WhatsApp: si toglie spazio sotto (sopra la barretta di iPhone) e lo si
-     mette sopra, così l'altezza della barra non cambia. Senza barretta (safe area 0) resta com'era. */
-  padding: calc(6px + min(12px, env(safe-area-inset-bottom))) 8px max(4px, calc(env(safe-area-inset-bottom) - 8px));
+  /* Icone più vicine al fondo, come WhatsApp: sotto 8 pt meno della barretta di iPhone (senza barretta 4 pt) */
+  padding: 6px 8px max(4px, calc(env(safe-area-inset-bottom) - 8px));
 }
 .tabbar button {
   margin: 0; padding: 4px 0; border: 0; background: none; color: #757575; font-size: 10.5px; font-weight: 600;
@@ -408,8 +407,8 @@ body.fake-data #page-title::after { content: 'DATI FITTIZI'; margin-left: 10px; 
 
 /* iOS 26 sfoca la parte alta delle app installate (circa 40 punti sotto la barra di stato) e nessuna
    impostazione lo spegne: lasciamo lì una fascia vuota, così la sfocatura non copre titoli e sondaggio. */
-html.ios.standalone body { padding-top: 1.75rem; }
-html.ios.standalone .sheet, html.ios.standalone .viewer { top: 1.75rem; }
+html.ios.standalone body { padding-top: var(--ios-top, 28px); }
+html.ios.standalone .sheet, html.ios.standalone .viewer { top: var(--ios-top, 28px); }
 
 /* Orario del sondaggio: su iPhone il campo vuoto non mostra nulla, quindi una scritta al suo posto */
 .time-wrap { position: relative; display: block; min-width: 0; }
@@ -420,7 +419,7 @@ html.ios.standalone .sheet, html.ios.standalone .viewer { top: 1.75rem; }
 .time-wrap.busy input { opacity: 0; } /* non visibility: un campo nascosto perde il fuoco e chiuderebbe la rotella */
 .time-wrap .bicep { position: absolute; top: 50%; left: 50%; width: 30px; height: 29px; margin: -14px 0 0 -15px; color: #000; --bicep-bg: var(--exercise); pointer-events: none; }
 /* In chat il sondaggio non scorre: va tenuto tutto sotto la sfocatura di iOS (circa 50 punti dall'alto) */
-html.ios.standalone .chat-top { padding-top: 36px; }
+html.ios.standalone .chat-top { padding-top: var(--ios-chat, 36px); }
 
 /* Sondaggio: chi c'è e chi no, sempre visibile */
 .poll-names { margin: 8px 0 0; font-size: 13px; line-height: 1.35; color: var(--fg); }
@@ -548,3 +547,11 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 .sfida-between { margin: 2px 0 2px !important; font-size: 14px; font-weight: 700; color: var(--fg); }
 .sfida-saving { display: flex; align-items: center; gap: 6px; margin-top: 6px !important; font-size: 13px; color: var(--muted); }
 .sfida-saving .bicep { width: 22px; height: 22px; color: #ff9f0a; --bicep-bg: var(--card); }
+
+/* Salvataggio in corso (Sudometro) */
+.saving-line { display: flex; align-items: center; gap: 8px; margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+.saving-line .bicep { width: 26px; height: 26px; color: var(--stand); --bicep-bg: var(--card); }
+/* Cursori del margine in alto (debug) */
+.range-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; padding: 12px 0; }
+.range-row input { grid-column: 1 / -1; width: 100%; padding: 0; margin: 0; background: none; }
+.range-row b { font-variant-numeric: tabular-nums; }

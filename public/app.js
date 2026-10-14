@@ -146,8 +146,9 @@ function render() {
   const btn = $('btn-checkin');
   btn.disabled = me.checkedInToday;
   btn.classList.toggle('done', me.checkedInToday);
-  btn.innerHTML = me.checkedInToday ? '<svg><use href="#i-check"/></svg>Check-in fatto oggi' : 'Sono in palestra';
-  $('btn-checkin-undo').hidden = !me.checkedInToday;
+  btn.innerHTML = me.checkedInToday ? `${savingCheckin ? bicep() : '<svg><use href="#i-check"/></svg>'}Check-in fatto oggi` : 'Sono in palestra';
+  btn.classList.toggle('with-bicep', savingCheckin);
+  $('btn-checkin-undo').hidden = !me.checkedInToday || savingCheckin;
 
   const mine = week.ranking.find((r) => r.name === me.name) || { count: 0, goal: me.goal, streak: 0 };
   $('week-ring').innerHTML = ring(mine.count / mine.goal, ...COLORS.move, { size: 132, width: 20 });
@@ -437,6 +438,7 @@ function renderSudometro() {
         </div>
       </div>`;
     el.querySelector('.sudo-title').textContent = clean(me.sudometroToday.title);
+    if (me.sudometroToday.saving) el.insertAdjacentHTML('beforeend', `<p class="saving-line">${bicep()}<span>Pubblico la foto…</span></p>`);
     if (me.sudometroToday.photoId) {
       const t = me.sudometroToday;
       el.append(photoPair(t.photoId, me.reference && me.reference.photoId, `${me.display} · ${t.score} · ${clean(t.title)}`, true));
@@ -482,9 +484,14 @@ async function login(code) {
   }
 }
 
+// Azioni in corso mostrate subito sullo schermo: finché il server non risponde, i dati vecchi non le cancellano
+let optimistic = 0;
+
 async function refresh() {
   try {
-    state = await api('state');
+    const fresh = await api('state');
+    if (optimistic) return;
+    state = fresh;
     store.set('state', { day: new Date().toDateString(), test: testOn(), data: state });
     if (!state.me.admin && testOn()) store.set('testMode', null); // non più admin: niente prova
     setTimerAccount(state.me.name, state.me.timerSeconds, (s) => api('setTimer', { seconds: s }).catch(() => {}));
@@ -495,18 +502,31 @@ async function refresh() {
   }
 }
 
+let savingCheckin = false;
+
 async function checkin() {
   if (!confirm('Confermi il check-in? Sei in palestra adesso?')) return;
-  await withBusy($('btn-checkin'), 'Check-in…', async () => {
-    try {
-      const r = await api('checkin');
-      toast(r.alreadyToday ? 'Avevi già fatto check-in oggi' : testOn() ? 'Check-in di prova fatto: la notifica arriva solo a te' : 'Check-in fatto. Gli altri lo sapranno.');
-    } catch (err) {
-      toast(`Errore: ${err.message}`);
-    }
-    await refresh();
-  });
+  // Subito "Check-in fatto": il bicipite al posto della spunta finché il server conferma
+  const before = state;
+  state = {
+    ...state,
+    me: { ...state.me, checkedInToday: true },
+    week: { ...state.week, ranking: state.week.ranking.map((r) => (r.name === state.me.name ? { ...r, count: r.count + 1 } : r)) },
+  };
+  savingCheckin = true;
+  optimistic++;
   render();
+  try {
+    const r = await api('checkin');
+    toast(r.alreadyToday ? 'Avevi già fatto check-in oggi' : testOn() ? 'Check-in di prova fatto: la notifica arriva solo a te' : 'Check-in fatto. Gli altri lo sapranno.');
+  } catch (err) {
+    state = before; // non è andato: torna com'era
+    toast(`Errore: ${err.message}`);
+  }
+  savingCheckin = false;
+  optimistic--;
+  render();
+  refresh();
 }
 
 async function checkinUndo() {
@@ -553,7 +573,14 @@ async function takeSweat(debug, overwrite = false) {
     sudoBusy('Analizzo il selfie…');
     const features = await sudometro.analyze(canvas);
     const result = sudometro.score(reference, features);
-    sudoBusy('Pubblico la foto…');
+    let before = null;
+    if (!debug) {
+      // Il risultato si vede subito; la foto si pubblica intanto (bicipite finché non è caricata)
+      before = state;
+      state = { ...state, me: { ...state.me, sudometroToday: { score: result.score, title: result.title, photoId: '', saving: true } } };
+      optimistic++;
+      renderSudometro();
+    } else sudoBusy('Pubblico la foto…');
     const r = await api('sudometro', {
       score: result.score,
       title: result.title,
@@ -561,7 +588,15 @@ async function takeSweat(debug, overwrite = false) {
       debug,
       overwrite,
       photo: sudometro.toJpegBase64(canvas),
+    }).catch((err) => {
+      if (before) {
+        state = before; // non è andato: torna com'era
+        optimistic--;
+        before = null;
+      }
+      throw err;
     });
+    if (before) optimistic--;
     if (debug) {
       lastDebug = [
         `${result.score}: ${result.title}`,
@@ -769,6 +804,28 @@ function renderAdmin() {
 }
 
 $('btn-admin').addEventListener('click', openAdmin);
+
+// Margini in alto su iPhone (debug): per trovare dove iOS smette di sfocare. Salvati solo su questo telefono.
+const IOS_MARGINS = { 'ios-top': 28, 'ios-chat': 36 };
+function applyIosMargins() {
+  Object.keys(IOS_MARGINS).forEach((k) => {
+    const v = store.get(k);
+    const val = typeof v === 'number' ? v : IOS_MARGINS[k];
+    if (typeof v === 'number') document.documentElement.style.setProperty(`--${k}`, `${v}px`);
+    else document.documentElement.style.removeProperty(`--${k}`);
+    $(k).value = val;
+    $(`${k}-val`).textContent = `${val} pt`;
+  });
+}
+Object.keys(IOS_MARGINS).forEach((k) => $(k).addEventListener('input', (e) => {
+  store.set(k, Number(e.target.value));
+  applyIosMargins();
+}));
+$('ios-reset').addEventListener('click', () => {
+  Object.keys(IOS_MARGINS).forEach((k) => store.set(k, null));
+  applyIosMargins();
+});
+applyIosMargins();
 $('act-as').addEventListener('change', async (e) => {
   store.set('actAs', e.target.value || null);
   store.set('state', null);
@@ -1028,10 +1085,20 @@ document.addEventListener('visibilitychange', () => {
 
 // Tastiera aperta: l'app si restringe all'area visibile, così la casella dei messaggi
 // resta sopra la tastiera (i tab spariscono mentre scrivi, come in WhatsApp).
+// Tastiera aperta: su iOS 26 con la tastiera si accorcia anche la finestra, quindi non basta confrontare
+// l'area visibile con innerHeight. Vale anche "c'è un campo di testo attivo" e il confronto con l'altezza
+// massima vista; la barra dei tab resta nascosta dietro la tastiera invece di salire sopra.
+let fullHeight = 0;
+const TEXT_TYPES = ['text', 'search', 'number', 'email', 'tel', 'url', 'password'];
+function typingNow() {
+  const a = document.activeElement;
+  return !!a && (a.tagName === 'TEXTAREA' || (a.tagName === 'INPUT' && TEXT_TYPES.includes(a.type)));
+}
 function fitViewport() {
   const vv = window.visualViewport;
   if (!vv) return;
-  const keyboard = vv.height < window.innerHeight - 120;
+  if (!typingNow()) fullHeight = Math.max(fullHeight, window.innerHeight, Math.round(vv.height));
+  const keyboard = typingNow() || vv.height < Math.max(window.innerHeight, fullHeight) - 120;
   document.documentElement.style.setProperty('--app-h', `${Math.round(vv.height)}px`);
   document.body.classList.toggle('keyboard', keyboard);
   if (keyboard) window.scrollTo(0, 0);
@@ -1039,6 +1106,8 @@ function fitViewport() {
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', fitViewport);
   window.visualViewport.addEventListener('scroll', fitViewport);
+  document.addEventListener('focusin', fitViewport);
+  document.addEventListener('focusout', () => setTimeout(fitViewport, 60));
 }
 $('chat-input').addEventListener('focus', () => {
   setTimeout(() => ($('scroller').scrollTop = $('scroller').scrollHeight), 350);
