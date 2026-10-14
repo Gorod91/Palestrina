@@ -132,7 +132,10 @@ input::placeholder { color: #636366; }
   flex: none; z-index: 5;
   display: grid; grid-template-columns: repeat(4, 1fr);
   background: rgba(22, 22, 24, .82); backdrop-filter: saturate(180%) blur(20px); -webkit-backdrop-filter: saturate(180%) blur(20px);
-  border-top: .5px solid var(--line); padding: 6px 8px calc(4px + env(safe-area-inset-bottom));
+  border-top: .5px solid var(--line);
+  /* Icone 12 pt più in basso, come WhatsApp: si toglie spazio sotto (sopra la barretta di iPhone) e lo si
+     mette sopra, così l'altezza della barra non cambia. Senza barretta (safe area 0) resta com'era. */
+  padding: calc(6px + min(12px, env(safe-area-inset-bottom))) 8px max(4px, calc(env(safe-area-inset-bottom) - 8px));
 }
 .tabbar button {
   margin: 0; padding: 4px 0; border: 0; background: none; color: #757575; font-size: 10.5px; font-weight: 600;
