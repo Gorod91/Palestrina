@@ -393,7 +393,7 @@ body.chat-mode #scroller { background: #0b0b0c url("chat-bg.svg") repeat; backgr
 .sender .crown { width: 14px; height: 12px; margin-left: 4px; }
 
 /* Dati fittizi attivi: avviso fisso in alto */
-body.test-mode #page-title::after { content: 'PROVA'; margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: #0a84ff; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; vertical-align: middle; }
+body.test-mode #page-title::after { content: attr(data-test); margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: #0a84ff; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; vertical-align: middle; }
 body.test-mode .tabbar { box-shadow: inset 0 2px 0 #0a84ff; }
 body.fake-data #page-title::after { content: 'DATI FITTIZI'; margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: #ff9f0a; color: #000; font-size: 11px; font-weight: 700; letter-spacing: .04em; vertical-align: middle; }
 
@@ -541,3 +541,4 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 .sfida-form input { flex: 1; margin: 0; padding: 10px 12px; font-size: 16px; text-transform: none; letter-spacing: 0; }
 .sfida-form .primary.small { flex: none; }
 .sfida-how { display: inline-block; margin: 4px 0 0; padding: 0; border: 0; background: none; color: var(--stand); font-size: 13px; }
+.act-as { max-width: 55%; padding: 6px 8px; border: 0; border-radius: 8px; background: var(--card-2); color: var(--fg); font-size: 15px; }

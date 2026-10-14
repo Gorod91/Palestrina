@@ -362,12 +362,19 @@ function doPost(e) {
     } catch (err) {
       console.error('Novità non rilasciate', err);
     }
-    const user = findUserByCode(req.code);
+    let user = findUserByCode(req.code);
     if (!user) return json({ error: 'Codice non valido' });
     if (req.test === true && user.admin) {
       TEST = true;
       TESTER = user.name;
       MEMO = {};
+      // "Agisci come" (solo in prova): l'admin fa le azioni a nome di un altro, sui dati di prova.
+      // Le notifiche restano dirette a chi prova (TESTER); i poteri da admin restano.
+      if (req.actAs && req.actAs !== user.name) {
+        const other = allUsers().find((u) => u.name === String(req.actAs));
+        if (!other) return json({ error: 'Utente non trovato' });
+        user = { ...other, admin: true, debug: user.debug, actingAs: true };
+      }
     }
     try {
       closeOldSfide();
@@ -695,6 +702,7 @@ function buildState(user) {
       goal: user.goal,
       debug: user.debug,
       admin: user.admin,
+      actingAs: !!user.actingAs,
       checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
       sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title, photoId: mySudoToday.photoId } : null,
       reference: getReference(user),

@@ -138,7 +138,7 @@ Solo admin, in **Impostazioni → Admin → Modalità prova** (in alto compare l
 - le notifiche arrivano solo a chi prova, con **[PROVA]** nel titolo e l'elenco di chi le avrebbe ricevute;
 - nessuna foto vera finisce nel cestino, l'alias non si cambia.
 
-Con la prova attiva ci sono anche **Simula il recap della settimana**, **Simula le premiazioni del mese** e **Riallinea la prova ai dati veri** (cancella fogli e proprietà di prova). Il check-in automatico di Comandi resta sempre vero.
+Con la prova attiva c'è **Agisci come**: si sceglie un altro utente e l'app si comporta come se fosse lui (check-in, sfide, risposte, conferme), sempre sui dati di prova e con le notifiche solo a chi prova; in alto compare "PROVA · nome". Ci sono anche **Simula il recap della settimana**, **Simula le premiazioni del mese** e **Riallinea la prova ai dati veri** (cancella fogli e proprietà di prova). Il check-in automatico di Comandi resta sempre vero.
 
 ### Novità dormienti
 

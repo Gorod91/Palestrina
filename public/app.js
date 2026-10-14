@@ -59,7 +59,7 @@ async function realApi(action, data = {}) {
   const res = await fetch(cfg.appsScriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, code: session && session.code, ...(testOn() ? { test: true } : {}), ...data }),
+    body: JSON.stringify({ action, code: session && session.code, ...(testOn() ? { test: true, actAs: store.get('actAs') || undefined } : {}), ...data }),
   });
   const out = await res.json();
   if (out.error) throw new Error(out.error);
@@ -173,7 +173,7 @@ function render() {
   if (document.activeElement !== $('in-name')) $('in-name').value = me.alias || '';
   $('in-name').placeholder = me.name;
   $('name-hint').textContent = `È il nome che vedono gli altri in classifica e nelle notifiche. Lascia vuoto per usare il nome originale (${me.name}).`;
-  if (session.display !== me.display) {
+  if (!me.actingAs && session.display !== me.display) {
     session.display = me.display;
     store.set('session', session);
     show('home');
@@ -189,8 +189,19 @@ function render() {
   $('fake-mode').checked = fakeOn();
   document.body.classList.toggle('fake-data', fakeOn());
   document.body.classList.toggle('test-mode', testOn());
+  $('page-title').dataset.test = me.actingAs ? `PROVA · ${me.display}` : 'PROVA';
   $('test-mode').checked = testOn();
   $('test-tools').hidden = !testOn();
+  // "Agisci come": tutti tranne me (l'admin vero è quello della sessione)
+  const others = week.ranking.filter((r) => r.name !== session.name);
+  const opts = [['', `${session.display || session.name} (io)`]].concat(others.map((r) => [r.name, r.display]));
+  const sel = $('act-as');
+  const want = opts.map(([v, l]) => `${v}|${l}`).join(';');
+  if (sel.dataset.opts !== want) {
+    sel.innerHTML = opts.map(([v, l]) => `<option value="${escHtml(v)}">${escHtml(l)}</option>`).join('');
+    sel.dataset.opts = want;
+  }
+  sel.value = store.get('actAs') || '';
   $('rule-apripista').hidden = !(state.features && state.features.apripista);
   $('rule-oltre').hidden = !(state.features && state.features.oltre);
   $('rule-falsono').hidden = !(state.features && state.features.falsoNo);
@@ -759,8 +770,16 @@ function renderAdmin() {
 }
 
 $('btn-admin').addEventListener('click', openAdmin);
+$('act-as').addEventListener('change', async (e) => {
+  store.set('actAs', e.target.value || null);
+  store.set('state', null);
+  toast(e.target.value ? `Ora agisci come ${e.target.selectedOptions[0].textContent} (solo in prova)` : 'Di nuovo te stesso');
+  await refresh();
+  chat.reload();
+});
 $('test-mode').addEventListener('change', async (e) => {
   store.set('testMode', e.target.checked ? true : null);
+  if (!e.target.checked) store.set('actAs', null); // fuori dalla prova si è sempre se stessi
   store.set('state', null);
   toast(e.target.checked ? 'Modalità prova attiva: niente arriva agli altri' : 'Modalità prova spenta: dati veri');
   render();
