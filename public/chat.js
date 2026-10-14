@@ -328,18 +328,12 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         renderPoll(true);
       };
     });
-    // Le mie caselle della settimana: un tocco passa a Ci sono → Forse → No → niente (solo nei giorni con la domanda)
+    // Le mie caselle della settimana: un tocco seleziona il giorno; risposta e orario si cambiano dai pulsanti sopra.
+    // (Prima un tocco faceva girare la risposta: chi toccava "19:15" per cambiare l'orario si ritrovava su "Forse".)
     card.querySelectorAll('[data-cell]').forEach((b) => {
       b.onclick = () => {
-        const d = plans.find((x) => x.day === b.dataset.cell);
-        if (!d) return;
-        selDay = d.day;
-        if (!d.poll) return renderPoll(true);
-        const p = d.people.find((x) => x.name === me.name) || {};
-        const next = { '': 'si', si: 'forse', forse: 'no', no: '' }[p.choice || ''];
-        setLocal(d.day, next, next ? p.time || '' : '');
+        selDay = b.dataset.cell;
         renderPoll(true);
-        queuePlan(d.day, next, next ? p.time || '' : '');
       };
     });
     const tg = card.querySelector('.week-toggle');
@@ -421,7 +415,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         const p = d.people.find((x) => x.name === person.name) || {};
         const c = d.poll ? p.choice || '' : '';
         const txt = { si: p.time || '✓', forse: '?', no: '✕' }[c] || '';
-        const cls = ['pcell', c, mine && 'me', !d.poll && 'closed', p.arrived && 'arrived'].filter(Boolean).join(' ');
+        const cls = ['pcell', c, mine && 'me', mine && d.day === selDay && 'sel', !d.poll && 'closed', p.arrived && 'arrived'].filter(Boolean).join(' ');
         return mine ? `<button class="${cls}" data-cell="${d.day}" type="button">${txt}</button>` : `<span class="${cls}" data-day="${d.day}">${txt}</span>`;
       });
       return `<span class="pname${mine ? ' me' : ''}">${mine ? 'Tu' : esc(person.display)}</span>${cells.join('')}`;

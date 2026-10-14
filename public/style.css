@@ -452,6 +452,7 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 .pcell.forse { background: #ffd60a; color: #000; }
 .pcell.no { background: rgba(255, 69, 58, .2); color: var(--danger); }
 .pcell.me { box-shadow: 0 0 0 1.5px var(--stand); }
+.pcell.me.sel { box-shadow: 0 0 0 2.5px var(--fg); }
 .pcell .bicep { width: 22px; height: 21px; color: var(--exercise); --bicep-bg: var(--card-2); }
 .pcell.si .bicep { color: #000; --bicep-bg: var(--exercise); }
 .plan-note { margin: 6px 0 0; }
