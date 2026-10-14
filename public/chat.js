@@ -353,7 +353,6 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     // l'ultima modifica, senza ridisegnare la casella mentre la rotella è aperta (si chiuderebbe).
     // Con un orario e nessuna risposta vale "Ci sono".
     const timeInput = card.querySelector('#poll-time');
-    timeInput.oninput = () => timeInput.parentNode.classList.toggle('filled', !!timeInput.value);
     // Orario: si vede subito e parte poco dopo l'ultima modifica o alla chiusura della rotella.
     // Su iPhone "change" arriva a ogni giro della rotella: mentre è aperta la casella non si ridisegna (si chiuderebbe).
     // Con un orario e nessuna risposta vale "Ci sono".
@@ -370,18 +369,24 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       const c = now.choice || 'si';
       setLocal(day, c, t);
       queuePlan(day, c, t);
+      toast(t ? `Orario: ${t}` : 'Orario tolto', 1800); // si vede subito cosa è stato salvato
       if (!focused()) renderPoll(true);
     };
     // Mentre la rotella gira non si salva: si salva alla chiusura (blur) o dopo qualche secondo fermi,
     // così i passaggi intermedi (17:28 → 19:28 → 19:15) non diventano cambi e notifiche.
-    timeInput.onchange = () => {
+    // iPhone a volte manda solo "input", a volte solo "change": si ascoltano tutti e due.
+    const onWheel = () => {
+      timeInput.parentNode.classList.toggle('filled', !!timeInput.value);
       clearTimeout(timer);
       timer = setTimeout(saveTime, focused() ? 4000 : 600);
     };
+    timeInput.oninput = onWheel;
+    timeInput.onchange = onWheel;
+    // Alla chiusura si aspetta un attimo: iPhone fissa l'ultimo valore della rotella subito dopo il blur
     timeInput.onblur = () => setTimeout(() => {
       saveTime();
       renderPoll(true); // aggiorna nomi e pulsanti rimasti indietro mentre la rotella era aperta
-    }, 0);
+    }, 300);
     // Chi c'è e chi no, in chiaro e in poco spazio
     const names = card.querySelector('.poll-names');
     const who = (k) => plan.people.filter((p) => p.choice === k).map((p) => p.display + (p.time ? ` ${p.time}` : '') + (p.arrived ? ' ✓' : ''));
