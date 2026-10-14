@@ -548,21 +548,3 @@ html.ios.standalone .chat-top { padding-top: 36px; }
 .sfida-between { margin: 2px 0 2px !important; font-size: 14px; font-weight: 700; color: var(--fg); }
 .sfida-saving { display: flex; align-items: center; gap: 6px; margin-top: 6px !important; font-size: 13px; color: var(--muted); }
 .sfida-saving .bicep { width: 22px; height: 22px; color: #ff9f0a; --bicep-bg: var(--card); }
-
-/* Animazioni delle sfide: solo quando qualcosa cambia (classi messe da chat.js) */
-@keyframes card-enter { from { opacity: 0; transform: translateY(18px) scale(.96); } to { opacity: 1; transform: none; } }
-@keyframes card-bump { from { box-shadow: 0 0 0 0 rgba(255, 159, 10, .55); } to { box-shadow: 0 0 0 14px rgba(255, 159, 10, 0); } }
-@keyframes card-won { from { box-shadow: 0 0 0 0 rgba(166, 255, 0, .7); } to { box-shadow: 0 0 0 22px rgba(166, 255, 0, 0); } }
-@keyframes pop-in { 0% { opacity: 0; transform: scale(.5); } 60% { opacity: 1; transform: scale(1.12); } 100% { transform: scale(1); } }
-@keyframes fade-in { from { opacity: 0; } }
-.event.enter { animation: card-enter .45s cubic-bezier(.2, .8, .2, 1); }
-.event.sfida.changed { animation: card-bump .6s ease-out; }
-.event.sfida.won, .event.award.won { border-color: var(--exercise); animation: card-won 1s ease-out 2; }
-.event.sfida.won .sfida-win, .event.award.won .event-title + .event-text { display: inline-block; animation: pop-in .6s cubic-bezier(.2, .8, .2, 1) .15s both; }
-.sfida-saving { animation: fade-in .2s ease-out; }
-.sfida-btns .choice, .sfida-form .primary, .event.news .primary { transition: transform .12s ease-out; }
-.sfida-btns .choice:active, .sfida-form .primary:active, .event.news .primary:active { transform: scale(.94); }
-@media (prefers-reduced-motion: reduce) {
-  .event.enter, .event.sfida.changed, .event.sfida.won, .event.award.won, .sfida-win, .event-text, .sfida-saving { animation: none !important; }
-  .sfida-btns .choice, .sfida-form .primary, .event.news .primary { transition: none; }
-}
