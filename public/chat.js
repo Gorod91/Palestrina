@@ -482,6 +482,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       return;
     }
     listDeferred = false;
+    listRenders++;
     const list = $('chat-list');
     list.dataset.rendered = '1';
     list.innerHTML = '';
@@ -522,6 +523,18 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
 
   let listDeferred = false;
   let sfidaSending = 0;
+  // Animazioni solo quando qualcosa cambia davvero (la lista si ridisegna a ogni aggiornamento):
+  // ultimo stato visto di ogni card, per id.
+  let listRenders = 0;
+  const seen = {};
+  /** Classe di animazione per una card: entra (nuova), cambiata, vinta (appena conclusa). */
+  function motion(key, sig, state) {
+    const prev = seen[key];
+    seen[key] = { sig, state };
+    if (!prev) return listRenders > 1 ? 'enter' : '';
+    if (prev.state === 'aperta' && state === 'conclusa') return 'won';
+    return prev.sig !== sig ? 'changed' : '';
+  }
   const sfidaDrafts = {}; // numeri scritti e non ancora inviati, per sfida
 
   /** Cambia subito la card (senza aspettare il server): quello che il server farà con questa azione. */
@@ -584,6 +597,10 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   function sfidaCard(d) {
     const s = (data.sfide || []).find((x) => x.id === d.id);
     const row = el('div', 'event sfida');
+    if (s) {
+      const m = motion(`sfida:${s.id}`, JSON.stringify([s.people, s.winner, s.noWinner, s.invited.length]), s.state);
+      if (m) row.classList.add(m);
+    }
     if (!s) {
       row.append(el('p', 'event-title', 'Sfida'), el('p', 'event-text', 'Sfida non più disponibile'));
       return row;
@@ -707,6 +724,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   function sfidaEnd(d) {
     const s = (data.sfide || []).find((x) => x.id === d.id);
     const row = el('div', 'event award');
+    if (motion(`fine:${d.id}`, '', 'conclusa') === 'enter') row.classList.add('won');
     row.append(el('p', 'event-title', s ? `Sfida conclusa: ${s.label}` : 'Sfida conclusa'));
     const r = s && s.result;
     if (r) {
@@ -752,6 +770,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     } else if (d.kind === 'news') {
       // Novità sbloccate: le slide si aprono a tutto schermo
       row.classList.add('award', 'news');
+      if (motion(`news:${m.id}`, '', '') === 'enter') row.classList.add('enter');
       row.append(el('p', 'event-title', d.title || 'Novità'));
       row.append(el('p', 'event-text', d.body || ''));
       const btn = el('button', 'primary small', 'Guarda le novità');
