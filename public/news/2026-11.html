@@ -54,20 +54,35 @@
   .week i { flex: none; width: 3px; height: 56px; border-radius: 2px; background: var(--fg); }
   .cmp { row-gap: 10px; }
   .cmp b { font-size: 38px; }
+  /* Falso no */
+  .eyebrow.red { color: #ff453a; }
+  .check.sneaky { border-color: #ff453a66; }
+  .check.sneaky span { background: #ff453a; color: #fff; }
+  .plus.minus { color: #ff453a; text-shadow: 0 0 60px #ff453a88; }
+  /* Cosa cambia: prima → ora */
+  .rows { display: grid; gap: 10px; margin: 26px 0 24px; }
+  .rows p { display: grid; grid-template-columns: 1fr 56px 56px; align-items: center; gap: 8px; padding: 16px; border-radius: 18px; background: #1c1c1e; }
+  .rows p.rh { padding: 0 16px; background: none; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .rows p.rh span:not(:first-child) { text-align: center; }
+  .rows span { font-size: 16px; line-height: 1.3; color: #d1d1d6; }
+  .rows b, .rows em { text-align: center; font-style: normal; font-size: 26px; font-weight: 900; letter-spacing: -.03em; }
+  .rows b { color: var(--muted); }
+  .rows em { color: var(--lime); }
+  .rows em.red { color: #ff453a; }
   .rules { list-style: none; padding: 0; display: grid; gap: 10px; font-size: 17px; color: #d1d1d6; }
   .rules li::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%; background: var(--cyan); vertical-align: middle; }
   .hint { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 16px); text-align: center; font-size: 14px; color: var(--muted); }
 </style>
 </head>
 <body>
-  <div class="bars"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
+  <div class="bars"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
   <button class="close" aria-label="Chiudi">×</button>
 
   <section class="slide">
     <div class="glow"></div>
     <p class="eyebrow" data-a style="--d:.2">Novità</p>
     <h1 data-a style="--d:.5;--anim:pop">Novembre.</h1>
-    <p class="lead" data-a style="--d:1.1">Due nuovi modi di fare punti.<br>Chi rompe il ghiaccio. E chi non si ferma.</p>
+    <p class="lead" data-a style="--d:1.1">Due nuovi modi di fare punti.<br>E uno nuovo per perderli.</p>
     <p class="hint" data-a style="--d:2">Tocca per continuare</p>
   </section>
 
@@ -99,16 +114,27 @@
   </section>
 
   <section class="slide">
+    <p class="eyebrow red" data-a style="--d:0">Falso no</p>
+    <h2 data-a style="--d:.1">Dite di no?<br>Allora non venite.</h2>
+    <div class="scene">
+      <p class="bubble" data-a style="--d:.7;--anim:left"><small>Voi</small>Stasera no, sono distrutto</p>
+      <p class="check sneaky" data-a style="--d:1.5;--anim:right"><span>✓</span>Check-in alle 19:02</p>
+      <p class="plus minus" data-a style="--d:2.3;--anim:pop">−5</p>
+    </div>
+    <p class="lead" data-a style="--d:2.9">Avete detto "no" e poi fate check-in? −5. Cambiate idea? Ditelo almeno un'ora prima.</p>
+  </section>
+
+  <section class="slide">
     <p class="eyebrow" data-a style="--d:.1">Cosa cambia</p>
-    <div class="cmp">
-      <div data-a style="--d:.4;--anim:left"><p>Prima</p><b>0</b><span>per chi faceva la domanda</span></div>
-      <div class="new" data-a style="--d:.7;--anim:right"><p>Da novembre</p><b>+3</b><span>se la fate per primi e poi andate</span></div>
-      <div data-a style="--d:1;--anim:left"><p>Prima</p><b>10</b><span>per ogni ingresso, sempre</span></div>
-      <div class="new" data-a style="--d:1.3;--anim:right"><p>Da novembre</p><b>13</b><span>per ogni ingresso oltre l'obiettivo</span></div>
+    <div class="rows">
+      <p class="rh" data-a style="--d:.3"><span></span><span>Prima</span><span>Ora</span></p>
+      <p data-a style="--d:.6;--anim:left"><span>Fare la domanda e poi andare</span><b>0</b><em>+3</em></p>
+      <p data-a style="--d:.9;--anim:left"><span>Ingresso oltre l'obiettivo</span><b>10</b><em>13</em></p>
+      <p data-a style="--d:1.2;--anim:left"><span>Dire "no" e poi venire</span><b>−3</b><em class="red">−5</em></p>
     </div>
     <ul class="rules">
-      <li data-a style="--d:1.8">Apripista: solo il primo che chiede, una volta per giorno</li>
-      <li data-a style="--d:2.1">Tutto il resto resta com'è</li>
+      <li data-a style="--d:1.7">Apripista: solo il primo che chiede, una volta per giorno</li>
+      <li data-a style="--d:2">Tutto il resto resta com'è</li>
     </ul>
     <p class="hint" data-a style="--d:2.6">Tocca per chiudere</p>
   </section>

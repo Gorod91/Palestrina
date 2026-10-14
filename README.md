@@ -144,9 +144,10 @@ Con la prova attiva ci sono anche **Simula il recap della settimana**, **Simula 
 
 Le funzioni nuove si preparano "dormienti": si aggiungono in `NEWS` in `Code.gs` (id, mese di rilascio, giorno da cui contano i punti, funzioni coinvolte, titolo e testo della notifica) con le slide in `public/news/<id>.html`. Restano invisibili finché, l'ultimo giorno del mese, subito dopo le premiazioni del mese (trigger delle 21, verso le 21:05), il server le rilascia: evento **Novità** in chat con il tasto *Guarda le novità* (slide a tutto schermo) e notifica a tutti. Se il trigger non parte, il rilascio avviene alla prima apertura dell'app dopo le 23 o nei giorni successivi. In modalità prova il tasto **Simula il rilascio delle novità** le mostra in anticipo, e i loro punti contano da subito.
 
-Novità di novembre 2026 (+3 punti ciascuna, dal 1° novembre):
+Novità di novembre 2026 (dal 1° novembre):
 - **Apripista**: chi fa per primo la domanda "chi va in palestra?" per un giorno e quel giorno fa check-in;
 - **Oltre l'obiettivo**: ogni ingresso della settimana dopo quelli dell'obiettivo (con obiettivo 2: dal terzo in poi).
+- **Falso no** (−5): hai detto "no" per quel giorno e fai check-in, senza aver cambiato risposta almeno un'ora prima; sostituisce il −3 di "Check-in senza avvisare".
 
 ### Aggiornamento automatico
 
