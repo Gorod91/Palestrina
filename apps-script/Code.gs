@@ -31,7 +31,66 @@ const DEBUG_USERS = ['Francesco'];
 // Admin: può annullare e ripristinare le azioni di tutti (registro admin nelle Impostazioni).
 const ADMIN_USERS = ['Francesco'];
 const TZ = Session.getScriptTimeZone();
-const props = PropertiesService.getScriptProperties();
+const realProps = PropertiesService.getScriptProperties();
+
+// ---------- Modalità prova (solo admin) ----------
+// Le richieste con { test: true } fanno girare tutto il server, ma su fogli "Prova · …" (copiati da quelli veri
+// al primo uso) e con le proprietà copiate alla prima scrittura (prova_…). Le notifiche arrivano solo a chi prova.
+let TEST = false;
+let TESTER = '';
+const TEST_SHEETS = ['presenze', 'sudometro', 'chat', 'piani', 'cambi', 'annullati'];
+const TEST_PREFIX = 'prova_';
+const TEST_DELETED = '__eliminata__';
+const props = {
+  getProperty(k) {
+    if (TEST) {
+      const v = realProps.getProperty(TEST_PREFIX + k);
+      if (v !== null && v !== undefined) return v === TEST_DELETED ? null : v;
+    }
+    return realProps.getProperty(k);
+  },
+  setProperty(k, v) {
+    return realProps.setProperty(TEST ? TEST_PREFIX + k : k, v);
+  },
+  deleteProperty(k) {
+    if (TEST) realProps.setProperty(TEST_PREFIX + k, TEST_DELETED);
+    else realProps.deleteProperty(k);
+  },
+  getProperties() {
+    const all = realProps.getProperties();
+    const out = {};
+    Object.keys(all).forEach((k) => {
+      if (k.indexOf(TEST_PREFIX) !== 0) out[k] = all[k];
+    });
+    if (TEST) {
+      Object.keys(all).forEach((k) => {
+        if (k.indexOf(TEST_PREFIX) !== 0) return;
+        const key = k.slice(TEST_PREFIX.length);
+        if (all[k] === TEST_DELETED) delete out[key];
+        else out[key] = all[k];
+      });
+    }
+    return out;
+  },
+};
+
+function sheetName(key) {
+  return (TEST && TEST_SHEETS.includes(key) ? 'Prova · ' : '') + SHEETS[key].name;
+}
+
+/** Riallinea la prova ai dati veri: cancella fogli e proprietà di prova (si ricreano copiando i veri). */
+function testReset() {
+  const ss = SpreadsheetApp.getActive();
+  TEST_SHEETS.forEach((key) => {
+    const sh = ss.getSheetByName('Prova · ' + SHEETS[key].name);
+    if (sh) ss.deleteSheet(sh);
+  });
+  Object.keys(realProps.getProperties())
+    .filter((k) => k.indexOf(TEST_PREFIX) === 0)
+    .forEach((k) => realProps.deleteProperty(k));
+  MEMO = {};
+  return { ok: true };
+}
 
 // Letture del foglio ricordate per la durata di una richiesta: lo stato legge molte volte gli stessi fogli.
 // Chi prende un foglio con sheet() per scriverci cancella il ricordo di quel foglio.
@@ -226,6 +285,8 @@ function getAlbo() {
 
 function doPost(e) {
   MEMO = {};
+  TEST = false;
+  TESTER = '';
   try {
     const req = JSON.parse(e.postData.contents);
     try {
@@ -236,6 +297,11 @@ function doPost(e) {
     ensureReset();
     const user = findUserByCode(req.code);
     if (!user) return json({ error: 'Codice non valido' });
+    if (req.test === true && user.admin) {
+      TEST = true;
+      TESTER = user.name;
+      MEMO = {};
+    }
 
     switch (req.action) {
       case 'login':
@@ -269,7 +335,17 @@ function doPost(e) {
         else props.deleteProperty('mute_' + user.name);
         return json({ ok: true, muted: !!req.muted });
       case 'setAlias':
+        if (TEST) return json({ error: 'In modalità prova l\'alias non si cambia (è un dato vero)' });
         return json(setAlias(user, req.alias));
+      case 'testReset':
+      case 'testRecap':
+        if (!TEST) return json({ error: 'Solo in modalità prova' });
+        if (req.action === 'testReset') return json(testReset());
+        if (req.kind === 'monthly') {
+          props.deleteProperty('LAST_MONTHLY'); // nella prova le premiazioni del mese si possono rifare
+          sendMonthlyRecap();
+        } else sendWeeklyRecap();
+        return json({ ok: true });
       case 'setTimer': {
         const s = Math.round(Number(req.seconds));
         if (!(s >= 5 && s <= 600)) return json({ error: 'Durata non valida' });
@@ -301,6 +377,8 @@ function doPost(e) {
 
 function doGet(e) {
   MEMO = {};
+  TEST = false;
+  TESTER = '';
   ensureReset();
   const p = e.parameter;
 
@@ -313,7 +391,14 @@ function doGet(e) {
   }
 
   if (!p.secret || p.secret !== props.getProperty('ADMIN_SECRET')) return json({ error: 'Non autorizzato' });
-  if (p.action === 'pushJob') return json({ notifications: buildNotifications(p.event, p.name) });
+  if (p.action === 'pushJob') {
+    if (p.test === '1' && p.tester) {
+      TEST = true;
+      TESTER = p.tester;
+      return json({ notifications: testNotifications(buildNotifications(p.event, p.name), p.event) });
+    }
+    return json({ notifications: buildNotifications(p.event, p.name) });
+  }
   if (p.action === 'removeSubscription') {
     removeSubscription(p.endpoint);
     return json({ ok: true });
@@ -467,7 +552,7 @@ function overwriteSudometro(user, req, today) {
   } finally {
     lock.releaseLock();
   }
-  if (oldPhoto) {
+  if (oldPhoto && !TEST) {
     try {
       DriveApp.getFileById(oldPhoto).setTrashed(true);
     } catch (err) {
@@ -554,6 +639,26 @@ function buildState(user) {
         .map((r) => ({ name: r.name, display: dn(r.name), day: r.day, score: r.score, title: r.title, photoId: r.photoId })),
     },
   };
+}
+
+/** Prova: ogni notifica diversa arriva solo a chi prova, con scritto a chi sarebbe andata. */
+function testNotifications(list, event) {
+  const dn = displayNames();
+  const subs = rows('iscrizioni').filter((s) => s.name === TESTER);
+  const byText = {};
+  list.forEach((n) => {
+    const k = n.title + '\n' + n.body;
+    const who = rows('iscrizioni').find((s) => s.sub.endpoint === n.subscription.endpoint);
+    (byText[k] = byText[k] || { n, to: [] }).to.push(who ? dn(who.name) : '?');
+  });
+  const out = [];
+  Object.keys(byText).forEach((k) => {
+    const { n, to } = byText[k];
+    const names = to.filter((x, i) => to.indexOf(x) === i).join(', ');
+    subs.forEach((s) => out.push({ subscription: s.sub, title: '[PROVA] ' + n.title, body: `${n.body}\n→ a: ${names}`, tab: n.tab || '' }));
+  });
+  if (!list.length) subs.forEach((s) => out.push({ subscription: s.sub, title: '[PROVA] ' + event, body: 'Nessuno riceverebbe questa notifica.' }));
+  return out;
 }
 
 /** Testi delle notifiche, con destinatari. Chiamato dalla GitHub Action. */
@@ -743,7 +848,7 @@ function chatState(user, v) {
   // Uguale per tutti: si calcola una volta per versione e giorno e si tiene in cache qualche minuto
   const today = dayString(new Date());
   const cache = CacheService.getScriptCache();
-  const key = `chat_${version}_${today}`;
+  const key = `${TEST ? 'prova_' : ''}chat_${version}_${today}`;
   const hit = cache.get(key);
   if (hit) return JSON.parse(hit);
   const out = buildChatState(version, today);
@@ -1044,7 +1149,8 @@ function adminUndo(admin, kind, key) {
     }
     // Dal fondo di ogni foglio, così gli indici restano validi
     take.slice().sort((a, b) => b.row - a.row).forEach((t) => sheet(t.sheet).deleteRow(t.row));
-    photos.forEach((id) => {
+    // In prova le righe copiate puntano alle foto vere: niente cestino
+    if (!TEST) photos.forEach((id) => {
       try {
         DriveApp.getFileById(id).setTrashed(true);
       } catch (err) {
@@ -1081,7 +1187,7 @@ function adminRestore(id) {
       const sh = sheet(key);
       if (cols && sh.getLastRow() > 2) sh.getRange(2, 1, sh.getLastRow() - 1, SHEETS[key].header.length).sort(cols.map((c) => ({ column: c, ascending: true })));
     });
-    (data.photos || []).forEach((pid) => {
+    if (!TEST) (data.photos || []).forEach((pid) => {
       try {
         DriveApp.getFileById(pid).setTrashed(false);
       } catch (err) {
@@ -1123,7 +1229,7 @@ function savePhoto(user, base64, label) {
   if (!base64) return {};
   if (base64.length > 3e6) return { error: 'Foto troppo grande' };
   try {
-    const name = `${Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH.mm')} ${user.name} ${label}.jpg`;
+    const name = `${Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH.mm')} ${user.name} ${TEST ? 'prova ' : ''}${label}.jpg`;
     const blob = Utilities.newBlob(Utilities.base64Decode(base64), 'image/jpeg', name);
     return { id: userFolder(user.name).createFile(blob).getId() };
   } catch (err) {
@@ -1432,11 +1538,22 @@ function sheetRaw(key) {
 
 function openSheet(key) {
   const ss = SpreadsheetApp.getActive();
-  let sh = ss.getSheetByName(SHEETS[key].name);
+  let sh = ss.getSheetByName(sheetName(key));
+  if (!sh && TEST && TEST_SHEETS.includes(key)) {
+    // Primo uso della prova: copia del foglio vero, tutto come testo
+    const real = ss.getSheetByName(SHEETS[key].name);
+    const values = real ? real.getDataRange().getDisplayValues() : [SHEETS[key].header];
+    sh = ss.insertSheet(sheetName(key));
+    const width = Math.max(SHEETS[key].header.length, values[0].length);
+    sh.getRange(1, 1, Math.max(values.length, 1000), width).setNumberFormat('@');
+    sh.getRange(1, 1, values.length, values[0].length).setValues(values);
+    sh.setFrozenRows(1);
+    return sh;
+  }
   if (!sh) {
     // Fogli aggiunti dopo il primo setup (es. Chat): li crea al primo uso.
     if (key === 'utenti') throw new Error('Esegui prima setup() dall\'editor di Apps Script');
-    sh = ss.insertSheet(SHEETS[key].name);
+    sh = ss.insertSheet(sheetName(key));
     sh.appendRow(SHEETS[key].header);
     sh.setFrozenRows(1);
   }
@@ -1518,7 +1635,7 @@ function dispatch(event, name) {
       method: 'post',
       contentType: 'application/json',
       headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },
-      payload: JSON.stringify({ event_type: event, client_payload: { name } }),
+      payload: JSON.stringify({ event_type: event, client_payload: TEST ? { name, test: '1', tester: TESTER } : { name } }),
       muteHttpExceptions: true,
     });
   } catch (err) {

@@ -393,6 +393,8 @@ body.chat-mode #scroller { background: #0b0b0c url("chat-bg.svg") repeat; backgr
 .sender .crown { width: 14px; height: 12px; margin-left: 4px; }
 
 /* Dati fittizi attivi: avviso fisso in alto */
+body.test-mode #page-title::after { content: 'PROVA'; margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: #0a84ff; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; vertical-align: middle; }
+body.test-mode .tabbar { box-shadow: inset 0 2px 0 #0a84ff; }
 body.fake-data #page-title::after { content: 'DATI FITTIZI'; margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: #ff9f0a; color: #000; font-size: 11px; font-weight: 700; letter-spacing: .04em; vertical-align: middle; }
 
 /* Pulsante per tornare in fondo alla chat */

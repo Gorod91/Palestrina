@@ -49,12 +49,17 @@ async function api(action, data = {}) {
   return realApi(action, data);
 }
 
+/** Modalità prova (solo admin): il server lavora su fogli di prova e manda le notifiche solo a chi prova. */
+function testOn() {
+  return store.get('testMode') === true && !!session;
+}
+
 async function realApi(action, data = {}) {
   // text/plain evita la richiesta preflight CORS, che Apps Script non gestisce.
   const res = await fetch(cfg.appsScriptUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, code: session && session.code, ...data }),
+    body: JSON.stringify({ action, code: session && session.code, ...(testOn() ? { test: true } : {}), ...data }),
   });
   const out = await res.json();
   if (out.error) throw new Error(out.error);
@@ -183,6 +188,9 @@ function render() {
   $('debug-mode').checked = debugOn();
   $('fake-mode').checked = fakeOn();
   document.body.classList.toggle('fake-data', fakeOn());
+  document.body.classList.toggle('test-mode', testOn());
+  $('test-mode').checked = testOn();
+  $('test-tools').hidden = !testOn();
   $('viewport-card').hidden = !debugOn();
   if (debugOn()) renderViewportDebug();
   $('chat-notify').checked = !me.chatMuted;
@@ -463,7 +471,8 @@ async function login(code) {
 async function refresh() {
   try {
     state = await api('state');
-    store.set('state', { day: new Date().toDateString(), data: state });
+    store.set('state', { day: new Date().toDateString(), test: testOn(), data: state });
+    if (!state.me.admin && testOn()) store.set('testMode', null); // non più admin: niente prova
     setTimerAccount(state.me.name, state.me.timerSeconds, (s) => api('setTimer', { seconds: s }).catch(() => {}));
     render();
   } catch (err) {
@@ -477,7 +486,7 @@ async function checkin() {
   await withBusy($('btn-checkin'), 'Check-in…', async () => {
     try {
       const r = await api('checkin');
-      toast(r.alreadyToday ? 'Avevi già fatto check-in oggi' : 'Check-in fatto. Gli altri lo sapranno.');
+      toast(r.alreadyToday ? 'Avevi già fatto check-in oggi' : testOn() ? 'Check-in di prova fatto: la notifica arriva solo a te' : 'Check-in fatto. Gli altri lo sapranno.');
     } catch (err) {
       toast(`Errore: ${err.message}`);
     }
@@ -731,6 +740,29 @@ function renderAdmin() {
 }
 
 $('btn-admin').addEventListener('click', openAdmin);
+$('test-mode').addEventListener('change', async (e) => {
+  store.set('testMode', e.target.checked ? true : null);
+  store.set('state', null);
+  toast(e.target.checked ? 'Modalità prova attiva: niente arriva agli altri' : 'Modalità prova spenta: dati veri');
+  render();
+  await refresh();
+  chat.reload();
+});
+const testAction = (btn, label, data, done) => withBusy(btn, label, async () => {
+  try {
+    await realApi(...data);
+    toast(done);
+  } catch (err) {
+    toast(`Errore: ${err.message}`);
+  }
+  await refresh();
+  chat.reload();
+});
+$('btn-test-reset').addEventListener('click', () => {
+  if (confirm('Riallineare la prova ai dati veri? Tutto quello fatto in prova viene cancellato.')) testAction($('btn-test-reset'), 'Riallineo…', ['testReset'], 'Prova riallineata ai dati veri');
+});
+$('btn-test-weekly').addEventListener('click', () => testAction($('btn-test-weekly'), 'Invio…', ['testRecap', { kind: 'weekly' }], 'Recap della settimana simulato'));
+$('btn-test-monthly').addEventListener('click', () => testAction($('btn-test-monthly'), 'Invio…', ['testRecap', { kind: 'monthly' }], 'Premiazioni del mese simulate'));
 $('admin-sheet').addEventListener('click', async (e) => {
   if (e.target === $('admin-sheet') || e.target.closest('.sheet-close')) {
     $('admin-sheet').hidden = true;
@@ -859,7 +891,7 @@ async function home() {
   if (fromUrl) history.replaceState(null, '', location.pathname);
   // Mostra subito l'ultimo stato salvato sul telefono, poi lo aggiorna da Apps Script.
   const cached = store.get('state');
-  if (!state && cached && cached.data && cached.data.me && cached.data.me.name === session.name) {
+  if (!state && cached && cached.data && cached.data.me && cached.data.me.name === session.name && !!cached.test === testOn()) {
     state = cached.data;
     // Stato di un altro giorno: classifiche e punti vanno bene come anteprima, il resto di oggi no
     if (cached.day !== new Date().toDateString()) state = withoutToday(state);

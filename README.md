@@ -130,6 +130,16 @@ Scrivi `sì` nella colonna **D (Debug)** del foglio Utenti. Quell'utente vede il
 
 Solo per chi è in `ADMIN_USERS` (in `Code.gs`, oggi Francesco): in **Impostazioni → Admin → Registro admin** ci sono check-in, Sudometro, messaggi, domande, risposte e penalità degli ultimi 31 giorni di tutti. Ogni voce si può **annullare** (le penalità si **condonano**) e ogni annullamento si può **ripristinare** dal filtro *Annullati*: le righe tolte restano nel foglio **Annullati** e le foto vanno nel cestino di Drive. Si possono anche aggiungere check-in dimenticati, pure per giorni passati. Nessuna di queste azioni manda notifiche.
 
+### Modalità prova
+
+Solo admin, in **Impostazioni → Admin → Modalità prova** (in alto compare la scritta blu **PROVA**). Le richieste girano davvero su Apps Script, ma:
+- check-in, Sudometro, chat, risposte, cambi e annullamenti finiscono nei fogli **Prova · …**, copiati da quelli veri al primo uso;
+- le proprietà dello script (foto di riferimento, chat silenziata, albo d'oro…) vengono copiate alla prima modifica come `prova_…`;
+- le notifiche arrivano solo a chi prova, con **[PROVA]** nel titolo e l'elenco di chi le avrebbe ricevute;
+- nessuna foto vera finisce nel cestino, l'alias non si cambia.
+
+Con la prova attiva ci sono anche **Simula il recap della settimana**, **Simula le premiazioni del mese** e **Riallinea la prova ai dati veri** (cancella fogli e proprietà di prova). Il check-in automatico di Comandi resta sempre vero.
+
 ### Aggiornamento automatico
 
 A ogni pubblicazione la GitHub Action scrive il commit nel meta `app-version` di `index.html` e in `version.json`. Quando l'app si apre o torna in primo piano confronta le due versioni e, se è vecchia, si ricarica da sola (non mentre si scrive, si usa la fotocamera, c'è un'azione in corso o il timer è attivo).

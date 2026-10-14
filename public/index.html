@@ -225,8 +225,19 @@
 
         <div id="admin-card" hidden>
           <h2 class="section">Admin</h2>
-          <section class="card list"><button id="btn-admin" class="row">Registro admin</button></section>
-          <p class="footnote">Annulla o ripristina check-in, Sudometro, messaggi, risposte e penalità di tutti, e aggiungi check-in dimenticati. Nessuna notifica parte.</p>
+          <section class="card list">
+            <button id="btn-admin" class="row">Registro admin</button>
+            <label class="row switch-row">
+              <span>Modalità prova</span>
+              <input id="test-mode" type="checkbox" class="switch">
+            </label>
+          </section>
+          <p class="footnote">Registro: annulla o ripristina check-in, Sudometro, messaggi, risposte e penalità di tutti, e aggiungi check-in dimenticati, senza notifiche.<br>Modalità prova: tutto funziona davvero, server compreso, ma su una copia dei dati; le notifiche arrivano solo a te con scritto a chi sarebbero andate.</p>
+          <section id="test-tools" class="card list" hidden>
+            <button id="btn-test-weekly" class="row">Simula il recap della settimana</button>
+            <button id="btn-test-monthly" class="row">Simula le premiazioni del mese</button>
+            <button id="btn-test-reset" class="row destructive">Riallinea la prova ai dati veri</button>
+          </section>
         </div>
 
         <div id="debug-mode-card" hidden>

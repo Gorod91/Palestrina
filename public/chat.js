@@ -74,7 +74,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   }
 
   // Ultima chat scaricata, tenuta sul telefono: all'apertura si vede subito, poi si aggiorna
-  const cacheKey = () => `palestrina.chatCache.${me ? me.name : ''}`;
+  const cacheKey = () => `palestrina.chatCache.${me ? me.name : ''}${localStorage.getItem('palestrina.testMode') === 'true' ? '.prova' : ''}`;
   function saveCache(r) {
     try {
       localStorage.setItem(cacheKey(), JSON.stringify({ day: new Date().toDateString(), r }));

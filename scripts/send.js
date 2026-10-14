@@ -4,7 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const webpush = require('web-push');
 
-const { APPS_SCRIPT_URL, APPS_SCRIPT_SECRET, VAPID_PRIVATE_KEY, VAPID_SUBJECT, EVENT, NAME } = process.env;
+const { APPS_SCRIPT_URL, APPS_SCRIPT_SECRET, VAPID_PRIVATE_KEY, VAPID_SUBJECT, EVENT, NAME, TEST, TESTER } = process.env;
 
 function fail(msg) {
   console.error(`::error::${msg}`);
@@ -41,8 +41,9 @@ async function appsScript(params) {
 }
 
 (async () => {
-  const { notifications } = await appsScript({ action: 'pushJob', event: EVENT, name: NAME || '' });
-  console.log(`Evento "${EVENT}"${NAME ? ` di ${NAME}` : ''}: ${notifications.length} notifiche da inviare`);
+  const test = TEST === '1' && TESTER ? { test: '1', tester: TESTER } : {};
+  const { notifications } = await appsScript({ action: 'pushJob', event: EVENT, name: NAME || '', ...test });
+  console.log(`Evento "${EVENT}"${NAME ? ` di ${NAME}` : ''}${test.test ? ` (prova di ${TESTER})` : ''}: ${notifications.length} notifiche da inviare`);
 
   let ok = 0;
   for (const n of notifications) {

@@ -33,6 +33,9 @@ jobs:
         env:
           EVENT: ${{ github.event.action || inputs.event }}
           NAME: ${{ github.event.client_payload.name || inputs.name }}
+          # Modalità prova: le notifiche vanno solo a chi sta provando
+          TEST: ${{ github.event.client_payload.test }}
+          TESTER: ${{ github.event.client_payload.tester }}
           APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
           APPS_SCRIPT_SECRET: ${{ secrets.APPS_SCRIPT_SECRET }}
           VAPID_PRIVATE_KEY: ${{ secrets.VAPID_PRIVATE_KEY }}
