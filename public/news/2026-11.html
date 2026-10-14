@@ -54,11 +54,6 @@
   .week i { flex: none; width: 3px; height: 56px; border-radius: 2px; background: var(--fg); }
   .cmp { row-gap: 10px; }
   .cmp b { font-size: 38px; }
-  /* Falso no */
-  .eyebrow.red { color: #ff453a; }
-  .check.sneaky { border-color: #ff453a66; }
-  .check.sneaky span { background: #ff453a; color: #fff; }
-  .plus.minus { color: #ff453a; text-shadow: 0 0 60px #ff453a88; }
   /* Cosa cambia: prima → ora */
   .rows { display: grid; gap: 10px; margin: 26px 0 24px; }
   .rows p { display: grid; grid-template-columns: 1fr 56px 56px; align-items: center; gap: 8px; padding: 16px; border-radius: 18px; background: #1c1c1e; }
@@ -80,14 +75,14 @@
 </style>
 </head>
 <body>
-  <div class="bars"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
+  <div class="bars"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
   <button class="close" aria-label="Chiudi">×</button>
 
   <section class="slide">
     <div class="glow"></div>
     <p class="eyebrow" data-a style="--d:.2">Novità</p>
     <h1 data-a style="--d:.5;--anim:pop">Novembre.</h1>
-    <p class="lead" data-a style="--d:1.1">Più modi di fare punti. Uno per perderli.<br>E una sorpresa.</p>
+    <p class="lead" data-a style="--d:1.1">Nuovi modi di fare punti.<br>E una sorpresa.</p>
     <p class="hint" data-a style="--d:2">Tocca per continuare</p>
   </section>
 
@@ -119,17 +114,6 @@
   </section>
 
   <section class="slide">
-    <p class="eyebrow red" data-a style="--d:0">Falso no</p>
-    <h2 data-a style="--d:.1">Dite di no?<br>Allora non venite.</h2>
-    <div class="scene">
-      <p class="bubble" data-a style="--d:.7;--anim:left"><small>Voi</small>Stasera no, sono distrutto</p>
-      <p class="check sneaky" data-a style="--d:1.5;--anim:right"><span>✓</span>Check-in alle 19:02</p>
-      <p class="plus minus" data-a style="--d:2.3;--anim:pop">−4</p>
-    </div>
-    <p class="lead" data-a style="--d:2.9">Avete detto "no" e poi fate check-in? −4. Cambiate idea? Ditelo almeno un'ora prima.</p>
-  </section>
-
-  <section class="slide">
     <div class="glow"></div>
     <p class="eyebrow orange" data-a style="--d:0">E poi…</p>
     <h2 data-a style="--d:.2">C'è anche<br>una sorpresa.</h2>
@@ -143,7 +127,6 @@
       <p class="rh" data-a style="--d:.3"><span></span><span>Prima</span><span>Ora</span></p>
       <p data-a style="--d:.6;--anim:left"><span>Fare la domanda e poi andare</span><b>0</b><em>+3</em></p>
       <p data-a style="--d:.9;--anim:left"><span>Ingresso oltre l'obiettivo</span><b>10</b><em>13</em></p>
-      <p data-a style="--d:1.2;--anim:left"><span>Dire "no" e poi venire</span><b>−3</b><em class="red">−4</em></p>
     </div>
     <ul class="rules">
       <li data-a style="--d:1.7">Apripista: solo il primo che chiede, una volta per giorno</li>

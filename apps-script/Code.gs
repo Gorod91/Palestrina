@@ -239,9 +239,9 @@ const NEWS = [
     id: '2026-11',
     month: '2026-10',
     from: '2026-11-01',
-    features: ['apripista', 'oltre', 'falsoNo', 'sfide'],
+    features: ['apripista', 'oltre', 'sfide'],
     title: 'Novità di novembre',
-    body: 'Apripista, Oltre l\'obiettivo, Falso no… e una sorpresa. Tocca per vedere.',
+    body: 'Apripista, Oltre l\'obiettivo… e una sorpresa. Tocca per vedere.',
   },
 ];
 
@@ -712,7 +712,7 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
-    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), falsoNo: featureOn('falsoNo'), sfide: featureOn('sfide') && sfide().length > 0 }, // sfide: sorpresa, si vedono dalla prima
+    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0 }, // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
@@ -1869,7 +1869,6 @@ const POINTS = {
   ritardoMinuti: 30,
   settimanaVuota: -5, // nessuna presenza in una settimana intera
   senzaAvviso: -3, // check-in senza aver detto "ci sono" o "forse" almeno 1 ora prima
-  falsoNo: -4, // novità di novembre 2026: detto "no" e poi check-in (salvo cambio almeno 1 ora prima); sostituisce senzaAvviso
   avvisoMinuti: 60,
 };
 
@@ -1991,10 +1990,7 @@ function computePoints(month) {
       if (plan && plan.choice === 'si' && plan.time && minutes(came.time) > minutes(plan.time) + P.ritardoMinuti) pen('ritardo', 'Ritardo', P.ritardo, day);
       const limit = `${day} ${hhmmMinus(came.time, P.avvisoMinuti)}`;
       const told = myCambi.filter((c) => c.day === day && (c.to === 'si' || c.to === 'forse')).map((c) => c.at).sort()[0];
-      // Falso no (novità di novembre 2026): un'ora prima del check-in la risposta era ancora "no". Sostituisce il -3.
-      const standing = myCambi.filter((c) => c.day === day && c.at <= limit).sort((a, b) => (a.at < b.at ? -1 : 1)).pop();
-      if (featureOn('falsoNo') && day >= featureFrom('falsoNo') && standing && standing.to === 'no') pen('falsoNo', 'Falso no', P.falsoNo, day);
-      else if (!told || told > limit) pen('avviso', 'Check-in senza avvisare', P.senzaAvviso, day);
+      if (!told || told > limit) pen('avviso', 'Check-in senza avvisare', P.senzaAvviso, day);
     }
     // Settimana a vuoto: settimane finite (domenica nel mese) senza presenze, per chi c'era già
     const firstEver = mine.length ? mine[0].day : null;

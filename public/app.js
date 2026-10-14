@@ -204,7 +204,6 @@ function render() {
   sel.value = store.get('actAs') || '';
   $('rule-apripista').hidden = !(state.features && state.features.apripista);
   $('rule-oltre').hidden = !(state.features && state.features.oltre);
-  $('rule-falsono').hidden = !(state.features && state.features.falsoNo);
   $('rule-sfide').hidden = !(state.features && state.features.sfide);
   $('viewport-card').hidden = !debugOn();
   if (debugOn()) renderViewportDebug();
