@@ -15,6 +15,9 @@ function planLabel(day) {
   return `${['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'][d.getDay()]} ${d.getDate()}`;
 }
 
+// Orologio "in invio" sull'angolo del pulsante della risposta non ancora salvata
+const CLOCK = '<span class="unsaved" aria-label="In invio"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.6"/><path d="M6 3.4V6l1.8 1.1"/></svg></span>';
+
 const CHOICES = [
   ['si', 'Ci sono'],
   ['forse', 'Forse'],
@@ -65,19 +68,70 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   async function load(force = false) {
     if (loading || !me) return;
     loading = true;
+    renderSync();
     tlog('chat load', `inizio${force ? ' (forza)' : ''} v=${v}${data ? '' : ' · mai caricata'}`);
     try {
       const r = await api('chat', { v: force ? -1 : v });
       tlog('chat load', `ok${r && r.same ? ' (niente di nuovo)' : ''}`);
+      syncedAt = Date.now();
+      syncErr = '';
       apply(r);
     } catch (err) {
       tlog('chat load', `ERRORE ${err.message}${active && !data ? ' · schermo bloccato' : ''}`);
-      if (force) toast(`Chat non disponibile: ${err.message}`);
+      syncErr = err.message;
+      if (force && !retrying) toast(`Chat non disponibile: ${err.message}`);
       if (active && !data) loadError(err.message);
     } finally {
       loading = false;
+      retrying = false;
+      renderSync();
     }
   }
+
+  // ---------- Chat aggiornata o no ----------
+  // Pillola sotto il sondaggio, come "Connessione in corso…" di WhatsApp: compare solo quando quello che
+  // si vede potrebbe essere vecchio (chat dell'ultima volta in attesa del server, server che non risponde, offline).
+  const STALE_MS = 20000; // la chat si aggiorna ogni 5 s: 20 s senza risposta = 3-4 tentativi andati a vuoto
+  let syncedAt = 0; // ultima risposta del server alla chat (anche "niente di nuovo")
+  let syncErr = ''; // errore dell'ultimo tentativo, finché uno non va a buon fine
+  let retrying = false; // "Riprova" toccato: mostra "Aggiorno…" invece dell'avviso giallo
+  let cachedAt = 0; // quando è stata salvata la chat dell'ultima volta mostrata all'apertura
+
+  function syncState() {
+    if (!active || !data) return 'ok'; // senza chat ci pensa già "Carico la chat…"
+    if (!navigator.onLine) return 'off';
+    if (syncErr) return retrying ? 'busy' : 'stale';
+    if (!syncedAt || Date.now() - syncedAt > STALE_MS) return loading ? 'busy' : 'stale';
+    return 'ok';
+  }
+
+  const hhmm = (t) => new Date(t).toTimeString().slice(0, 5);
+
+  function renderSync() {
+    const box = $('chat-sync');
+    if (!box) return;
+    const s = syncState();
+    const last = syncedAt || cachedAt;
+    box.classList.toggle('show', s !== 'ok');
+    box.classList.toggle('warn', s === 'stale' || s === 'off');
+    $('poll-card').classList.toggle('stale', s === 'stale' || s === 'off');
+    if (s === 'ok') return;
+    if (s === 'busy') box.innerHTML = `${bicep()}<span>Aggiorno…</span>`;
+    else if (s === 'off') box.innerHTML = `<span>Sei offline${last ? ` · chat delle ${hhmm(last)}` : ''}</span>`;
+    else {
+      box.innerHTML = `<span>Non aggiornata${last ? ` · alle ${hhmm(last)}` : ''} · </span><button type="button">Riprova</button>`;
+      box.querySelector('button').onclick = () => {
+        retrying = true;
+        renderSync();
+        load(true);
+      };
+    }
+  }
+  window.addEventListener('online', () => {
+    renderSync();
+    if (active) load();
+  });
+  window.addEventListener('offline', renderSync);
 
   /** Chat mai caricata: al posto di "Carico la chat…" infinito, il motivo e un tasto per riprovare. */
   function loadError(msg) {
@@ -97,14 +151,16 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   const cacheKey = () => `palestrina.chatCache.${me ? me.name : ''}${localStorage.getItem('palestrina.testMode') === 'true' ? '.prova' : ''}`;
   function saveCache(r) {
     try {
-      localStorage.setItem(cacheKey(), JSON.stringify({ day: new Date().toDateString(), r }));
+      localStorage.setItem(cacheKey(), JSON.stringify({ day: new Date().toDateString(), at: Date.now(), r }));
     } catch { /* storage pieno o non disponibile */ }
   }
   function readCache() {
     try {
       const c = JSON.parse(localStorage.getItem(cacheKey()));
       // di un altro giorno: i giorni della pianificazione sono cambiati, meglio non mostrarla
-      return c && c.day === new Date().toDateString() ? c.r : null;
+      if (!c || c.day !== new Date().toDateString()) return null;
+      cachedAt = c.at || 0;
+      return c.r;
     } catch {
       return null;
     }
@@ -233,30 +289,38 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     let last = null;
     while (outbox.length) {
       const job = outbox.shift();
+      sendingDay = job.day;
       try {
         last = await api('planSet', job);
       } catch (err) {
         toast(err.message);
         outbox.length = 0;
         sending = false;
+        sendingDay = '';
         v = -1;
         load(true); // torna ai dati veri
         return;
       }
     }
     sending = false;
+    sendingDay = '';
     if (last) {
       v = -1;
       apply(last);
     }
+    renderPoll(); // toglie l'orologio anche se la risposta del server non ha ridisegnato
   }
+
+  // Risposta al sondaggio non ancora salvata: orologio sul pulsante scelto, come la spunta in attesa di WhatsApp
+  let sendingDay = '';
+  const unsaved = (day) => sendingDay === day || outbox.some((j) => j.day === day);
 
   // Risposta per un giorno; ritoccare la risposta già data la toglie.
   function answer(choice, current, time, day = selectedDay()) {
     const c = choice === current ? '' : choice;
     setLocal(day, c, time);
+    queuePlan(day, c, c ? time : ''); // prima in coda, così il ridisegno mostra già l'orologio "in invio"
     renderPoll(true);
-    queuePlan(day, c, c ? time : '');
   }
   const selectedDay = () => {
     const days = (data && data.plans) || [];
@@ -335,7 +399,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         ${days}
         ${isPending(plan) ? `<p class="poll-askme"><b></b> ti chiede: ${label} ci sei?</p>` : ''}
         <div class="choices">
-          ${CHOICES.map(([k, l]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}">${l}</button>`).join('')}
+          ${CHOICES.map(([k, l]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}">${l}${mine.choice === k && unsaved(day) ? CLOCK : ''}</button>`).join('')}
           <label class="time-wrap${mine.time ? ' filled' : ''}"><input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span></label>
         </div>
         <p class="poll-names"></p>
@@ -888,6 +952,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
 
   function tick() {
     if (active && document.visibilityState === 'visible') load();
+    renderSync();
   }
 
   // ---------- API per app.js ----------
@@ -915,6 +980,9 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       me = user;
       v = 0;
       data = null;
+      syncedAt = 0;
+      syncErr = '';
+      cachedAt = 0;
       $('chat-list').innerHTML = '';
       delete $('chat-list').dataset.rendered;
       const cached = readCache();
@@ -938,6 +1006,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       clearInterval(timer);
       if (!on) {
         $('chat-down').hidden = true;
+        renderSync();
         return;
       }
       tlog('chat aperta', data ? `in cache (${data.messages ? data.messages.length : 0} messaggi)` : 'vuota, carico');
@@ -948,6 +1017,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         $('chat-list').innerHTML = `<div class="loading">${bicep()}<p>Carico la chat…</p></div>`;
       }
       load(!data);
+      renderSync();
       timer = setInterval(tick, POLL_EVERY);
     },
     /** Pallino dei non letti, dai dati leggeri dello stato generale. */

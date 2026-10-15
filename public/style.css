@@ -241,6 +241,19 @@ body.chat-mode header.top { display: none; }
 body.chat-mode #scroller { padding-top: 0; }
 .chat-top #poll-card { margin: 0; padding: 10px 12px; }
 body.composing .chat-top #poll-card { display: none; }
+/* Chat non aggiornata: pillola che galleggia sotto il sondaggio, sopra i messaggi (non sposta niente) */
+.chat-top { position: relative; z-index: 4; }
+.chat-sync { position: absolute; left: 50%; top: calc(100% + 6px); display: inline-flex; align-items: center; gap: 7px; max-width: calc(100% - 32px); padding: 6px 12px; border-radius: 999px; background: rgba(44, 44, 46, .96); color: var(--fg); font-size: 13px; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, .5); opacity: 0; transform: translate(-50%, -12px); pointer-events: none; transition: opacity .25s, transform .25s; }
+.chat-sync span { overflow: hidden; text-overflow: ellipsis; }
+.chat-sync.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.chat-sync.warn { background: #3a2a10; color: #ffb340; }
+.chat-sync button { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; }
+.chat-sync .bicep { width: 22px; height: 21px; color: var(--exercise); --bicep-bg: #2c2c2e; }
+.poll.stale .poll-names, .poll.stale .pday i, .poll.stale .pweek { opacity: .45; transition: opacity .3s; }
+.choice { position: relative; }
+.choice .unsaved { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--card); display: grid; place-items: center; }
+.choice .unsaved svg { width: 12px; height: 12px; fill: none; stroke: #ffb340; stroke-width: 1.4; stroke-linecap: round; }
+@media (prefers-reduced-motion: reduce) { .chat-sync { transition: none; } }
 body.composing .chat-top { padding-bottom: 0; }
 .poll-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 15px; }
 .poll-head .muted { font-size: 12px; white-space: nowrap; }
