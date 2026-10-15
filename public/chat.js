@@ -68,9 +68,24 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       apply(await api('chat', { v: force ? -1 : v }));
     } catch (err) {
       if (force) toast(`Chat non disponibile: ${err.message}`);
+      if (active && !data) loadError(err.message);
     } finally {
       loading = false;
     }
+  }
+
+  /** Chat mai caricata: al posto di "Carico la chat…" infinito, il motivo e un tasto per riprovare. */
+  function loadError(msg) {
+    const box = el('div', 'loading');
+    box.append(el('p', '', `Chat non caricata: ${msg}`));
+    const b = el('button', 'primary small', 'Riprova');
+    b.type = 'button';
+    b.onclick = () => {
+      $('chat-list').innerHTML = `<div class="loading">${bicep()}<p>Carico la chat…</p></div>`;
+      load(true);
+    };
+    box.append(b);
+    $('chat-list').replaceChildren(box);
   }
 
   // Ultima chat scaricata, tenuta sul telefono: all'apertura si vede subito, poi si aggiorna

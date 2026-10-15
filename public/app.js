@@ -54,14 +54,31 @@ function testOn() {
   return store.get('testMode') === true && !!session;
 }
 
+// Letture con un tempo massimo: su iPhone una richiesta interrotta (app in background a metà caricamento)
+// può restare appesa per sempre, e chi la aspetta (es. la chat) non riproverebbe più.
+const READ_TIMEOUT = { chat: 20000, state: 20000, photos: 30000 };
+
 async function realApi(action, data = {}) {
-  // text/plain evita la richiesta preflight CORS, che Apps Script non gestisce.
-  const res = await fetch(cfg.appsScriptUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-    body: JSON.stringify({ action, code: session && session.code, ...(testOn() ? { test: true, actAs: store.get('actAs') || undefined } : {}), ...data }),
-  });
-  const out = await res.json();
+  const ms = READ_TIMEOUT[action];
+  const ctrl = ms && typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = ctrl && setTimeout(() => ctrl.abort(), ms);
+  let out;
+  try {
+    // text/plain evita la richiesta preflight CORS, che Apps Script non gestisce.
+    const res = await fetch(cfg.appsScriptUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action, code: session && session.code, ...(testOn() ? { test: true, actAs: store.get('actAs') || undefined } : {}), ...data }),
+      signal: ctrl ? ctrl.signal : undefined,
+    });
+    out = await res.json();
+  } catch (err) {
+    if (ctrl && ctrl.signal.aborted) throw new Error('il server non risponde, riprova');
+    if (err instanceof TypeError) throw new Error('connessione non riuscita');
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
   if (out.error) throw new Error(out.error);
   return out;
 }
