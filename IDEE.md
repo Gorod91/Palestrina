@@ -19,6 +19,7 @@ Due telefoni che si urtano registrano un picco dell'accelerometro nello stesso i
   - **Prodotti sbloccabili**: legati al gioco, per esempio la maglietta del Re del mese acquistabile solo da chi è stato Re, o sconti per chi ha più punti.
 - **Prodotti scelti**:
   - Maglietta tecnica grigia melange (Spreadshirt, logo piccolo sul cuore, verde o a colori): https://www.spreadshirt.it/creare-da-se?productType=1310&appearance=1513&size=
+  - Sacca sportiva nera (Spreadshirt, logo e scritta "palestrina" al centro, verde o a colori): https://www.spreadshirt.it/creare/dettaglio/sacca-sportiva-PT1155?appearance=2
 - **Pubblicità / sponsor** nell'app: studio notarile, medico endocrinologo, studio dentistico, azienda di robot, ecc.
 
 ## Altre versioni dell'app
