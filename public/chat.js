@@ -21,7 +21,8 @@ const CHOICES = [
   ['no', 'No'],
 ];
 
-export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown, openNews }) {
+export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown, openNews, trace }) {
+  const tlog = trace || (() => {});
   let me = null; // { name, display }
   let v = 0; // versione dei dati in Apps Script
   let data = null; // { messages, poll, names }
@@ -64,9 +65,13 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   async function load(force = false) {
     if (loading || !me) return;
     loading = true;
+    tlog('chat load', `inizio${force ? ' (forza)' : ''} v=${v}${data ? '' : ' · mai caricata'}`);
     try {
-      apply(await api('chat', { v: force ? -1 : v }));
+      const r = await api('chat', { v: force ? -1 : v });
+      tlog('chat load', `ok${r && r.same ? ' (niente di nuovo)' : ''}`);
+      apply(r);
     } catch (err) {
+      tlog('chat load', `ERRORE ${err.message}${active && !data ? ' · schermo bloccato' : ''}`);
       if (force) toast(`Chat non disponibile: ${err.message}`);
       if (active && !data) loadError(err.message);
     } finally {
@@ -884,6 +889,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         $('chat-down').hidden = true;
         return;
       }
+      tlog('chat aperta', data ? `in cache (${data.messages ? data.messages.length : 0} messaggi)` : 'vuota, carico');
       if (data) {
         render();
         scrollToBottom();

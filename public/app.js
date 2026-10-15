@@ -24,6 +24,61 @@ const store = {
 
 let session = store.get('session'); // { code, name }
 let state = null;
+
+// ---------- Diagnostica (accesa dal server per un singolo account) ----------
+// Quando il server risponde trace:true, l'app registra cosa succede (richieste, errori, caricamenti, rete)
+// e lo manda ogni tanto al foglio Debug. Chi usa l'app lo vede: badge "DIAGNOSTICA" sul titolo e un avviso
+// all'accensione. Serve per capire un problema su un telefono a cui non abbiamo accesso.
+const trace = (() => {
+  let on = false;
+  let buf = [];
+  let flushing = false;
+  let timer = null;
+  const now = () => new Date().toTimeString().slice(0, 8);
+  function schedule() {
+    if (timer || !on) return;
+    timer = setTimeout(flush, 4000);
+  }
+  function log(ev, d) {
+    if (!on) return;
+    buf.push({ t: now(), ev: String(ev), d: d == null ? '' : String(d) });
+    if (buf.length > 80) buf = buf.slice(-80);
+    schedule();
+  }
+  async function flush() {
+    timer = null;
+    if (flushing || !on || !buf.length || !session) return;
+    flushing = true;
+    const batch = buf;
+    buf = [];
+    try {
+      await realApi('trace', { events: batch });
+    } catch {
+      buf = batch.concat(buf).slice(-80); // non è partito: riprova la prossima volta
+    } finally {
+      flushing = false;
+      if (buf.length) schedule();
+    }
+  }
+  return {
+    set(v) {
+      const was = on;
+      on = !!v;
+      document.body.classList.toggle('diag', on);
+      if (on && !was) {
+        log('acceso', `app ${APP_VERSION} · ${navigator.standalone ? 'home' : 'browser'} · ${navigator.onLine ? 'online' : 'offline'}`);
+        if (!store.get('diagSeen')) {
+          store.set('diagSeen', true);
+          toast('🔧 Francesco ha attivato la diagnostica sulla tua app per sistemare la chat: registra solo errori e caricamenti, non i messaggi.', 8000);
+        }
+      }
+      if (on) schedule();
+    },
+    isOn: () => on,
+    log,
+    flush,
+  };
+})();
 let registration = null;
 let lastDebug = null; // ultimo risultato di prova (solo utenti debug)
 
@@ -62,23 +117,27 @@ async function realApi(action, data = {}) {
   const ms = READ_TIMEOUT[action];
   const ctrl = ms && typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = ctrl && setTimeout(() => ctrl.abort(), ms);
+  const traced = trace.isOn() && action !== 'trace';
+  const t0 = Date.now();
   let out;
   try {
     // text/plain evita la richiesta preflight CORS, che Apps Script non gestisce.
     const res = await fetch(cfg.appsScriptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, code: session && session.code, ...(testOn() ? { test: true, actAs: store.get('actAs') || undefined } : {}), ...data }),
+      body: JSON.stringify({ action, code: session && session.code, ver: APP_VERSION, ...(testOn() ? { test: true, actAs: store.get('actAs') || undefined } : {}), ...data }),
       signal: ctrl ? ctrl.signal : undefined,
     });
     out = await res.json();
   } catch (err) {
+    if (traced) trace.log('richiesta ' + action, (ctrl && ctrl.signal.aborted ? 'TIMEOUT' : (err instanceof TypeError ? 'RETE ' + err.message : 'ERRORE ' + (err.message || err))) + ` · ${Date.now() - t0} ms`);
     if (ctrl && ctrl.signal.aborted) throw new Error('il server non risponde, riprova');
     if (err instanceof TypeError) throw new Error('connessione non riuscita');
     throw err;
   } finally {
     clearTimeout(timer);
   }
+  if (traced) trace.log('richiesta ' + action, `${out.error ? 'risposta errore ' + out.error : 'ok'} · ${Date.now() - t0} ms${action === 'chat' ? ' v=' + (data.v) : ''}`);
   if (out.error) throw new Error(out.error);
   return out;
 }
@@ -491,6 +550,7 @@ async function login(code) {
   session = { code: code.trim().toUpperCase() };
   try {
     const r = await api('login');
+    trace.set(r.trace);
     session.name = r.name;
     session.display = r.display;
     store.set('session', session);
@@ -507,6 +567,7 @@ let optimistic = 0;
 async function refresh() {
   try {
     const fresh = await api('state');
+    trace.set(fresh.trace);
     if (optimistic) return;
     state = fresh;
     store.set('state', { day: new Date().toDateString(), test: testOn(), data: state });
@@ -644,7 +705,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
-const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews });
+const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews, trace: (ev, d) => trace.log(ev, d) });
 
 // ---------- Tab ----------
 
@@ -1094,11 +1155,18 @@ $('btn-browser').addEventListener('click', () => {
   start();
 });
 document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState !== 'visible') return;
+  trace.log('schermo', document.visibilityState);
+  if (document.visibilityState !== 'visible') return trace.flush();
   checkUpdate();
   syncDay();
   if (session && state) refresh().then(() => chat.preload());
 });
+
+// Diagnostica: errori e stato della rete (registrati solo se il server la accende per questo account).
+window.addEventListener('error', (e) => trace.log('errore js', `${e.message || ''} @ ${(e.filename || '').split('/').pop()}:${e.lineno || ''}`));
+window.addEventListener('unhandledrejection', (e) => trace.log('promise rifiutata', String((e.reason && e.reason.message) || e.reason || '')));
+window.addEventListener('online', () => trace.log('rete', 'online'));
+window.addEventListener('offline', () => trace.log('rete', 'offline'));
 
 // Tastiera aperta: l'app si restringe all'area visibile, così la casella dei messaggi
 // resta sopra la tastiera (i tab spariscono mentre scrivi, come in WhatsApp).

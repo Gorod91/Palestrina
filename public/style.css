@@ -401,6 +401,9 @@ body.chat-mode #scroller { background: none; }
 body.test-mode #page-title::after { content: attr(data-test); margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: #0a84ff; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; vertical-align: middle; }
 body.test-mode .tabbar { box-shadow: inset 0 2px 0 #0a84ff; }
 body.fake-data #page-title::after { content: 'DATI FITTIZI'; margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: #ff9f0a; color: #000; font-size: 11px; font-weight: 700; letter-spacing: .04em; vertical-align: middle; }
+/* Diagnostica attiva per questo account: avviso sempre visibile, così chi usa l'app sa che è sotto controllo */
+body.diag #page-title::after { content: '🔧 DIAGNOSTICA'; margin-left: 10px; padding: 2px 8px; border-radius: 999px; background: #bf5af2; color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; vertical-align: middle; }
+body.diag .tabbar { box-shadow: inset 0 2px 0 #bf5af2; }
 
 /* Pulsante per tornare in fondo alla chat */
 .composer { position: relative; }

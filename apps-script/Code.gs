@@ -26,12 +26,17 @@ const SHEETS = {
   annullati: { name: 'Annullati', header: ['ID', 'Quando', 'Tipo', 'Descrizione', 'Dati', 'Ripristinato'] },
   // Sfide tra chi è in palestra (novità di novembre 2026); Dati = JSON con partecipanti, risultati e conferme
   sfide: { name: 'Sfide', header: ['ID', 'Giorno', 'Aperta', 'Tipo', 'Stato', 'Dati'] },
+  // Registro di diagnostica degli account in TRACE_USERS (richieste al server e cosa succede sul telefono)
+  debug: { name: 'Debug', header: ['Quando', 'Nome', 'Da', 'Evento', 'Dettagli'] },
 };
 const DEFAULT_GOAL = 3;
 // Utenti con il pulsante di debug, oltre a quelli con "sì" nella colonna D di Utenti.
 const DEBUG_USERS = ['Francesco'];
 // Admin: può annullare e ripristinare le azioni di tutti (registro admin nelle Impostazioni).
 const ADMIN_USERS = ['Francesco'];
+// Diagnostica per capire un problema sul telefono di qualcuno: le sue richieste e gli eventi dell'app
+// finiscono nel foglio Debug. Solo lui vede nell'app il badge "DIAGNOSTICA". Togliere il nome a problema risolto.
+const TRACE_USERS = ['Michy'];
 const TZ = Session.getScriptTimeZone();
 const realProps = PropertiesService.getScriptProperties();
 
@@ -346,6 +351,7 @@ function getAlbo() {
 // ---------- API per la web app (POST con Content-Type text/plain) ----------
 
 function doPost(e) {
+  const t0 = Date.now();
   MEMO = {};
   TEST = false;
   TESTER = '';
@@ -381,12 +387,31 @@ function doPost(e) {
     } catch (err) {
       console.error('Sfide non chiuse', err);
     }
+    if (!TRACE_USERS.includes(user.name) || TEST) return handle(req, user);
+    let out;
+    let failed = '';
+    try {
+      out = handle(req, user);
+    } catch (err) {
+      failed = String(err.message || err);
+      out = json({ error: failed });
+    }
+    traceServer(user, req, out, Date.now() - t0, failed);
+    return out;
+  } catch (err) {
+    return json({ error: String(err.message || err) });
+  }
+}
 
+function handle(req, user) {
+  {
     switch (req.action) {
       case 'login':
-        return json({ name: user.name, display: user.display, goal: user.goal, debug: user.debug });
+        return json({ name: user.name, display: user.display, goal: user.goal, debug: user.debug, trace: isTraced(user) });
       case 'state':
-        return json(buildState(user));
+        return json({ ...buildState(user), trace: isTraced(user) });
+      case 'trace':
+        return json(saveTrace(user, req.events));
       case 'checkin':
         return json(checkin(user, 'app'));
       case 'checkinUndo':
@@ -453,9 +478,53 @@ function doPost(e) {
       default:
         return json({ error: 'Azione sconosciuta' });
     }
-  } catch (err) {
-    return json({ error: String(err.message || err) });
   }
+}
+
+// ---------- Diagnostica (TRACE_USERS, avvisati nell'app) ----------
+
+function isTraced(user) {
+  return TRACE_USERS.includes(user.name) && !TEST;
+}
+
+function traceRow(user, from, event, details) {
+  const when = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss');
+  sheet('debug').appendRow([when, user.name, from, String(event).slice(0, 80), String(details).slice(0, 1000)]);
+}
+
+/** Una riga per ogni richiesta dell'account seguito: azione, durata, esito. */
+function traceServer(user, req, out, ms, failed) {
+  if (req.action === 'trace') return;
+  try {
+    let body = '';
+    try {
+      body = out.getContent();
+    } catch (e) {
+      body = out.body || '';
+    }
+    let err = failed;
+    if (!err && body.indexOf('"error"') >= 0) {
+      try {
+        err = JSON.parse(body).error || '';
+      } catch (e) { /* risposta non JSON */ }
+    }
+    const extra = req.action === 'chat' ? ` v=${req.v}` : '';
+    traceRow(user, 'server', req.action, `${err ? 'ERRORE ' + err : 'ok'} · ${ms} ms · ${body.length} byte · app ${req.ver || '?'}${extra}`);
+  } catch (e) {
+    console.error('Registro non scritto', e);
+  }
+}
+
+/** Eventi mandati dall'app dell'account seguito (errori, caricamenti, cosa vede a schermo). */
+function saveTrace(user, events) {
+  if (!isTraced(user)) return { ok: true };
+  const list = Array.isArray(events) ? events.slice(0, 60) : [];
+  if (!list.length) return { ok: true };
+  const when = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss');
+  const rows = list.map((e) => [when, user.name, 'app ' + String(e.t || ''), String(e.ev || '').slice(0, 80), String(e.d || '').slice(0, 1000)]);
+  const sh = sheet('debug');
+  sh.getRange(sh.getLastRow() + 1, 1, rows.length, 5).setValues(rows);
+  return { ok: true };
 }
 
 // ---------- API GET: check-in automatico (Comandi iOS) e GitHub Action ----------
