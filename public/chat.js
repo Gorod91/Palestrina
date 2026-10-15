@@ -363,7 +363,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         try {
           localStorage.setItem('palestrina.weekOpen', weekOpen ? '1' : '0');
         } catch { /* storage non disponibile */ }
-        renderPoll(true);
+        toggleWeek(card);
       };
     }
     refreshPollEvents();
@@ -431,6 +431,49 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   }
 
   /** Presenze dei 7 giorni, una riga a persona (io per primo), in colonna sotto ai giorni. */
+  /**
+   * "Vedi la settimana" / "Nascondi la settimana" animato: il riquadro cresce (o si richiude) in altezza,
+   * i giorni scivolano al loro posto e le righe delle persone scendono una dopo l'altra.
+   */
+  function toggleWeek(card) {
+    const still = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (still || !card.animate) return renderPoll(true);
+    const ease = 'cubic-bezier(.2, .8, .2, 1)';
+    const dayRects = () => [...card.querySelectorAll('.pday')].map((b) => b.getBoundingClientRect());
+    const swap = () => {
+      const h0 = card.getBoundingClientRect().height;
+      const before = dayRects();
+      renderPoll(true);
+      const h1 = card.getBoundingClientRect().height;
+      card.style.overflow = 'hidden';
+      card.animate([{ height: `${h0}px` }, { height: `${h1}px` }], { duration: 340, easing: ease })
+        .finished.then(() => (card.style.overflow = ''), () => {});
+      // i giorni si spostano per fare posto alla colonna dei nomi (o tornano larghi)
+      card.querySelectorAll('.pday').forEach((b, i) => {
+        const a = before[i];
+        if (!a) return;
+        const r = b.getBoundingClientRect();
+        const dx = a.left - r.left;
+        const sx = a.width / r.width;
+        if (Math.abs(dx) < 1 && Math.abs(sx - 1) < 0.01) return;
+        b.animate([{ transform: `translateX(${dx}px) scaleX(${sx})`, transformOrigin: 'left center' }, { transform: 'none', transformOrigin: 'left center' }], { duration: 340, easing: ease });
+      });
+      // righe della settimana: scendono una per volta
+      const cols = 8;
+      card.querySelectorAll('.pweek > *').forEach((c, i) => {
+        const row = Math.floor(i / cols);
+        c.animate([{ opacity: 0, transform: 'translateY(-8px)' }, { opacity: 1, transform: 'none' }], { duration: 260, delay: 60 + row * 45, easing: ease, fill: 'backwards' });
+      });
+    };
+    const grid = card.querySelector('.pweek');
+    if (weekOpen || !grid) return swap();
+    // chiusura: prima le righe svaniscono risalendo, poi il riquadro si richiude
+    const cells = [...grid.children];
+    const rows = Math.ceil(cells.length / 8);
+    const anims = cells.map((c, i) => c.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: 'translateY(-6px)' }], { duration: 160, delay: (rows - 1 - Math.floor(i / 8)) * 30, easing: 'ease-in', fill: 'forwards' }));
+    Promise.all(anims.map((a) => a.finished)).then(swap, swap);
+  }
+
   function weekGrid(plans) {
     const people = plans[0].people.slice().sort((a, b) => (b.name === me.name) - (a.name === me.name));
     const esc = (t) => String(t).replace(/[<&>"]/g, (c) => `&#${c.charCodeAt(0)};`);
