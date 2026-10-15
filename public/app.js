@@ -1186,6 +1186,9 @@ function fitViewport() {
   const keyboard = typingNow() || vv.height < Math.max(window.innerHeight, fullHeight) - 120;
   document.documentElement.style.setProperty('--app-h', `${Math.round(vv.height)}px`);
   document.body.classList.toggle('keyboard', keyboard);
+  // Scrivendo un messaggio il sondaggio sopra la chat si nasconde, per lasciare più spazio ai messaggi
+  // (non mentre si sceglie l'orario del sondaggio: lì serve vederlo).
+  document.body.classList.toggle('composing', keyboard && !!document.activeElement && document.activeElement.id === 'chat-input');
   if (keyboard) window.scrollTo(0, 0);
 }
 if (window.visualViewport) {
