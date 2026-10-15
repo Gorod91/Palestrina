@@ -19,6 +19,17 @@ Due telefoni che si urtano registrano un picco dell'accelerometro nello stesso i
   - **Prodotti sbloccabili**: legati al gioco, per esempio la maglietta del Re del mese acquistabile solo da chi è stato Re, o sconti per chi ha più punti.
 - **Pubblicità / sponsor** nell'app: studio notarile, medico endocrinologo, studio dentistico, azienda di robot, ecc.
 
+## Altre versioni dell'app
+
+- **iPhone Fold** (pieghevole): da aperto lo schermo è quasi quadrato, quindi due colonne invece di una, per esempio chat e calendario affiancati, oppure classifica accanto a Home. Da chiuso resta l'app di oggi. Si fa con il CSS (layout diverso sopra una certa larghezza) senza toccare il server; da provare sul dispositivo vero per margini e cerniera.
+- **Versione desktop**: la stessa PWA aperta dal computer (installabile anche da Chrome/Edge/Safari). Barra laterale al posto della barra in basso, contenuto centrato e più largo, chat a destra sempre visibile. Le notifiche web funzionano anche da desktop.
+- **Versioni leggermente personalizzate per ogni partecipante**: stessa app per tutti, ma con piccoli tocchi personali legati al nome:
+  - un colore d'accento scelto da ognuno (lime, rosa, azzurro…) usato per pulsanti e anello dell'obiettivo;
+  - avatar o emoji personale vicino al nome in chat e in classifica;
+  - saluto e frasi motivazionali su misura (per esempio "Bentornato Re" per chi ha la corona, record personali, serie di settimane di fila);
+  - obiettivo settimanale personale già previsto dal foglio (colonna C) messo più in evidenza;
+  - impostazioni salvate sul server (foglio Utenti) così seguono la persona su ogni dispositivo.
+
 ## Mese a squadre (gennaio, per ora)
 
 Un mese "speciale" con regole diverse dal solito, da rilasciare come novità dormiente a fine dicembre:
