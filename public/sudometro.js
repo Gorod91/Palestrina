@@ -305,13 +305,14 @@ export function score(rest, sweat) {
 // - colori corretti sulla luce: la dominante dello sfondo (porta a vetri con luci calde, muro bianco, tubo blu…)
 //   viene neutralizzata a metà, così riferimento e selfie da sudato si possono confrontare;
 // - rossore sugli zigomi (non sulle guance basse, dove c'è la barba), scartando ombre e riflessi;
-// - lucidità relativa: quanto i punti più chiari di fronte e naso staccano dalla pelle intorno
-//   (la soglia fissa della versione 1 non scattava mai);
+// - lucidità relativa, zona per zona (fronte, naso, zigomi): quanto i punti più chiari staccano dalla pelle
+//   intorno (la soglia fissa della versione 1 non scattava mai). Una zona più lucida nel riferimento per colpa
+//   della luce (es. faretto sulla fronte) non annulla il sudore sulle altre;
 // - controllo dello scatto: luce molto diversa dal riferimento o foto mossa → si chiede di rifarlo una volta.
 
 export const WEIGHTS2 = {
   redness: { points: 60, full: 6 }, // tonalità più rossa (gradi di tinta in meno) su zigomi e fronte, colori corretti
-  shine: { points: 40, full: 25 }, // aumento dello stacco dei riflessi ((95° percentile − mediana di L) / mediana, in %)
+  shine: { points: 40, full: 15 }, // aumento medio dei riflessi per zona (fronte, naso, zigomi); una zona in calo conta 0
 };
 export const QUALITY2 = {
   maxLight: 16, // differenza di luminosità del viso oltre la quale si chiede di rifare lo scatto
@@ -367,21 +368,24 @@ export async function analyzeV2(source) {
     return px;
   };
   const skinTone = sample([...REGIONS2.malar, ...REGIONS2.forehead]);
-  const shinyArea = sample([...REGIONS2.forehead, ...REGIONS2.nose]);
-  if (!skinTone.length || !shinyArea.length) throw new Error('Viso fuori dall\'inquadratura');
+  if (!skinTone.length) throw new Error('Viso fuori dall\'inquadratura');
+  // stacco dei riflessi in una zona: (95° percentile − mediana della luminosità) / mediana, in %
+  const highlightOf = (px) => {
+    const Ls = px.map((p) => p.L).sort((a, b) => a - b);
+    const m = quantile(Ls, 0.5);
+    return m ? round(((quantile(Ls, 0.95) - m) / m) * 100) : 0;
+  };
+  const zones = { f: highlightOf(sample(REGIONS2.forehead)), n: highlightOf(sample(REGIONS2.nose)), z: highlightOf(sample(REGIONS2.malar)) };
   const med = median(skinTone.map((p) => p.L));
   // rossore: tinta della pelle "normale" (niente ombre, barba, riflessi). La tinta non cambia con la luminosità,
   // a differenza di a* che cala quando il selfie è più scuro: più è bassa (verso il rosso), più la pelle è rossa.
   const skin = skinTone.filter((p) => p.L > med - 18 && p.L < med + 15);
   const hue = median((skin.length ? skin : skinTone).map((p) => p.h));
-  const Ls = shinyArea.map((p) => p.L).sort((a, b) => a - b);
-  const p50 = quantile(Ls, 0.5);
-  const highlight = p50 ? ((quantile(Ls, 0.95) - p50) / p50) * 100 : 0;
   return {
     v: 2,
     L: round(med),
     hue: round(hue),
-    highlight: round(highlight),
+    zones,
     sharp: round(sharpness(data, W, H, box), 1),
     gains: gains.map((g) => round(g, 3)),
   };
@@ -448,7 +452,9 @@ function sharpness(data, W, H, box) {
 export function scoreV2(rest, sweat, { reduced = false } = {}) {
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
   const dRed = rest.hue - sweat.hue; // tinta più bassa = più rossa
-  const dShine = sweat.highlight - rest.highlight;
+  // riflessi: media degli aumenti per zona, le zone in calo contano 0
+  const keys = Object.keys(sweat.zones);
+  const dShine = keys.reduce((s, k) => s + Math.max(0, sweat.zones[k] - (rest.zones[k] || 0)), 0) / keys.length;
   const dL = sweat.L - rest.L;
   let retake = null;
   if (dL < -QUALITY2.maxLight) retake = 'luce+';

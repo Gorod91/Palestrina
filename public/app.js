@@ -795,7 +795,7 @@ async function sudometroV2(photo, rest = null) {
 /** Cosa finisce nel foglio (colonna Dettagli): punteggio 2 e valori grezzi delle due foto, per tarare i pesi. */
 function compactV2(v2) {
   if (!v2 || v2.error) return { err: v2 ? v2.error : 'non calcolato' };
-  const raw = (f) => ({ L: f.L, h: f.hue, hl: f.highlight, sh: f.sharp, g: f.gains });
+  const raw = (f) => ({ L: f.L, h: f.hue, hl: f.zones, sh: f.sharp, g: f.gains });
   return { score: v2.res.score, retake: v2.res.retake || '', again: !!v2.retaken, ...v2.res.details, rif: raw(v2.rest), sud: raw(v2.sweat) };
 }
 
