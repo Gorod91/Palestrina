@@ -2,7 +2,7 @@
 
 - L'app è live e la usano gli amici: le modifiche a `public/` e `apps-script/` arrivano a tutti appena pushate su `main`.
 - **Nuove funzioni, punteggi o sfide visibili agli altri: chiedere sempre prima** se vanno attivate subito oppure implementate "dormienti" (invisibili) e attivate alle 21:05 dell'ultimo giorno del mese, dopo l'incoronazione del Re, con le slide delle novità inviate in chat.
-- Risposte all'utente in italiano, di lunghezza media.
+- Risposte all'utente in italiano, brevi: report circa il 40% più corti di una risposta "media" (solo l'essenziale: cosa è cambiato, cosa è stato provato, cosa serve decidere).
 - Codici personali, ADMIN_SECRET, token e `.clasprc.json` non vanno mai scritti nel repo né letti se non serve.
 - Novità dormienti: aggiungerle in `NEWS` (`apps-script/Code.gs`), controllare la funzione con `featureOn('nome')` (punti da `featureFrom`), slide brevi in `public/news/<id>.html` nello stile della presentazione (vedi `public/news/2026-11.html`). Provarle con la modalità prova → "Simula il rilascio delle novità".
 - **Slide delle novità: usare sempre lo stile di `public/news/2026-11.html`**: a storia (barre in alto, tocco per avanzare, × per chiudere), sfondo nero, Inter, titoli grandi con gradiente lime/azzurro/rosa, animazioni che partono a ogni slide, 3-4 slide brevi con un'ultima "Cosa cambia" (prima / da ora). Dare del "voi".
