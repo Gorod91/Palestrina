@@ -12,6 +12,8 @@ let deadline = null; // ms epoch di fine, null se fermo
 let frame = null;
 let wakeLock = null;
 let goAt = 0; // fine del conto alla rovescia iniziale
+let runMs = 0; // durata del giro in corso: l'anello si calcola su questa, anche se nel frattempo cambia "seconds"
+let touched = false; // tempo cambiato (o timer avviato) prima che si sapesse di chi è l'account
 const COUNTDOWN = 3;
 
 const valid = (v) => Number.isFinite(v) && v >= MIN && v <= MAX;
@@ -32,14 +34,24 @@ function saveLocal() {
 }
 
 /**
- * Collega il timer all'account: usa il tempo salvato in Apps Script (`serverSeconds`),
- * altrimenti quello del telefono, altrimenti 30 secondi.
+ * Collega il timer all'account. Vale, nell'ordine: il tempo appena scelto (se l'utente l'ha cambiato prima che
+ * arrivasse la risposta del server), l'ultimo tempo usato su questo telefono, quello salvato in Apps Script
+ * (per un telefono nuovo), 30 secondi. Se il server ha un valore diverso (es. salvataggio perso per la rete) lo riallinea.
  */
 export function setTimerAccount(name, serverSeconds, save) {
   if (account && account.name === name) return; // già impostato: non sovrascrive le modifiche in corso
   account = { name, save };
-  const local = loadLocal();
-  seconds = valid(serverSeconds) ? serverSeconds : valid(local) ? local : DEFAULT;
+  if (!name) {
+    touched = false;
+    seconds = DEFAULT;
+  } else if (touched) {
+    touched = false;
+    saveLocal(); // il tempo scelto prima del login vale per questo account
+  } else {
+    const local = loadLocal();
+    seconds = valid(local) ? local : valid(serverSeconds) ? serverSeconds : DEFAULT;
+  }
+  if (name && save && seconds !== serverSeconds) save(seconds);
   if (deadline === null) render();
 }
 
@@ -49,6 +61,7 @@ function fmt(s) {
 
 function setSeconds(v) {
   seconds = Math.max(MIN, Math.min(MAX, Math.round(v)));
+  if (!account || !account.name) touched = true;
   saveLocal();
   render();
 }
@@ -77,11 +90,13 @@ function releaseAwake() {
 }
 
 function start() {
+  if (!account || !account.name) touched = true;
   saveLocal();
   if (account && account.save) account.save(seconds); // ultimo tempo usato, anche su altri telefoni
   // 3 secondi di conto alla rovescia prima che parta il tempo
   goAt = Date.now() + COUNTDOWN * 1000;
-  deadline = goAt + seconds * 1000;
+  runMs = seconds * 1000;
+  deadline = goAt + runMs;
   render();
   keepAwake();
   tick();
@@ -101,7 +116,7 @@ function tick() {
   if (left <= 0) return finish();
   const s = Math.ceil(left / 1000);
   $('timer-left').textContent = s >= 60 ? fmt(s) : String(s);
-  $('timer-running').style.setProperty('--p', String(1 - left / (seconds * 1000)));
+  $('timer-running').style.setProperty('--p', String(Math.min(1, Math.max(0, 1 - left / runMs))));
   frame = requestAnimationFrame(tick);
 }
 
