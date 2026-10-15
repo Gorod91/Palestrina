@@ -40,6 +40,17 @@ Ricordare pesi e ripetizioni per macchina/esercizio, come Hevy, Strong, Fitbod, 
 - **Fasi**: 1 diario (catalogo, serie, ultima volta, recupero, senza rete) → 2 schede e partenza dal check-in → 3 progressi (record, grafici, massimale stimato) → 4 suggerimento del peso → 5 gioco (record in chat, punti/sfide, dormiente).
 - **Da decidere**: schede private o visibili al gruppo; tab Timer trasformato in "Allenamento" (con il timer dentro); rilascio subito o dormiente il 30 novembre; se i record danno punti.
 
+## Sudometro: strade alternative (da valutare con più dati)
+
+Il Sudometro 2 gira in silenzio dal 15/10 (Dettagli del foglio). Altre idee, dalla più promettente:
+1. **Selfie d'ingresso** al check-in come riferimento del giorno (stesso posto e luce).
+2. **Flash dello schermo**: due fotogrammi con e senza schermo bianco, la differenza isola la riflessione della pelle.
+3. **Breve video** muovendo la testa: i riflessi del sudore si spostano, la pelle no; meno foto mosse.
+4. **Capelli bagnati**: più scuri, appiccicati e lucidi rispetto al riferimento.
+5. **Punteggio rispetto a sé stessi** (storico personale).
+6. **Modello addestrato** sulle nostre foto etichettate, quando saranno qualche decina.
+Inoltre: rifiutare le foto di riferimento mosse (dormiente, insieme al Sudometro 2).
+
 ## Mese a squadre (gennaio, per ora)
 
 Un mese "speciale" con regole diverse dal solito, da rilasciare come novità dormiente a fine dicembre:
