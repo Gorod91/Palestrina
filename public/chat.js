@@ -74,11 +74,11 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       const r = await api('chat', { v: force ? -1 : v });
       tlog('chat load', `ok${r && r.same ? ' (niente di nuovo)' : ''}`);
       syncedAt = Date.now();
-      syncErr = '';
+      syncFails = 0;
       apply(r);
     } catch (err) {
       tlog('chat load', `ERRORE ${err.message}${active && !data ? ' · schermo bloccato' : ''}`);
-      syncErr = err.message;
+      syncFails++;
       if (force && !retrying) toast(`Chat non disponibile: ${err.message}`);
       if (active && !data) loadError(err.message);
     } finally {
@@ -93,16 +93,16 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   // si vede potrebbe essere vecchio (chat dell'ultima volta in attesa del server, server che non risponde, offline).
   const STALE_MS = 20000; // la chat si aggiorna ogni 5 s: 20 s senza risposta = 3-4 tentativi andati a vuoto
   let syncedAt = 0; // ultima risposta del server alla chat (anche "niente di nuovo")
-  let syncErr = ''; // errore dell'ultimo tentativo, finché uno non va a buon fine
+  let syncFails = 0; // tentativi falliti di fila: l'avviso giallo arriva al secondo (un intoppo isolato non conta)
   let retrying = false; // "Riprova" toccato: mostra "Aggiorno…" invece dell'avviso giallo
   let cachedAt = 0; // quando è stata salvata la chat dell'ultima volta mostrata all'apertura
 
   function syncState() {
     if (!active || !data) return 'ok'; // senza chat ci pensa già "Carico la chat…"
     if (!navigator.onLine) return 'off';
-    if (syncErr) return retrying ? 'busy' : 'stale';
-    if (!syncedAt || Date.now() - syncedAt > STALE_MS) return loading ? 'busy' : 'stale';
-    return 'ok';
+    if (syncFails >= 2) return retrying ? 'busy' : 'stale';
+    if (syncedAt && Date.now() - syncedAt <= STALE_MS) return 'ok';
+    return loading || syncFails ? 'busy' : 'stale'; // dopo un solo errore riprova da sola: resta "Aggiorno…"
   }
 
   const hhmm = (t) => new Date(t).toTimeString().slice(0, 5);
@@ -981,7 +981,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       v = 0;
       data = null;
       syncedAt = 0;
-      syncErr = '';
+      syncFails = 0;
       cachedAt = 0;
       $('chat-list').innerHTML = '';
       delete $('chat-list').dataset.rendered;

@@ -259,7 +259,7 @@ function render() {
 
   renderSudometro();
   renderGallery();
-  $('ref-card').hidden = !me.reference;
+  renderRefCard(me.reference);
   $('debug-mode-card').hidden = !me.debug;
   $('admin-card').hidden = !me.admin;
   $('debug-mode').checked = debugOn();
@@ -445,6 +445,35 @@ function renderGallery() {
     el.append(li);
     li.querySelector('.photo').replaceWith(photoPair(r.photoId, (state.refPhotos || {})[r.name], `${who} · ${r.score} · ${title}`));
   });
+}
+
+/** Impostazioni → Sudometro: la foto di riferimento sempre in vista (o l'invito a farla). */
+let refShown;
+function renderRefCard(ref) {
+  const id = (ref && ref.photoId) || '';
+  $('btn-reref').textContent = ref ? 'Rifai la foto di riferimento' : 'Fai la foto di riferimento';
+  $('ref-when').textContent = !ref
+    ? 'Non l\'hai ancora fatta: serve per il Sudometro.'
+    : ref.at ? `Da riposato, fatta il ${new Date(ref.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}.` : 'Da riposato.';
+  if (id === refShown) return; // non ricaricare la foto a ogni aggiornamento
+  refShown = id;
+  const box = $('ref-photo');
+  box.onclick = null;
+  if (!id) {
+    box.innerHTML = '<svg><use href="#i-camera"/></svg>';
+    return;
+  }
+  box.innerHTML = bicep();
+  loadPhoto(id)
+    .then((src) => {
+      if (refShown !== id) return;
+      const img = new Image();
+      img.alt = 'Foto di riferimento';
+      img.src = src;
+      box.replaceChildren(img);
+      box.onclick = () => openPhoto(id, null, 'Foto di riferimento');
+    })
+    .catch(() => (box.innerHTML = '<svg><use href="#i-camera"/></svg>'));
 }
 
 /** Foto da fresco e da sudato una accanto all'altra; un tocco le apre in grande. */
@@ -1101,7 +1130,7 @@ $('points-info').addEventListener('click', (e) => {
   if (e.target === $('points-info') || e.target.closest('.sheet-close')) $('points-info').hidden = true;
 });
 $('btn-reref').addEventListener('click', () => {
-  if (!confirm('Rifare la foto di riferimento? Quella vecchia verrà sostituita.')) return;
+  if (state.me.reference && !confirm('Rifare la foto di riferimento? Quella vecchia verrà sostituita.')) return;
   selectTab('oggi'); // il risultato si vede nel Sudometro della Home
   takeReference();
 });

@@ -354,6 +354,13 @@ body.chat-mode #scroller { background: none; }
 
 /* Foto da fresco accanto a quella da sudato */
 .pair { display: flex; gap: 4px; flex: none; cursor: pointer; }
+.ref-photo { display: flex; align-items: center; gap: 14px; }
+.ref-photo b { font-size: 16px; }
+.ref-photo p { margin: 4px 0 0; }
+.ref-ph { flex: none; width: 84px; aspect-ratio: 3 / 4; border-radius: 14px; background: var(--card-2); overflow: hidden; display: grid; place-items: center; color: var(--muted); cursor: pointer; }
+.ref-ph img { width: 100%; height: 100%; object-fit: cover; }
+.ref-ph > svg:not(.bicep) { width: 28px; height: 28px; }
+.ref-ph .bicep { width: 40px; height: 39px; color: var(--exercise); --bicep-bg: var(--card-2); }
 .pair .ph { position: relative; width: 44px; height: 44px; border-radius: 10px; background: var(--card-2); overflow: hidden; display: grid; place-items: center; color: var(--muted); }
 .pair .ph svg { width: 18px; height: 18px; }
 .pair .ph img { width: 100%; height: 100%; object-fit: cover; }
