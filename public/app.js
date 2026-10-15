@@ -672,29 +672,62 @@ async function takeReference() {
 async function takeSweat(debug, overwrite = false) {
   try {
     const reference = state.me.reference.features;
-    const canvas = await sudometro.takeSelfie('Selfie da sudato: stesso punto della foto di riferimento', {
+    // Sudometro 2 ufficiale solo quando la novità è rilasciata; prima si calcola in silenzio (solo nel foglio).
+    const v2live = !debug && !!(state.features && state.features.sudometro2);
+    let canvas = await sudometro.takeSelfie('Selfie da sudato: stesso punto della foto di riferimento', {
       live: debugOn(),
       reference,
     });
     if (!canvas) return;
     sudoBusy('Analizzo il selfie…');
-    const features = await sudometro.analyze(canvas);
-    const result = sudometro.score(reference, features);
+    let result = sudometro.score(reference, await sudometro.analyze(canvas));
+    let photo = sudometro.toJpegBase64(canvas);
+    let v2 = null;
+    if (v2live) {
+      v2 = await sudometroV2(photo);
+      // Scatto da rifare (luce molto diversa o foto mossa): si chiede una volta sola, dicendo come.
+      // Se anche il secondo non va, si tiene il meno peggio dei due con il punteggio ridotto.
+      if (v2.res && v2.res.retake) {
+        const hint = sudometro.RETAKE_HINT[v2.res.retake];
+        toast(hint, 6000);
+        const again = await sudometro.takeSelfie(hint, { live: debugOn(), reference });
+        let keep = v2;
+        let reduced = true;
+        if (again) {
+          sudoBusy('Analizzo il selfie…');
+          const result2 = sudometro.score(reference, await sudometro.analyze(again));
+          const photo2 = sudometro.toJpegBase64(again);
+          const second = await sudometroV2(photo2, v2.rest);
+          if (second.res && (!second.res.retake || sudometro.lessBadV2(v2.rest, v2.sweat, second.sweat) === 'b')) {
+            keep = second;
+            canvas = again;
+            result = result2;
+            photo = photo2;
+          }
+          reduced = !second.res || !!second.res.retake;
+        }
+        v2 = keep;
+        if (reduced && v2.res) v2.res = sudometro.scoreV2(v2.rest, v2.sweat, { reduced: true });
+        v2.retaken = true;
+      }
+    }
+    const shown = v2live && v2 && v2.res ? { score: v2.res.score, title: v2.res.title, warnings: [] } : result;
     let before = null;
     if (!debug) {
       // Il risultato si vede subito; la foto si pubblica intanto (bicipite finché non è caricata)
       before = state;
-      state = { ...state, me: { ...state.me, sudometroToday: { score: result.score, title: result.title, photoId: '', saving: true } } };
+      state = { ...state, me: { ...state.me, sudometroToday: { score: shown.score, title: shown.title, photoId: '', saving: true } } };
       optimistic++;
       renderSudometro();
     } else sudoBusy('Pubblico la foto…');
+    if (!v2) v2 = await sudometroV2(photo); // in silenzio, a risultato già sullo schermo
     const r = await api('sudometro', {
-      score: result.score,
-      title: result.title,
-      details: result.details,
+      score: shown.score,
+      title: shown.title,
+      details: { ...result.details, v2: compactV2(v2) },
       debug,
       overwrite,
-      photo: sudometro.toJpegBase64(canvas),
+      photo,
     }).catch((err) => {
       if (before) {
         state = before; // non è andato: torna com'era
@@ -708,18 +741,62 @@ async function takeSweat(debug, overwrite = false) {
       lastDebug = [
         `${result.score}: ${result.title}`,
         `rossore +${result.details.red} · lucidità +${result.details.shine} · luce ${result.details.light}`,
+        v2.res ? `Sudometro 2: ${v2.res.score} (tinta ${v2.res.details.red} · riflessi ${v2.res.details.shine} · luce ${v2.res.details.light} · nitidezza ×${v2.res.details.sharp}${v2.res.retake ? ` · da rifare: ${v2.res.retake}` : ''})` : `Sudometro 2: ${v2.error}`,
         ...result.warnings,
         photoWarning(r),
       ].filter(Boolean).join('\n');
       toast('Prova di debug salvata');
     } else {
-      toast(result.warnings.length ? result.warnings.join(' ') : `${result.score}: ${result.title}`, 6000);
+      toast(shown.warnings.length ? shown.warnings.join(' ') : `${shown.score}: ${shown.title}`, 6000);
     }
     await refresh();
   } catch (err) {
     toast(cameraError(err));
   }
   renderSudometro(); // anche se l'aggiornamento non è riuscito, toglie il bicipite
+}
+
+// ---------- Sudometro 2 ----------
+// Si analizzano le foto così come vengono salvate (ritaglio del viso, 480 px): il riferimento si rilegge dalla sua
+// foto su Drive, quindi nessuno deve rifare la foto di riferimento.
+const refV2Cache = new Map();
+const within = (p, ms) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error('tempo scaduto')), ms))]);
+
+async function imageFrom(src) {
+  const img = new Image();
+  img.src = src;
+  await img.decode();
+  return img;
+}
+
+function refV2() {
+  const id = state.me.reference && state.me.reference.photoId;
+  if (!id) return Promise.reject(new Error('foto di riferimento non salvata'));
+  if (!refV2Cache.has(id)) {
+    refV2Cache.set(id, loadPhoto(id).then(imageFrom).then((img) => sudometro.analyzeV2(img)).catch((err) => {
+      refV2Cache.delete(id);
+      throw err;
+    }));
+  }
+  return refV2Cache.get(id);
+}
+
+/** Punteggio del Sudometro 2 per una foto (JPEG base64): { rest, sweat, res } oppure { error }. Non blocca mai il selfie. */
+async function sudometroV2(photo, rest = null) {
+  try {
+    rest = rest || (await within(refV2(), 20000));
+    const sweat = await within(imageFrom(`data:image/jpeg;base64,${photo}`).then((img) => sudometro.analyzeV2(img)), 15000);
+    return { rest, sweat, res: sudometro.scoreV2(rest, sweat) };
+  } catch (err) {
+    return { error: String((err && err.message) || err) };
+  }
+}
+
+/** Cosa finisce nel foglio (colonna Dettagli): punteggio 2 e valori grezzi delle due foto, per tarare i pesi. */
+function compactV2(v2) {
+  if (!v2 || v2.error) return { err: v2 ? v2.error : 'non calcolato' };
+  const raw = (f) => ({ L: f.L, h: f.hue, hl: f.highlight, sh: f.sharp, g: f.gains });
+  return { score: v2.res.score, retake: v2.res.retake || '', again: !!v2.retaken, ...v2.res.details, rif: raw(v2.rest), sud: raw(v2.sweat) };
 }
 
 /** Avviso per gli utenti debug se la foto non è finita su Drive (es. Drive non ancora autorizzato). */

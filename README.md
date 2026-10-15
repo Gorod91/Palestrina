@@ -116,6 +116,14 @@ I pesi (`WEIGHTS`) e le soglie (`TITLES`) sono in `public/sudometro.js`, da tara
 
 **Anti-furbizia**: solo fotocamera dal vivo (niente galleria), un check-in e un Sudometro al giorno, controllati da Apps Script.
 
+### Sudometro 2 (in prova silenziosa)
+Dall'ottobre 2026 a ogni selfie da sudato l'app calcola anche il punteggio della versione 2, senza mostrarlo: finisce nella colonna *Dettagli* del foglio Sudometro (`v2`), insieme ai valori grezzi delle due foto (`rif` e `sud`: luminosità `L`, tinta `h`, riflessi `hl`, nitidezza `sh`, correzione della luce `g`), per tarare i pesi prima del rilascio. La foto di riferimento si rianalizza dalla sua copia su Drive: nessuno deve rifarla.
+- **Colori corretti sulla luce**: la dominante dello sfondo viene neutralizzata a metà.
+- **Rossore come tinta** della pelle su zigomi e fronte bassa (non cala quando il selfie è più scuro, come invece a*), scartando ombre, barba e riflessi.
+- **Lucidità relativa**: quanto i punti più chiari di fronte e naso staccano dalla pelle intorno (la soglia fissa della versione 1 non scattava mai).
+- **Scatto da rifare, una volta sola**: luce molto diversa dal riferimento ("più luce" / "meno luce") o foto mossa ("tieni fermo il telefono"); se anche il secondo non va, si tiene il meno peggio con il punteggio ridotto (×0,7).
+Pesi e soglie in `WEIGHTS2` e `QUALITY2` di `public/sudometro.js`. Diventa il punteggio ufficiale (con la richiesta di rifare lo scatto) quando si aggiunge `sudometro2` alle funzioni di una novità in `NEWS`.
+
 ### Alias
 Nel tab **Impostazioni → Profilo** ognuno può scegliere un **nome visualizzato** (colonna **E "Alias"** del foglio Utenti), usato in classifica e nelle notifiche. Il nome della colonna A resta quello originale e collega tutti i dati (presenze, foto, cartelle su Drive, debug), quindi non va cambiato. Alias vuoto = si vede il nome originale.
 

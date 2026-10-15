@@ -300,6 +300,187 @@ export function score(rest, sweat) {
   };
 }
 
+// ---------- Sudometro 2 (per ora calcolato in silenzio, accanto al punteggio attuale) ----------
+// Cosa cambia rispetto alla versione 1, guardando i selfie veri:
+// - colori corretti sulla luce: la dominante dello sfondo (porta a vetri con luci calde, muro bianco, tubo blu…)
+//   viene neutralizzata a metà, così riferimento e selfie da sudato si possono confrontare;
+// - rossore sugli zigomi (non sulle guance basse, dove c'è la barba), scartando ombre e riflessi;
+// - lucidità relativa: quanto i punti più chiari di fronte e naso staccano dalla pelle intorno
+//   (la soglia fissa della versione 1 non scattava mai);
+// - controllo dello scatto: luce molto diversa dal riferimento o foto mossa → si chiede di rifarlo una volta.
+
+export const WEIGHTS2 = {
+  redness: { points: 60, full: 6 }, // tonalità più rossa (gradi di tinta in meno) su zigomi e fronte, colori corretti
+  shine: { points: 40, full: 25 }, // aumento dello stacco dei riflessi ((95° percentile − mediana di L) / mediana, in %)
+};
+export const QUALITY2 = {
+  maxLight: 16, // differenza di luminosità del viso oltre la quale si chiede di rifare lo scatto
+  minSharp: 0.35, // nitidezza minima rispetto al riferimento (sotto: foto mossa)
+  penalty: 0.7, // punteggio ridotto se anche il secondo scatto non è buono
+};
+const REGIONS2 = {
+  forehead: [151, 108, 337, 9, 107, 336], // fronte bassa: in alto si prendono anche i capelli
+  malar: [117, 118, 50, 346, 347, 280],
+  nose: [1, 4, 5, 195, 197, 6],
+};
+
+/** Caratteristiche della versione 2 da un canvas o da un'immagine (es. la foto di riferimento salvata). */
+export async function analyzeV2(source) {
+  let canvas = source;
+  if (!(source instanceof HTMLCanvasElement)) {
+    canvas = document.createElement('canvas');
+    canvas.width = source.naturalWidth || source.width;
+    canvas.height = source.naturalHeight || source.height;
+    canvas.getContext('2d').drawImage(source, 0, 0);
+  }
+  const landmarker = await loadLandmarker();
+  const res = landmarker.detect(canvas);
+  if (!res.faceLandmarks || !res.faceLandmarks.length) throw new Error('Viso non trovato');
+  const lm = res.faceLandmarks[0];
+  const { width: W, height: H } = canvas;
+  const data = canvas.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, W, H).data;
+  const xs = lm.map((p) => p.x * W);
+  const ys = lm.map((p) => p.y * H);
+  const box = { x0: Math.min(...xs), x1: Math.max(...xs), y0: Math.min(...ys), y1: Math.max(...ys) };
+  const faceWidth = Math.hypot((lm[FACE_RIGHT].x - lm[FACE_LEFT].x) * W, (lm[FACE_RIGHT].y - lm[FACE_LEFT].y) * H);
+
+  // Dominante della luce: media dello sfondo (fuori dal viso e dai capelli), corretta a metà
+  const gains = grayWorldGains(data, W, H, box, faceWidth);
+  const radius = Math.max(3, Math.round(faceWidth * 0.07));
+  const sample = (ids) => {
+    const px = [];
+    ids.forEach((i) => {
+      const cx = Math.round(lm[i].x * W);
+      const cy = Math.round(lm[i].y * H);
+      for (let y = cy - radius; y <= cy + radius; y++) {
+        for (let x = cx - radius; x <= cx + radius; x++) {
+          if (x < 0 || y < 0 || x >= W || y >= H || (x - cx) ** 2 + (y - cy) ** 2 > radius ** 2) continue;
+          const o = (y * W + x) * 4;
+          const r = Math.min(255, data[o] * gains[0]);
+          const g = Math.min(255, data[o + 1] * gains[1]);
+          const b = Math.min(255, data[o + 2] * gains[2]);
+          const [L, a, bb] = rgbToLab(r, g, b);
+          px.push({ L, a, h: (Math.atan2(bb, a) * 180) / Math.PI });
+        }
+      }
+    });
+    return px;
+  };
+  const skinTone = sample([...REGIONS2.malar, ...REGIONS2.forehead]);
+  const shinyArea = sample([...REGIONS2.forehead, ...REGIONS2.nose]);
+  if (!skinTone.length || !shinyArea.length) throw new Error('Viso fuori dall\'inquadratura');
+  const med = median(skinTone.map((p) => p.L));
+  // rossore: tinta della pelle "normale" (niente ombre, barba, riflessi). La tinta non cambia con la luminosità,
+  // a differenza di a* che cala quando il selfie è più scuro: più è bassa (verso il rosso), più la pelle è rossa.
+  const skin = skinTone.filter((p) => p.L > med - 18 && p.L < med + 15);
+  const hue = median((skin.length ? skin : skinTone).map((p) => p.h));
+  const Ls = shinyArea.map((p) => p.L).sort((a, b) => a - b);
+  const p50 = quantile(Ls, 0.5);
+  const highlight = p50 ? ((quantile(Ls, 0.95) - p50) / p50) * 100 : 0;
+  return {
+    v: 2,
+    L: round(med),
+    hue: round(hue),
+    highlight: round(highlight),
+    sharp: round(sharpness(data, W, H, box), 1),
+    gains: gains.map((g) => round(g, 3)),
+  };
+}
+
+function median(arr) {
+  return quantile([...arr].sort((a, b) => a - b), 0.5);
+}
+
+function quantile(sorted, q) {
+  if (!sorted.length) return 0;
+  const i = (sorted.length - 1) * q;
+  const lo = Math.floor(i);
+  const hi = Math.ceil(i);
+  return sorted[lo] + (sorted[hi] - sorted[lo]) * (i - lo);
+}
+
+/** Guadagni R, G, B che rendono grigio lo sfondo (metà correzione, limitata): toglie la dominante della luce. */
+function grayWorldGains(data, W, H, box, faceWidth) {
+  const m = faceWidth * 0.25;
+  let r = 0, g = 0, b = 0, n = 0;
+  const step = Math.max(1, Math.round(Math.min(W, H) / 160));
+  for (let y = 0; y < H; y += step) {
+    for (let x = 0; x < W; x += step) {
+      // fuori dal viso, dai capelli (sopra) e dal collo/maglia (sotto)
+      if (x > box.x0 - m && x < box.x1 + m && y > box.y0 - m * 2.5) continue;
+      const o = (y * W + x) * 4;
+      const R = data[o], G = data[o + 1], B = data[o + 2];
+      const mx = Math.max(R, G, B);
+      if (mx > 245 || mx < 20) continue; // luci bruciate e buio non dicono niente sulla dominante
+      r += R; g += G; b += B; n++;
+    }
+  }
+  if (n < 200) return [1, 1, 1];
+  const avg = (r + g + b) / (3 * n);
+  return [r, g, b].map((c) => Math.max(0.75, Math.min(1.35, Math.sqrt(avg / (c / n)))));
+}
+
+/** Nitidezza del viso: varianza del laplaciano sulla luminosità (bassa = foto mossa o sfocata). */
+function sharpness(data, W, H, box) {
+  const x0 = Math.max(1, Math.round(box.x0));
+  const x1 = Math.min(W - 2, Math.round(box.x1));
+  const y0 = Math.max(1, Math.round(box.y0));
+  const y1 = Math.min(H - 2, Math.round(box.y1));
+  const step = Math.max(1, Math.round((x1 - x0) / 140)); // ~140 punti di larghezza, come fra foto di misure diverse
+  const lum = (x, y) => {
+    const o = (y * W + x) * 4;
+    return 0.299 * data[o] + 0.587 * data[o + 1] + 0.114 * data[o + 2];
+  };
+  let s = 0, s2 = 0, n = 0;
+  for (let y = y0 + step; y < y1 - step; y += step) {
+    for (let x = x0 + step; x < x1 - step; x += step) {
+      const v = 4 * lum(x, y) - lum(x - step, y) - lum(x + step, y) - lum(x, y - step) - lum(x, y + step);
+      s += v; s2 += v * v; n++;
+    }
+  }
+  return n ? s2 / n - (s / n) ** 2 : 0;
+}
+
+/**
+ * Punteggio della versione 2. `retake` dice se conviene rifare lo scatto e come:
+ * 'luce+' (più luminoso), 'luce-' (meno luminoso), 'mossa' (tieni fermo il telefono), altrimenti null.
+ */
+export function scoreV2(rest, sweat, { reduced = false } = {}) {
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  const dRed = rest.hue - sweat.hue; // tinta più bassa = più rossa
+  const dShine = sweat.highlight - rest.highlight;
+  const dL = sweat.L - rest.L;
+  let retake = null;
+  if (dL < -QUALITY2.maxLight) retake = 'luce+';
+  else if (dL > QUALITY2.maxLight) retake = 'luce-';
+  else if (rest.sharp && sweat.sharp < rest.sharp * QUALITY2.minSharp) retake = 'mossa';
+  const parts = {
+    redness: clamp01(dRed / WEIGHTS2.redness.full) * WEIGHTS2.redness.points,
+    shine: clamp01(dShine / WEIGHTS2.shine.full) * WEIGHTS2.shine.points,
+  };
+  const raw = parts.redness + parts.shine;
+  const total = Math.round(reduced ? raw * QUALITY2.penalty : raw);
+  return {
+    score: total,
+    title: TITLES.find(([min]) => total >= min)[1],
+    retake,
+    parts,
+    details: { red: round(dRed), shine: round(dShine), light: round(dL), sharp: round(rest.sharp ? sweat.sharp / rest.sharp : 1), reduced },
+  };
+}
+
+/** Quale dei due scatti tenere quando anche il secondo non è buono: quello con meno problemi. */
+export function lessBadV2(rest, a, b) {
+  const badness = (f) => Math.max(0, Math.abs(f.L - rest.L) - QUALITY2.maxLight) / QUALITY2.maxLight + Math.max(0, QUALITY2.minSharp - (rest.sharp ? f.sharp / rest.sharp : 1)) * 3;
+  return badness(b) < badness(a) ? 'b' : 'a';
+}
+
+export const RETAKE_HINT = {
+  'luce+': 'Troppo buio rispetto alla foto di riferimento: rifallo con più luce sul viso.',
+  'luce-': 'Troppa luce rispetto alla foto di riferimento: rifallo con meno luce in faccia.',
+  mossa: 'Foto mossa: rifalla tenendo fermo il telefono.',
+};
+
 // ---------- Colore ----------
 
 function pixelInfo(r, g, b) {
