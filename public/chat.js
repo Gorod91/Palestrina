@@ -440,10 +440,18 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     if (still || !card.animate) return renderPoll(true);
     const ease = 'cubic-bezier(.2, .8, .2, 1)';
     const dayRects = () => [...card.querySelectorAll('.pday')].map((b) => b.getBoundingClientRect());
+    // pulsanti e righe sotto la griglia: scendono (o risalgono) insieme al riquadro invece di saltare
+    const BELOW = ['.poll-askme', '.choices', '.poll-names', '.poll-closed', '.week-toggle'];
+    const belowTops = () => Object.fromEntries(BELOW.map((s) => [s, card.querySelector(s)]).filter(([, e]) => e).map(([s, e]) => [s, e.getBoundingClientRect().top]));
     const swap = () => {
       const h0 = card.getBoundingClientRect().height;
       const before = dayRects();
+      const tops = belowTops();
       renderPoll(true);
+      Object.entries(belowTops()).forEach(([s, top]) => {
+        if (!(s in tops) || Math.abs(tops[s] - top) < 1) return;
+        card.querySelector(s).animate([{ transform: `translateY(${tops[s] - top}px)` }, { transform: 'none' }], { duration: 340, easing: ease });
+      });
       const h1 = card.getBoundingClientRect().height;
       card.style.overflow = 'hidden';
       card.animate([{ height: `${h0}px` }, { height: `${h1}px` }], { duration: 340, easing: ease })
