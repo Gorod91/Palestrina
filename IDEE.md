@@ -30,6 +30,16 @@ Due telefoni che si urtano registrano un picco dell'accelerometro nello stesso i
   - obiettivo settimanale personale già previsto dal foglio (colonna C) messo più in evidenza;
   - impostazioni salvate sul server (foglio Utenti) così seguono la persona su ogni dispositivo.
 
+## Schede della palestra (prossima cosa grossa)
+
+Ricordare pesi e ripetizioni per macchina/esercizio, come Hevy, Strong, Fitbod, Alpha Progression.
+
+- **Basi**: per ogni esercizio "Ultima volta: 3×10 a 45 kg" con "Uguale" / "+2,5 kg"; schede personali (A/B, Push/Pull/Gambe); recupero automatico con il timer silenzioso che c'è già; serie salvate sul telefono e inviate quando torna la rete (in palestra spesso non c'è campo).
+- **Il nostro vantaggio**: catalogo condiviso delle macchine della NOSTRA palestra, con regolazioni personali (sedile, schienale) e foto; "Inizia scheda A?" dopo il check-in; record in chat ("Nuovo record di Rizzo sulla panca"); suggerimento del peso con la doppia progressione (tutte le serie al massimo delle ripetizioni → +2,5 kg, altrimenti stesso peso e una ripetizione in più).
+- **Dati**: fogli Esercizi (nome, tipo, gruppo muscolare, chi l'ha aggiunto), Schede (di chi, nome, esercizi in ordine), Serie (data, persona, esercizio, kg, ripetizioni); il server manda solo il riepilogo "ultima volta".
+- **Fasi**: 1 diario (catalogo, serie, ultima volta, recupero, senza rete) → 2 schede e partenza dal check-in → 3 progressi (record, grafici, massimale stimato) → 4 suggerimento del peso → 5 gioco (record in chat, punti/sfide, dormiente).
+- **Da decidere**: schede private o visibili al gruppo; tab Timer trasformato in "Allenamento" (con il timer dentro); rilascio subito o dormiente il 30 novembre; se i record danno punti.
+
 ## Mese a squadre (gennaio, per ora)
 
 Un mese "speciale" con regole diverse dal solito, da rilasciare come novità dormiente a fine dicembre:
