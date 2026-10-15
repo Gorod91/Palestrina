@@ -17,6 +17,10 @@ Due telefoni che si urtano registrano un picco dell'accelerometro nello stesso i
   - subito dopo, un tasto apre PayPal o Satispay con l'importo già compilato, verso Francesco;
   - una volta al mese (o raggiunti N pezzi) un solo ordine a una tipografia locale o a uno stampatore online: prezzi più bassi, niente scorte (si ordina solo quello già prenotato e pagato), consegna a mano in palestra.
   - **Prodotti sbloccabili**: legati al gioco, per esempio la maglietta del Re del mese acquistabile solo da chi è stato Re, o sconti per chi ha più punti.
+- **Linea (decisa)**: solo il **logo a colori**; tutta la linea **scura ma non nero pieno** (antracite / grigio scuro melange) con il logo.
+  - Borraccia: quella **con cannuccia** (600 ml) di Spreadshirt.
+  - Pantaloncini: **tecnici con tasche**, da cercare fuori da Spreadshirt (candidati: Printful, Hidalgo multisport con tasche laterali e posteriore).
+  - Asciugamano: **Printful** (cotone, ricamo).
 - **Prodotti scelti**:
   - Maglietta tecnica grigia melange (Spreadshirt, logo piccolo sul cuore, verde o a colori): https://www.spreadshirt.it/creare-da-se?productType=1310&appearance=1513&size=
   - Sacca sportiva nera (Spreadshirt, logo e scritta "palestrina" al centro, verde o a colori): https://www.spreadshirt.it/creare/dettaglio/sacca-sportiva-PT1155?appearance=2
