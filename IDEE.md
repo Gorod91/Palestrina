@@ -12,7 +12,11 @@ Due telefoni che si urtano registrano un picco dell'accelerometro nello stesso i
 
 ## Shop e pubblicità (idea futura)
 
-- **Shop con merchandising** di Palestrina (magliette, borracce, ecc.).
+- **Shop con merchandising** di Palestrina (magliette, borracce, ecc.), come **ordine di gruppo**:
+  - nello Shop ognuno sceglie prodotto e taglia e tocca "Prenota"; le prenotazioni finiscono in un foglio (come i check-in);
+  - subito dopo, un tasto apre PayPal o Satispay con l'importo già compilato, verso Francesco;
+  - una volta al mese (o raggiunti N pezzi) un solo ordine a una tipografia locale o a uno stampatore online: prezzi più bassi, niente scorte (si ordina solo quello già prenotato e pagato), consegna a mano in palestra.
+  - **Prodotti sbloccabili**: legati al gioco, per esempio la maglietta del Re del mese acquistabile solo da chi è stato Re, o sconti per chi ha più punti.
 - **Pubblicità / sponsor** nell'app: studio notarile, medico endocrinologo, studio dentistico, azienda di robot, ecc.
 
 ## Mese a squadre (gennaio, per ora)
