@@ -36,7 +36,7 @@ const DEBUG_USERS = ['Francesco'];
 const ADMIN_USERS = ['Francesco'];
 // Diagnostica per capire un problema sul telefono di qualcuno: le sue richieste e gli eventi dell'app
 // finiscono nel foglio Debug. Solo lui vede nell'app il badge "DIAGNOSTICA". Togliere il nome a problema risolto.
-const TRACE_USERS = ['Michy'];
+const TRACE_USERS = []; // es. ['Michy']: diagnostica accesa per quell'account
 const TZ = Session.getScriptTimeZone();
 const realProps = PropertiesService.getScriptProperties();
 

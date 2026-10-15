@@ -243,17 +243,21 @@ body.chat-mode #scroller { padding-top: 0; }
 body.composing .chat-top #poll-card { display: none; }
 /* Chat non aggiornata: pillola che galleggia sotto il sondaggio, sopra i messaggi (non sposta niente) */
 .chat-top { position: relative; z-index: 4; }
-.chat-sync { position: absolute; left: 50%; top: calc(100% + 6px); display: inline-flex; align-items: center; gap: 7px; max-width: calc(100% - 32px); padding: 6px 12px; border-radius: 999px; background: rgba(44, 44, 46, .96); color: var(--fg); font-size: 13px; font-weight: 600; white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, .5); opacity: 0; transform: translate(-50%, -12px); pointer-events: none; transition: opacity .25s, transform .25s; }
+.chat-sync { position: absolute; left: 50%; top: calc(100% + 8px); display: inline-flex; align-items: center; gap: 8px; max-width: calc(100% - 32px); padding: 7px 14px 7px 10px; border: 1px solid transparent; border-radius: 999px; background: rgba(44, 44, 46, .97); color: var(--fg); font-size: 14px; font-weight: 700; white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, .5); opacity: 0; transform: translate(-50%, -14px) scale(.85); pointer-events: none; transition: opacity .25s, transform .35s cubic-bezier(.3, 1.6, .5, 1); }
 .chat-sync span { overflow: hidden; text-overflow: ellipsis; }
-.chat-sync.show { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
-.chat-sync.warn { background: #3a2a10; color: #ffb340; }
+.chat-sync.show { opacity: 1; transform: translate(-50%, 0) scale(1); pointer-events: auto; }
+/* "Aggiorno…": bordo lime che pulsa, così si nota che la chat si sta caricando */
+.chat-sync.show:not(.warn) { border-color: rgba(166, 255, 0, .55); color: var(--exercise); animation: sync-glow 1.2s ease-in-out infinite; }
+@keyframes sync-glow { 50% { box-shadow: 0 0 0 5px rgba(166, 255, 0, .16), 0 4px 14px rgba(0, 0, 0, .5); } }
+.chat-sync.warn { background: #3a2a10; border-color: rgba(255, 179, 64, .45); color: #ffb340; }
 .chat-sync button { margin: 0; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-decoration: underline; }
-.chat-sync .bicep { width: 22px; height: 21px; color: var(--exercise); --bicep-bg: #2c2c2e; }
+.chat-sync .bicep { width: 30px; height: 29px; margin: -6px 0; color: var(--exercise); --bicep-bg: #2c2c2e; }
 .poll.stale .poll-names, .poll.stale .pday i, .poll.stale .pweek { opacity: .45; transition: opacity .3s; }
-.choice { position: relative; }
-.choice .unsaved { position: absolute; top: -6px; right: -6px; width: 18px; height: 18px; border-radius: 50%; background: var(--card); display: grid; place-items: center; }
-.choice .unsaved svg { width: 12px; height: 12px; fill: none; stroke: #ffb340; stroke-width: 1.4; stroke-linecap: round; }
-@media (prefers-reduced-motion: reduce) { .chat-sync { transition: none; } }
+/* risposta in invio: bicipite dentro il pulsante, senza farlo crescere */
+.poll .choice .bicep, .poll-ev-choices .choice .bicep { width: 24px; height: 23px; margin: -6px 0; }
+#chat-list .loading .bicep { width: 84px; height: 82px; }
+#chat-list .loading p { font-size: 16px; font-weight: 600; color: var(--fg); }
+@media (prefers-reduced-motion: reduce) { .chat-sync { transition: none; } .chat-sync.show:not(.warn) { animation: none; } }
 body.composing .chat-top { padding-bottom: 0; }
 .poll-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin-bottom: 8px; font-size: 15px; }
 .poll-head .muted { font-size: 12px; white-space: nowrap; }

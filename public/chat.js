@@ -15,9 +15,6 @@ function planLabel(day) {
   return `${['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'][d.getDay()]} ${d.getDate()}`;
 }
 
-// Orologio "in invio" sull'angolo del pulsante della risposta non ancora salvata
-const CLOCK = '<span class="unsaved" aria-label="In invio"><svg viewBox="0 0 12 12" aria-hidden="true"><circle cx="6" cy="6" r="4.6"/><path d="M6 3.4V6l1.8 1.1"/></svg></span>';
-
 const CHOICES = [
   ['si', 'Ci sono'],
   ['forse', 'Forse'],
@@ -308,10 +305,10 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       v = -1;
       apply(last);
     }
-    renderPoll(); // toglie l'orologio anche se la risposta del server non ha ridisegnato
+    renderPoll(); // toglie il bicipite anche se la risposta del server non ha ridisegnato
   }
 
-  // Risposta al sondaggio non ancora salvata: orologio sul pulsante scelto, come la spunta in attesa di WhatsApp
+  // Risposta al sondaggio non ancora salvata: bicipite che si flette sul pulsante scelto finché il server non la salva
   let sendingDay = '';
   const unsaved = (day) => sendingDay === day || outbox.some((j) => j.day === day);
 
@@ -399,7 +396,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         ${days}
         ${isPending(plan) ? `<p class="poll-askme"><b></b> ti chiede: ${label} ci sei?</p>` : ''}
         <div class="choices">
-          ${CHOICES.map(([k, l]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}">${l}${mine.choice === k && unsaved(day) ? CLOCK : ''}</button>`).join('')}
+          ${CHOICES.map(([k, l]) => `<button data-choice="${k}" class="choice ${k}${mine.choice === k ? ' selected' : ''}">${mine.choice === k && unsaved(day) ? bicep() : ''}${l}</button>`).join('')}
           <label class="time-wrap${mine.time ? ' filled' : ''}"><input id="poll-time" type="time" value="${mine.time || ''}" aria-label="Orario (facoltativo)"><span>Orario</span></label>
         </div>
         <p class="poll-names"></p>
@@ -601,7 +598,13 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       return;
     }
     const mine = plan.people.find((x) => x.name === me.name) || {};
-    btns.querySelectorAll('button').forEach((b) => b.classList.toggle('selected', mine.choice === b.dataset.evChoice));
+    const wait = unsaved(row.dataset.target);
+    btns.querySelectorAll('button').forEach((b) => {
+      const sel = mine.choice === b.dataset.evChoice;
+      b.classList.toggle('selected', sel);
+      // bicipite che si flette finché la risposta non è salvata
+      b.innerHTML = (sel && wait ? bicep() : '') + CHOICES.find(([k]) => k === b.dataset.evChoice)[1];
+    });
     const n = (k) => plan.people.filter((p) => p.choice === k).length;
     sum.textContent = [n('si') && `${n('si')} ci sono`, n('forse') && `${n('forse')} forse`, n('no') && `${n('no')} no`].filter(Boolean).join(' · ') || 'Ancora nessuna risposta';
   }
