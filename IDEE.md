@@ -44,9 +44,9 @@ Due telefoni che si urtano registrano un picco dell'accelerometro nello stesso i
 Ricordare pesi e ripetizioni per macchina/esercizio, come Hevy, Strong, Fitbod, Alpha Progression.
 
 - **Basi**: per ogni esercizio "Ultima volta: 3×10 a 45 kg" con "Uguale" / "+2,5 kg"; schede personali (A/B, Push/Pull/Gambe); recupero automatico con il timer silenzioso che c'è già; serie salvate sul telefono e inviate quando torna la rete (in palestra spesso non c'è campo).
-- **Il nostro vantaggio**: catalogo condiviso delle macchine della NOSTRA palestra, con regolazioni personali (sedile, schienale) e foto; "Inizia scheda A?" dopo il check-in; record in chat ("Nuovo record di Rizzo sulla panca"); suggerimento del peso con la doppia progressione (tutte le serie al massimo delle ripetizioni → +2,5 kg, altrimenti stesso peso e una ripetizione in più).
+- **Il nostro vantaggio**: catalogo condiviso delle macchine della NOSTRA palestra, con regolazioni personali (sedile, schienale) e foto; "Inizia scheda A?" dopo il check-in; record in chat ("Nuovo record di Rizzo sulla panca").
 - **Dati**: fogli Esercizi (nome, tipo, gruppo muscolare, chi l'ha aggiunto), Schede (di chi, nome, esercizi in ordine), Serie (data, persona, esercizio, kg, ripetizioni); il server manda solo il riepilogo "ultima volta".
-- **Fasi**: 1 diario (catalogo, serie, ultima volta, recupero, senza rete) → 2 schede e partenza dal check-in → 3 progressi (record, grafici, massimale stimato) → 4 suggerimento del peso → 5 gioco (record in chat, punti/sfide, dormiente).
+- **Fasi**: 1 diario (catalogo, serie, ultima volta, recupero, senza rete) → 2 schede e partenza dal check-in → 3 progressi (record, grafici) → 4 gioco (record in chat, punti/sfide, dormiente).
 - **Deciso (16/10)** — proposta grafica: https://claude.ai/artifact/XtjfhUp7MWgbWBywSjDMQH
   - Tab **Allenamento** al posto di Timer (timer dentro). Nessun avviso al check-in: è il tab che propone la scheda da fare (quella non fatta da più tempo).
   - Per ogni esercizio solo **"l'ultima volta"** (serie, ripetizioni, kg): niente peso consigliato, niente obiettivo serie×rip nella scheda.
@@ -55,7 +55,8 @@ Ricordare pesi e ripetizioni per macchina/esercizio, come Hevy, Strong, Fitbod, 
   - Schede create da ognuno per sé: "Nuova scheda" → esercizi dal catalogo comune (ricerca, filtro per gruppo) o "+ Nuova macchina"; "Copia la scheda di…"; "Allenamento libero" → "Salva come scheda". Ognuno modifica solo le sue; l'admin sistema il catalogo (nomi, doppioni).
   - **Catalogo fittizio** per partire; il catalogo vero con un processo da concordare (idea: Francesco manda le foto di tutte le macchine e Claude lo compila).
   - Prova solo per Francesco (elenco TESTERS sul server, codice in un file separato, fogli nuovi), poi rilascio con le slide.
-  - **Per dopo**: regolazioni personali, peso automatico, record in chat, massimale stimato, punti del gioco.
+  - **Per dopo**: regolazioni personali, record in chat, punti del gioco.
+  - **Scartati**: massimale stimato e peso consigliato automatico (anche per il futuro).
   - **Tecnica corretta** di ogni esercizio: trovare un modo per mostrarla (video brevi, animazione, altro), da decidere.
 
 ## Sudometro: strade alternative (da valutare con più dati)
