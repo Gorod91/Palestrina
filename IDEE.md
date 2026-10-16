@@ -87,3 +87,11 @@ Con la pianificazione dei 7 giorni il sondaggio sembra un calendario da compilar
 4. Un solo promemoria automatico a chi non ha risposto, qualche ora dopo la domanda.
 
 Consigliato: 1 + 2 + 3, il 4 solo se serve.
+
+## Chat su Firebase (in corso)
+
+La chat oggi chiede al server ogni 5 secondi se ci sono novità (Apps Script + foglio: 1–6 s di ritardo). Con Firebase (Firestore) il telefono resta collegato e i messaggi arrivano in meno di mezzo secondo, con copia sul telefono e invio senza campo.
+- Accesso: il server di oggi verifica il codice e rilascia un permesso Firebase (custom token firmato con la chiave dell'account di servizio, tenuta solo nelle proprietà dello script, mai nel repo).
+- Il resto dell'app resta su Apps Script; le notifiche restano su GitHub (più avanti, forse FCM).
+- Fasi: 1 progetto Firebase (Francesco) → 2 messaggi in tempo reale solo per Francesco in prova → 3 sondaggio, piani, eventi automatici, cancella/silenzia → 4 copia dello storico e passaggio per tutti.
+- Da verificare: se il Wi-Fi aziendale di Michy blocca anche Firebase.
