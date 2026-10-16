@@ -56,6 +56,7 @@ Ricordare pesi e ripetizioni per macchina/esercizio, come Hevy, Strong, Fitbod, 
   - **Catalogo fittizio** per partire; il catalogo vero con un processo da concordare (idea: Francesco manda le foto di tutte le macchine e Claude lo compila).
   - Prova solo per Francesco (elenco TESTERS sul server, codice in un file separato, fogli nuovi), poi rilascio con le slide.
   - **Per dopo**: regolazioni personali, peso automatico, record in chat, massimale stimato, punti del gioco.
+  - **Tecnica corretta** di ogni esercizio: trovare un modo per mostrarla (video brevi, animazione, altro), da decidere.
 
 ## Sudometro: strade alternative (da valutare con più dati)
 
