@@ -1038,6 +1038,13 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     send($('chat-input').value);
   });
   $('chat-input').addEventListener('input', autosize);
+  // Come WhatsApp: toccando "Invia" la casella resta attiva e la tastiera non si chiude
+  // (senza questo il tocco sposta l'attenzione sul pulsante e iOS chiude la tastiera).
+  $('chat-send').addEventListener('mousedown', (e) => e.preventDefault());
+  $('chat-send').addEventListener('touchend', (e) => {
+    e.preventDefault(); // niente click dopo: il messaggio parte una volta sola
+    $('chat-form').requestSubmit();
+  });
   $('scroller').addEventListener('scroll', () => active && updateDown(), { passive: true });
   $('chat-down').addEventListener('click', () => {
     const sc = $('scroller');
