@@ -1040,6 +1040,20 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   $('chat-input').addEventListener('input', autosize);
   // Come WhatsApp: toccando "Invia" la casella resta attiva e la tastiera non si chiude
   // (senza questo il tocco sposta l'attenzione sul pulsante e iOS chiude la tastiera).
+  // Trascinando verso il basso (sui messaggi o sulla casella) la tastiera si chiude, come WhatsApp
+  let dragY = null;
+  const dragStart = (e) => {
+    dragY = document.activeElement === $('chat-input') ? e.touches[0].clientY : null;
+  };
+  const dragMove = (e) => {
+    if (dragY === null || e.touches[0].clientY - dragY < 40) return;
+    dragY = null;
+    $('chat-input').blur();
+  };
+  for (const id of ['scroller', 'chat-form']) {
+    $(id).addEventListener('touchstart', dragStart, { passive: true });
+    $(id).addEventListener('touchmove', dragMove, { passive: true });
+  }
   $('chat-send').addEventListener('mousedown', (e) => e.preventDefault());
   $('chat-send').addEventListener('touchend', (e) => {
     e.preventDefault(); // niente click dopo: il messaggio parte una volta sola
