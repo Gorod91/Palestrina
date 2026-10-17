@@ -57,8 +57,9 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
  * onChange(messaggi) a ogni novità, nel formato della chat di Apps Script ({ id, day, time, name, type, text })
  * più `pending` finché il messaggio non è arrivato a Firebase.
  */
-export function createFbChat({ getToken, onChange, onError, days = 7 }) {
+export function createFbChat({ getToken, onChange, onState, onError, days = 7 }) {
   let unsub = null;
+  let unsubState = null;
   let coll = '';
   let name = '';
   let gen = 0;
@@ -106,12 +107,23 @@ export function createFbChat({ getToken, onChange, onError, days = 7 }) {
       },
       (err) => onError(err),
     );
+    // Stato della chat (sondaggio, piani, eventi, sfide) scritto dal server appena cambia
+    unsubState = fs.onSnapshot(
+      fs.doc(db, test ? 'prova_state' : 'state', 'chat'),
+      (snap) => {
+        const x = snap.exists() ? snap.data() : null;
+        if (x && x.json) onState(JSON.parse(x.json), snap.metadata.fromCache);
+      },
+      (err) => onError(err),
+    );
   }
 
   function stop() {
     gen++;
     if (unsub) unsub();
+    if (unsubState) unsubState();
     unsub = null;
+    unsubState = null;
   }
 
   /** Il messaggio compare subito (in attesa) e parte appena c'è rete; la promessa finisce quando è salvato. */

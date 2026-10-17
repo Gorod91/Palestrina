@@ -5,7 +5,7 @@ service cloud.firestore {
     // Si scrive solo a proprio nome e solo messaggi nuovi; eventi e cancellazioni li fa il server.
     match /{coll}/{id} {
       allow read: if request.auth != null && request.auth.token.pal == true
-        && coll in ['chat', 'prova_chat'];
+        && coll in ['chat', 'prova_chat', 'state', 'prova_state'];
       allow create: if request.auth != null && request.auth.token.pal == true
         && coll in ['chat', 'prova_chat']
         && request.resource.data.name == request.auth.token.name

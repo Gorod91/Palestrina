@@ -80,6 +80,17 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         if (first && active) scrollToBottom();
       }
     },
+    onState(r, fromCache) {
+      if (!fbOn || !r) return;
+      if (!fromCache) {
+        syncedAt = Date.now();
+        syncFails = 0;
+      }
+      if (data && (r.v === v || (v > 0 && r.v < v))) return renderSync(); // già visto (per esempio dalla risposta a un'azione)
+      tlog('firebase', `stato v=${r.v}${fromCache ? ' (dal telefono)' : ''}`);
+      apply(r);
+      renderSync();
+    },
     onError(err) {
       tlog('firebase', `ERRORE ${err.code || ''} ${err.message}`);
       fbFail(err);
@@ -127,6 +138,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   async function load(force = false) {
     if (loading || !me) return;
     loading = true;
+    lastLoad = Date.now();
     renderSync();
     tlog('chat load', `inizio${force ? ' (forza)' : ''} v=${v}${data ? '' : ' · mai caricata'}`);
     try {
@@ -151,6 +163,8 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   // Pillola sotto il sondaggio, come "Connessione in corso…" di WhatsApp: compare solo quando quello che
   // si vede potrebbe essere vecchio (chat dell'ultima volta in attesa del server, server che non risponde, offline).
   const STALE_MS = 20000; // la chat si aggiorna ogni 5 s: 20 s senza risposta = 3-4 tentativi andati a vuoto
+  const FB_POLL_EVERY = 60000; // con Firebase collegato
+  let lastLoad = 0;
   let syncedAt = 0; // ultima risposta del server alla chat (anche "niente di nuovo")
   let syncFails = 0; // tentativi falliti di fila: l'avviso giallo arriva al secondo (un intoppo isolato non conta)
   let retrying = false; // "Riprova" toccato: mostra "Aggiorno…" invece dell'avviso giallo
@@ -160,7 +174,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     if (!active || !data) return 'ok'; // senza chat ci pensa già "Carico la chat…"
     if (!navigator.onLine) return 'off';
     if (syncFails >= 2) return retrying ? 'busy' : 'stale';
-    if (syncedAt && Date.now() - syncedAt <= STALE_MS) return 'ok';
+    if (syncedAt && Date.now() - syncedAt <= (fbOn && fbMsgs ? FB_POLL_EVERY + STALE_MS : STALE_MS)) return 'ok';
     return loading || syncFails ? 'busy' : 'stale'; // dopo un solo errore riprova da sola: resta "Aggiorno…"
   }
 
@@ -242,7 +256,9 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     autosize();
     if (fbOn && fbMsgs) {
       // Firebase lo mostra subito (in attesa) e lo invia appena c'è rete
-      fb.send(t).catch((err) => toast(`Messaggio non inviato: ${err.message}`));
+      fb.send(t)
+        .then(() => api('chatNotify').catch(() => {})) // la notifica agli altri la manda il server
+        .catch((err) => toast(`Messaggio non inviato: ${err.message}`));
       setTimeout(scrollToBottom, 0);
       return;
     }
@@ -265,9 +281,14 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   }
 
   // Modalità debug: cancella un messaggio o annulla la domanda di oggi.
-  async function remove(id, question) {
+  async function remove(id, question, fbMsg) {
     if (!confirm(question)) return;
     try {
+      if (fbMsg) {
+        await api('chatDelete', { id, fb: true }); // Firebase lo toglie da tutti i telefoni
+        toast('Cancellato');
+        return;
+      }
       const r = await api('chatDelete', { id });
       v = -1;
       apply(r);
@@ -277,11 +298,11 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     }
   }
 
-  function delButton(id) {
+  function delButton(id, fbMsg) {
     const b = el('button', 'del', '×');
     b.type = 'button';
     b.setAttribute('aria-label', 'Cancella');
-    b.onclick = () => remove(id, 'Cancellare questo messaggio per tutti?');
+    b.onclick = () => remove(id, 'Cancellare questo messaggio per tutti?', fbMsg);
     return b;
   }
 
@@ -714,7 +735,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
           s.innerHTML = bicep();
           bubble.append(s);
         } else bubble.append(el('span', 'time', m.time));
-        if (isDebug() && !m.fb) bubble.append(delButton(m.id));
+        if (isDebug() && !m.pending) bubble.append(delButton(m.id, m.fb));
         row.append(bubble);
         list.append(row);
         lastSender = m.name;
@@ -1027,7 +1048,9 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   }
 
   function tick() {
-    if (active && document.visibilityState === 'visible') load();
+    // Con Firebase le novità arrivano da sole: ad Apps Script si chiede solo ogni tanto (per il cambio di giorno)
+    const fbLive = fbOn && fbMsgs && Date.now() - lastLoad < FB_POLL_EVERY;
+    if (active && document.visibilityState === 'visible' && !fbLive) load();
     renderSync();
   }
 

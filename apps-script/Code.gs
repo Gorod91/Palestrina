@@ -358,6 +358,7 @@ function doPost(e) {
   MEMO = {};
   TEST = false;
   TESTER = '';
+  CHAT_DIRTY = false;
   try {
     const req = JSON.parse(e.postData.contents);
     try {
@@ -390,7 +391,11 @@ function doPost(e) {
     } catch (err) {
       console.error('Sfide non chiuse', err);
     }
-    if (!TRACE_USERS.includes(user.name) || TEST) return handle(req, user);
+    if (!TRACE_USERS.includes(user.name) || TEST) {
+      const res = handle(req, user);
+      pushChatIfChanged();
+      return res;
+    }
     let out;
     let failed = '';
     try {
@@ -399,6 +404,7 @@ function doPost(e) {
       failed = String(err.message || err);
       out = json({ error: failed });
     }
+    pushChatIfChanged();
     traceServer(user, req, out, Date.now() - t0, failed);
     return out;
   } catch (err) {
@@ -438,7 +444,18 @@ function handle(req, user) {
       case 'sfida':
         return json(sfidaAction(user, req));
       case 'chatDelete':
+        if (req.fb) {
+          // Messaggio scritto su Firebase (chat di prova)
+          if (!TEST || !user.debug) return json({ error: 'Solo per gli utenti debug, in prova' });
+          firestoreDelete('prova_chat', String(req.id || ''));
+          return json({ ok: true });
+        }
         return json(chatDelete(user, req.id));
+      case 'chatNotify':
+        // Messaggio appena scritto su Firebase: la notifica la manda il server, come per quelli di Apps Script
+        if (!TEST) return json({ error: 'Non disponibile' });
+        notifyChat(user);
+        return json({ ok: true });
       case 'chatMute':
         if (req.muted) props.setProperty('mute_' + user.name, '1');
         else props.deleteProperty('mute_' + user.name);
@@ -976,8 +993,12 @@ function readChatRows() {
 function bumpChat() {
   const v = Number(props.getProperty('CHAT_VERSION') || 0) + 1;
   props.setProperty('CHAT_VERSION', String(v));
+  CHAT_DIRTY = true;
   return v;
 }
+
+// La chat è cambiata in questa richiesta: a fine richiesta lo stato va anche su Firebase (per ora solo in prova)
+let CHAT_DIRTY = false;
 
 function newId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -1139,12 +1160,17 @@ function chatSend(user, text) {
   } finally {
     lock.releaseLock();
   }
+  notifyChat(user);
+  return chatState(user, -1);
+}
+
+/** Notifica "nuovo messaggio in chat", al massimo una ogni CHAT_NOTIFY_EVERY_MIN minuti per chi scrive. */
+function notifyChat(user) {
   const last = Number(props.getProperty('chatNotify_' + user.name) || 0);
   if (Date.now() - last > CHAT_NOTIFY_EVERY_MIN * 60000) {
     props.setProperty('chatNotify_' + user.name, String(Date.now()));
     dispatch('chat', user.name);
   }
-  return chatState(user, -1);
 }
 
 /** Crea la domanda per un giorno dei prossimi 7 (oggi se non indicato), se non c'è già. */
@@ -2278,29 +2304,95 @@ function fbUid(name) {
   return String(name).replace(/[^A-Za-z0-9_-]/g, '_') || 'utente';
 }
 
-/**
- * Permesso per Firebase (custom token) firmato con la chiave dell'account di servizio, che sta solo
- * nelle proprietà dello script (FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY). Le regole di Firestore
- * fanno leggere chi ha pal=true e scrivere solo a nome proprio (name).
- */
-function firebaseToken(user) {
+const FIREBASE_PROJECT = 'palestrina-cb43c';
+
+/** JWT firmato con la chiave dell'account di servizio (proprietà FIREBASE_CLIENT_EMAIL e FIREBASE_PRIVATE_KEY). */
+function signServiceJwt(claims) {
   const email = realProps.getProperty('FIREBASE_CLIENT_EMAIL');
   const key = String(realProps.getProperty('FIREBASE_PRIVATE_KEY') || '').replace(/\\n/g, '\n').trim();
-  if (!email || !key) return { error: 'Firebase non configurato' };
+  if (!email || !key) throw new Error('Firebase non configurato');
   const now = Math.floor(Date.now() / 1000);
   const b64 = (x) => Utilities.base64EncodeWebSafe(x).replace(/=+$/, '');
   const head = b64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const body = b64(JSON.stringify({
-    iss: email,
-    sub: email,
-    aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
-    iat: now,
-    exp: now + 3600,
-    uid: fbUid(user.name),
-    claims: { pal: true, name: user.name },
-  }));
+  const body = b64(JSON.stringify({ iss: email, iat: now, exp: now + 3600, ...claims(email) }));
   const sig = b64(Utilities.computeRsaSha256Signature(`${head}.${body}`, key + '\n'));
-  return { token: `${head}.${body}.${sig}`, uid: fbUid(user.name) };
+  return `${head}.${body}.${sig}`;
+}
+
+/**
+ * Permesso per Firebase (custom token). Le regole di Firestore fanno leggere chi ha pal=true
+ * e scrivere solo a nome proprio (name).
+ */
+function firebaseToken(user) {
+  try {
+    const token = signServiceJwt((email) => ({
+      sub: email,
+      aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
+      uid: fbUid(user.name),
+      claims: { pal: true, name: user.name },
+    }));
+    return { token, uid: fbUid(user.name) };
+  } catch (err) {
+    return { error: String(err.message || err) };
+  }
+}
+
+// ---------- Firestore dal server (REST) ----------
+// Il server scrive lo stato della chat (sondaggio, piani, eventi, sfide) su Firestore appena cambia:
+// i telefoni collegati lo ricevono subito invece di chiederlo ogni 5 secondi.
+
+function firestoreBase() {
+  const emu = realProps.getProperty('FIRESTORE_EMULATOR'); // solo per le prove in locale
+  return `${emu ? 'http://' + emu : 'https://firestore.googleapis.com'}/v1/projects/${FIREBASE_PROJECT}/databases/(default)/documents`;
+}
+
+/** Accesso a Firestore come account di servizio, tenuto in cache per 50 minuti. */
+function firestoreToken() {
+  if (realProps.getProperty('FIRESTORE_EMULATOR')) return 'owner';
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get('firestore_token');
+  if (hit) return hit;
+  const assertion = signServiceJwt(() => ({ scope: 'https://www.googleapis.com/auth/datastore', aud: 'https://oauth2.googleapis.com/token' }));
+  const r = UrlFetchApp.fetch('https://oauth2.googleapis.com/token', {
+    method: 'post',
+    payload: { grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer', assertion },
+    muteHttpExceptions: true,
+  });
+  const token = (safeJson(r.getContentText()) || {}).access_token;
+  if (!token) throw new Error(`Accesso a Firestore negato (${r.getResponseCode()})`);
+  cache.put('firestore_token', token, 3000);
+  return token;
+}
+
+function firestoreCall(method, path, body) {
+  const opts = { method, headers: { Authorization: 'Bearer ' + firestoreToken() }, muteHttpExceptions: true };
+  if (body) {
+    opts.contentType = 'application/json';
+    opts.payload = JSON.stringify(body);
+  }
+  const r = UrlFetchApp.fetch(`${firestoreBase()}/${path}`, opts);
+  const code = r.getResponseCode();
+  if (code >= 300 && !(method === 'delete' && code === 404)) throw new Error(`Firestore ${code}: ${r.getContentText().slice(0, 200)}`);
+}
+
+function firestoreDelete(coll, id) {
+  if (!/^[A-Za-z0-9_-]+$/.test(id)) throw new Error('Messaggio non indicato');
+  firestoreCall('delete', `${coll}/${id}`);
+}
+
+/** Stato della chat su Firestore (documento prova_state/chat), se in questa richiesta è cambiato. */
+function pushChatIfChanged() {
+  if (!CHAT_DIRTY || !TEST) return;
+  CHAT_DIRTY = false;
+  try {
+    MEMO = {}; // dopo le scritture si rilegge tutto
+    const st = chatState(null, -1);
+    firestoreCall('patch', 'prova_state/chat', {
+      fields: { json: { stringValue: JSON.stringify(st) }, v: { integerValue: String(st.v) }, at: { timestampValue: new Date().toISOString() } },
+    });
+  } catch (err) {
+    console.error('Chat non aggiornata su Firebase', err);
+  }
 }
 
 /** Chiede a GitHub di avviare la Action che invia le notifiche. */
