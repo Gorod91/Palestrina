@@ -37,9 +37,9 @@ const ADMIN_USERS = ['Francesco'];
 // Diagnostica per capire un problema sul telefono di qualcuno: le sue richieste e gli eventi dell'app
 // finiscono nel foglio Debug. Solo lui vede nell'app il badge "DIAGNOSTICA". Togliere il nome a problema risolto.
 const TRACE_USERS = []; // es. ['Michy']: diagnostica accesa per quell'account
-// Chat su Firebase in prova anche fuori dalla modalità prova: chi è qui scrive nella chat di prova (prova_chat)
-// e lo vede scritto nella casella. Gli altri continuano con la chat di sempre.
-const FB_TESTERS = ['Francesco', 'Michy'];
+// Modalità prova anche per chi non è admin (senza registro admin, "Agisci come" e simulazioni), per provare insieme
+// le novità, per esempio la chat su Firebase. Usa i dati di prova come l'admin.
+const PROVA_USERS = ['Michy'];
 const TZ = Session.getScriptTimeZone();
 const realProps = PropertiesService.getScriptProperties();
 
@@ -373,13 +373,13 @@ function doPost(e) {
     }
     let user = findUserByCode(req.code);
     if (!user) return json({ error: 'Codice non valido' });
-    if (req.test === true && user.admin) {
+    if (req.test === true && (user.admin || PROVA_USERS.includes(user.name))) {
       TEST = true;
       TESTER = user.name;
       MEMO = {};
       // "Agisci come" (solo in prova): l'admin fa le azioni a nome di un altro, sui dati di prova.
       // Le notifiche restano dirette a chi prova (TESTER); i poteri da admin restano.
-      if (req.actAs && req.actAs !== user.name) {
+      if (req.actAs && req.actAs !== user.name && user.admin) {
         const other = allUsers().find((u) => u.name === String(req.actAs));
         if (!other) return json({ error: 'Utente non trovato' });
         user = { ...other, admin: true, debug: user.debug, actingAs: true };
@@ -448,7 +448,7 @@ function handle(req, user) {
         return json(setAlias(user, req.alias));
       case 'testReset':
       case 'testRecap':
-        if (!TEST) return json({ error: 'Solo in modalità prova' });
+        if (!TEST || !user.admin) return json({ error: 'Solo in modalità prova' });
         if (req.action === 'testReset') return json(testReset());
         if (req.kind === 'monthly') {
           props.deleteProperty('LAST_MONTHLY'); // nella prova le premiazioni del mese si possono rifare
@@ -460,8 +460,8 @@ function handle(req, user) {
         } else sendWeeklyRecap();
         return json({ ok: true });
       case 'fbToken':
-        // Chat su Firebase: per ora solo in modalità prova (admin)
-        if (!(TEST && user.admin) && !FB_TESTERS.includes(user.name)) return json({ error: 'Non disponibile' });
+        // Chat su Firebase: per ora solo in modalità prova
+        if (!TEST) return json({ error: 'Non disponibile' });
         return json(firebaseToken(user));
       case 'setTimer': {
         const s = Math.round(Number(req.seconds));
@@ -778,6 +778,7 @@ function buildState(user) {
       goal: user.goal,
       debug: user.debug,
       admin: user.admin,
+      tester: user.admin || PROVA_USERS.includes(user.name),
       actingAs: !!user.actingAs,
       checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
       sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title, photoId: mySudoToday.photoId } : null,
@@ -788,7 +789,7 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
-    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), fbChat: FB_TESTERS.includes(user.name) }, // sfide: sorpresa, si vedono dalla prima
+    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2') }, // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),

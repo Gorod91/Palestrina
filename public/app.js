@@ -105,6 +105,8 @@ async function api(action, data = {}) {
 }
 
 /** Modalità prova (solo admin): il server lavora su fogli di prova e manda le notifiche solo a chi prova. */
+const ADMIN_FOOT = (document.getElementById('admin-foot') || {}).innerHTML || '';
+
 function testOn() {
   return store.get('testMode') === true && !!session;
 }
@@ -261,14 +263,18 @@ function render() {
   renderGallery();
   renderRefCard(me.reference);
   $('debug-mode-card').hidden = !me.debug;
-  $('admin-card').hidden = !me.admin;
+  // Admin: tutto. Chi è solo tester (PROVA_USERS nel server): solo l'interruttore della modalità prova.
+  $('admin-card').hidden = !(me.admin || me.tester);
+  $('admin-card-title').textContent = me.admin ? 'Admin' : 'Prova';
+  $('btn-admin').hidden = !me.admin;
+  $('admin-foot').innerHTML = me.admin ? ADMIN_FOOT : 'Modalità prova: tutto funziona davvero ma su una copia dei dati, e la chat usa Firebase (i messaggi li vede solo chi è in prova). Le notifiche arrivano solo a te.';
   $('debug-mode').checked = debugOn();
   $('fake-mode').checked = fakeOn();
   document.body.classList.toggle('fake-data', fakeOn());
   document.body.classList.toggle('test-mode', testOn());
   $('page-title').dataset.test = me.actingAs ? `PROVA · ${me.display}` : 'PROVA';
   $('test-mode').checked = testOn();
-  $('test-tools').hidden = !testOn();
+  $('test-tools').hidden = !testOn() || !me.admin;
   // "Agisci come": tutti tranne me (l'admin vero è quello della sessione)
   const others = week.ranking.filter((r) => r.name !== session.name);
   const opts = [['', `${session.display || session.name} (io)`]].concat(others.map((r) => [r.name, r.display]));
@@ -601,7 +607,7 @@ async function refresh() {
     if (optimistic) return;
     state = fresh;
     store.set('state', { day: new Date().toDateString(), test: testOn(), data: state });
-    if (!state.me.admin && testOn()) store.set('testMode', null); // non più admin: niente prova
+    if (!state.me.admin && !state.me.tester && testOn()) store.set('testMode', null); // non più admin né tester: niente prova
     setTimerAccount(state.me.name, state.me.timerSeconds, (s) => api('setTimer', { seconds: s }).catch(() => {}));
     render();
   } catch (err) {
@@ -812,7 +818,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
-const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => testOn() || !!(state && state.features && state.features.fbChat) });
+const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => testOn() });
 
 // ---------- Tab ----------
 

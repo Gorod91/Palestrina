@@ -102,7 +102,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     try {
       if (!localStorage.getItem('palestrina.fbIntro')) {
         localStorage.setItem('palestrina.fbIntro', '1');
-        toast('Chat in prova con Firebase: i messaggi li vede solo chi prova con te');
+        toast('Chat in prova con Firebase: i messaggi li vede solo chi è in modalità prova');
       }
     } catch { /* storage non disponibile */ }
   }
