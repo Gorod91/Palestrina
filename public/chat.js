@@ -66,6 +66,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   // Sondaggio, piani ed eventi restano su Apps Script; i messaggi arrivano da Firestore in tempo reale.
   let fbOn = false; // chat Firebase collegata (o in collegamento)
   let fbMsgs = null; // ultimi messaggi da Firestore
+  let rawMsgs = []; // messaggi come arrivano da Apps Script (salvati così sul telefono, mai mescolati con Firebase)
   const fb = createFbChat({
     getToken: () => api('fbToken'),
     onChange(list, fromCache) {
@@ -74,7 +75,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       fbMsgs = list;
       tlog('firebase', `${list.length} messaggi${fromCache ? ' (dal telefono)' : ''}`);
       if (data) {
-        data.messages = withFb(data.messages);
+        data.messages = withFb();
         render();
         if (first && active) scrollToBottom();
       }
@@ -85,10 +86,10 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     },
   });
   /** Messaggi di Apps Script senza quelli scritti (che ora arrivano da Firebase), più quelli di Firebase. */
-  function withFb(list) {
-    if (!fbOn || !fbMsgs) return list.filter((m) => !m.fb);
-    return list
-      .filter((m) => m.type !== 'msg' && !m.fb)
+  function withFb() {
+    if (!fbOn || !fbMsgs) return rawMsgs;
+    return rawMsgs
+      .filter((m) => m.type !== 'msg')
       .concat(fbMsgs)
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
@@ -112,10 +113,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     fbOn = false;
     fbMsgs = null;
     $('chat-input').placeholder = 'Messaggio';
-    if (data) {
-      data.messages = withFb(data.messages);
-      v = -1; // torna a chiedere i messaggi ad Apps Script
-    }
+    if (data) data.messages = withFb();
   }
   function fbFail(err) {
     if (!fbOn) return;
@@ -231,9 +229,9 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     if (!r || r.same) return;
     if (outbox.length || sending || asking || sfidaSending) return; // azioni ancora da inviare: vale quello che vede l'utente
     v = r.v;
-    data = r;
-    data.messages = withFb(r.messages || []);
-    saveCache(data);
+    rawMsgs = r.messages || [];
+    saveCache(r);
+    data = { ...r, messages: withFb() };
     render();
   }
 
@@ -1064,6 +1062,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       me = user;
       v = 0;
       data = null;
+      rawMsgs = [];
       syncedAt = 0;
       syncFails = 0;
       cachedAt = 0;
@@ -1072,9 +1071,11 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       const cached = readCache();
       if (cached) {
         // chat dell'ultima volta subito pronta; la versione fa sì che il server mandi solo le novità
-        data = cached;
-        data.messages = withFb(data.messages || []);
-        v = cached.v;
+        // Copia salvata da una versione di prova che mescolava Firebase: senza i messaggi normali, va riscaricata
+        const mixed = (cached.messages || []).some((m) => m.fb);
+        rawMsgs = (cached.messages || []).filter((m) => !m.fb);
+        data = { ...cached, messages: withFb() };
+        v = mixed ? 0 : cached.v;
         render();
       }
       fbStop();
@@ -1119,6 +1120,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       clearInterval(timer);
       me = null;
       data = null;
+      rawMsgs = [];
       v = 0;
       setBadge(0);
     },
