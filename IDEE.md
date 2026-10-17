@@ -70,6 +70,13 @@ Il Sudometro 2 gira in silenzio dal 15/10 (Dettagli del foglio). Altre idee, dal
 6. **Modello addestrato** sulle nostre foto etichettate, quando saranno qualche decina.
 Inoltre: rifiutare le foto di riferimento mosse (dormiente, insieme al Sudometro 2).
 
+## Cartine dei personaggi (idea della Michy)
+
+Ogni volta che uno diventa Re del mese sale di livello: il suo personaggio cambia ed evolve, mostrato con una cartina (carta collezionabile).
+- Si parte tutti dal livello **Orbit**; poi, per esempio, **Amotti → Itoi → Enkh → Ongil** (nomi e ordine da confermare con la Michy).
+- Da decidere: disegni delle cartine (una per livello, forse personalizzata per persona), dove si vedono (profilo, classifica, accanto al nome in chat), animazione di "salita di livello" nel riepilogo di fine mese, se si può anche scendere.
+- Da rilasciare come novità dormiente, dopo un'incoronazione del Re.
+
 ## Mese a squadre (gennaio, per ora)
 
 Un mese "speciale" con regole diverse dal solito, da rilasciare come novità dormiente a fine dicembre:
