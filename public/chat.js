@@ -99,6 +99,12 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     fbOn = true;
     $('chat-input').placeholder = 'Messaggio · Firebase';
     fb.start(me, true).catch(fbFail);
+    try {
+      if (!localStorage.getItem('palestrina.fbIntro')) {
+        localStorage.setItem('palestrina.fbIntro', '1');
+        toast('Chat in prova con Firebase: i messaggi li vede solo chi prova con te');
+      }
+    } catch { /* storage non disponibile */ }
   }
   function fbStop() {
     if (!fbOn) return;
@@ -1043,6 +1049,10 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   return {
     redraw() {
       if (data) render();
+    },
+    /** Accende o spegne la chat Firebase se è cambiato chi può usarla (stato dal server, modalità prova). */
+    checkFirebase() {
+      fbStart();
     },
     reload() {
       fbStop();

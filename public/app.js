@@ -286,6 +286,7 @@ function render() {
   if (debugOn()) renderViewportDebug();
   $('chat-notify').checked = !me.chatMuted;
   chat.setUser({ name: me.name, display: me.display });
+  chat.checkFirebase();
   chat.updateBadge(state.chatMeta);
   chat.updatePending(state.plans);
 }
@@ -811,7 +812,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
-const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => testOn() });
+const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => testOn() || !!(state && state.features && state.features.fbChat) });
 
 // ---------- Tab ----------
 

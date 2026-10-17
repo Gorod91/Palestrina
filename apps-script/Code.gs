@@ -37,6 +37,9 @@ const ADMIN_USERS = ['Francesco'];
 // Diagnostica per capire un problema sul telefono di qualcuno: le sue richieste e gli eventi dell'app
 // finiscono nel foglio Debug. Solo lui vede nell'app il badge "DIAGNOSTICA". Togliere il nome a problema risolto.
 const TRACE_USERS = []; // es. ['Michy']: diagnostica accesa per quell'account
+// Chat su Firebase in prova anche fuori dalla modalità prova: chi è qui scrive nella chat di prova (prova_chat)
+// e lo vede scritto nella casella. Gli altri continuano con la chat di sempre.
+const FB_TESTERS = ['Francesco', 'Michy'];
 const TZ = Session.getScriptTimeZone();
 const realProps = PropertiesService.getScriptProperties();
 
@@ -458,7 +461,7 @@ function handle(req, user) {
         return json({ ok: true });
       case 'fbToken':
         // Chat su Firebase: per ora solo in modalità prova (admin)
-        if (!TEST || !user.admin) return json({ error: 'Non disponibile' });
+        if (!(TEST && user.admin) && !FB_TESTERS.includes(user.name)) return json({ error: 'Non disponibile' });
         return json(firebaseToken(user));
       case 'setTimer': {
         const s = Math.round(Number(req.seconds));
@@ -785,7 +788,7 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
-    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2') }, // sfide: sorpresa, si vedono dalla prima
+    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), fbChat: FB_TESTERS.includes(user.name) }, // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
