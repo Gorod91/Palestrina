@@ -456,6 +456,10 @@ function handle(req, user) {
           releaseNews('');
         } else sendWeeklyRecap();
         return json({ ok: true });
+      case 'fbToken':
+        // Chat su Firebase: per ora solo in modalità prova (admin)
+        if (!TEST || !user.admin) return json({ error: 'Non disponibile' });
+        return json(firebaseToken(user));
       case 'setTimer': {
         const s = Math.round(Number(req.seconds));
         if (!(s >= 5 && s <= 600)) return json({ error: 'Durata non valida' });
@@ -2262,6 +2266,38 @@ function findUserByCode(code) {
 }
 
 // ---------- Utilità ----------
+
+// ---------- Firebase (chat in tempo reale) ----------
+
+/** Lo stesso calcolo è in public/fbchat.js. */
+function fbUid(name) {
+  return String(name).replace(/[^A-Za-z0-9_-]/g, '_') || 'utente';
+}
+
+/**
+ * Permesso per Firebase (custom token) firmato con la chiave dell'account di servizio, che sta solo
+ * nelle proprietà dello script (FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY). Le regole di Firestore
+ * fanno leggere chi ha pal=true e scrivere solo a nome proprio (name).
+ */
+function firebaseToken(user) {
+  const email = realProps.getProperty('FIREBASE_CLIENT_EMAIL');
+  const key = String(realProps.getProperty('FIREBASE_PRIVATE_KEY') || '').replace(/\\n/g, '\n').trim();
+  if (!email || !key) return { error: 'Firebase non configurato' };
+  const now = Math.floor(Date.now() / 1000);
+  const b64 = (x) => Utilities.base64EncodeWebSafe(x).replace(/=+$/, '');
+  const head = b64(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
+  const body = b64(JSON.stringify({
+    iss: email,
+    sub: email,
+    aud: 'https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit',
+    iat: now,
+    exp: now + 3600,
+    uid: fbUid(user.name),
+    claims: { pal: true, name: user.name },
+  }));
+  const sig = b64(Utilities.computeRsaSha256Signature(`${head}.${body}`, key + '\n'));
+  return { token: `${head}.${body}.${sig}`, uid: fbUid(user.name) };
+}
 
 /** Chiede a GitHub di avviare la Action che invia le notifiche. */
 function dispatch(event, name) {

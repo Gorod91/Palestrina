@@ -1,6 +1,8 @@
 // Chat del gruppo: messaggi, domanda "chi va in palestra oggi?" ed eventi automatici
 // (check-in, Sudometro, premiazioni). Si aggiorna ogni 5 secondi solo mentre è aperta.
 
+import { createFbChat } from './fbchat.js';
+
 const $ = (id) => document.getElementById(id);
 const POLL_EVERY = 5000;
 const WEEKDAYS = ['Dom', 'Lun', 'Mar', 'Mer', 'Gio', 'Ven', 'Sab'];
@@ -21,7 +23,7 @@ const CHOICES = [
   ['no', 'No'],
 ];
 
-export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown, openNews, trace }) {
+export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown, openNews, trace, useFirebase }) {
   const tlog = trace || (() => {});
   let me = null; // { name, display }
   let v = 0; // versione dei dati in Apps Script
@@ -59,6 +61,62 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     } catch { /* storage non disponibile */ }
   };
   const who = (name) => (data && data.names && data.names[name]) || name;
+
+  // ---------- Messaggi su Firebase (per ora solo in modalità prova) ----------
+  // Sondaggio, piani ed eventi restano su Apps Script; i messaggi arrivano da Firestore in tempo reale.
+  let fbOn = false; // chat Firebase collegata (o in collegamento)
+  let fbMsgs = null; // ultimi messaggi da Firestore
+  const fb = createFbChat({
+    getToken: () => api('fbToken'),
+    onChange(list, fromCache) {
+      if (!fbOn) return;
+      const first = !fbMsgs;
+      fbMsgs = list;
+      tlog('firebase', `${list.length} messaggi${fromCache ? ' (dal telefono)' : ''}`);
+      if (data) {
+        data.messages = withFb(data.messages);
+        render();
+        if (first && active) scrollToBottom();
+      }
+    },
+    onError(err) {
+      tlog('firebase', `ERRORE ${err.code || ''} ${err.message}`);
+      fbFail(err);
+    },
+  });
+  /** Messaggi di Apps Script senza quelli scritti (che ora arrivano da Firebase), più quelli di Firebase. */
+  function withFb(list) {
+    if (!fbOn || !fbMsgs) return list.filter((m) => !m.fb);
+    return list
+      .filter((m) => m.type !== 'msg' && !m.fb)
+      .concat(fbMsgs)
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  }
+  function fbStart() {
+    const want = !!(useFirebase && useFirebase());
+    if (!want) return fbStop();
+    if (fbOn || !me) return;
+    fbOn = true;
+    $('chat-input').placeholder = 'Messaggio · Firebase';
+    fb.start(me, true).catch(fbFail);
+  }
+  function fbStop() {
+    if (!fbOn) return;
+    fb.stop();
+    fbOn = false;
+    fbMsgs = null;
+    $('chat-input').placeholder = 'Messaggio';
+    if (data) {
+      data.messages = withFb(data.messages);
+      v = -1; // torna a chiedere i messaggi ad Apps Script
+    }
+  }
+  function fbFail(err) {
+    if (!fbOn) return;
+    fbStop();
+    toast(`Chat Firebase non disponibile: ${err.message}`);
+    load(true);
+  }
 
   // ---------- Dati ----------
 
@@ -168,7 +226,8 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     if (outbox.length || sending || asking || sfidaSending) return; // azioni ancora da inviare: vale quello che vede l'utente
     v = r.v;
     data = r;
-    saveCache(r);
+    data.messages = withFb(r.messages || []);
+    saveCache(data);
     render();
   }
 
@@ -177,6 +236,12 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     if (!t) return;
     $('chat-input').value = '';
     autosize();
+    if (fbOn && fbMsgs) {
+      // Firebase lo mostra subito (in attesa) e lo invia appena c'è rete
+      fb.send(t).catch((err) => toast(`Messaggio non inviato: ${err.message}`));
+      setTimeout(scrollToBottom, 0);
+      return;
+    }
     // Il messaggio compare subito, con il bicipite che si flette finché Apps Script non lo salva.
     const item = { text: t };
     pending.push(item);
@@ -640,8 +705,12 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
           row.append(sender);
         }
         const bubble = el('div', 'bubble', m.text);
-        bubble.append(el('span', 'time', m.time));
-        if (isDebug()) bubble.append(delButton(m.id));
+        if (m.pending) {
+          const s = el('span', 'sending');
+          s.innerHTML = bicep();
+          bubble.append(s);
+        } else bubble.append(el('span', 'time', m.time));
+        if (isDebug() && !m.fb) bubble.append(delButton(m.id));
         row.append(bubble);
         list.append(row);
         lastSender = m.name;
@@ -976,6 +1045,8 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       if (data) render();
     },
     reload() {
+      fbStop();
+      fbStart();
       load(true);
     },
     setUser(user) {
@@ -992,9 +1063,12 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       if (cached) {
         // chat dell'ultima volta subito pronta; la versione fa sì che il server mandi solo le novità
         data = cached;
+        data.messages = withFb(data.messages || []);
         v = cached.v;
         render();
       }
+      fbStop();
+      fbStart();
     },
     /** Pallino "devi rispondere" anche prima che la chat sia caricata (dallo stato generale). */
     updatePending(plans) {
@@ -1031,6 +1105,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     },
     ask,
     reset() {
+      fbStop();
       clearInterval(timer);
       me = null;
       data = null;

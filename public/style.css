@@ -339,7 +339,7 @@ body.keyboard .composer { padding-bottom: 8px; }
 .primary:disabled.with-bicep, .choice:disabled { opacity: 1; }
 .choice:disabled:not(.selected) { opacity: .5; }
 .msg.pending .bubble { opacity: .65; }
-.msg.pending .sending { display: inline-block; margin-left: 8px; vertical-align: -5px; color: #000; }
+.msg .sending { display: inline-block; margin-left: 8px; vertical-align: -5px; color: #000; }
 .msg.pending .bicep { width: 24px; height: 23px; }
 
 /* Sfondo della chat in stile WhatsApp, con disegnini a tema palestra (chat-bg.svg si ripete).

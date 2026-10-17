@@ -1,0 +1,19 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Solo chi ha fatto l'accesso a Palestrina legge la chat.
+    // Si scrive solo a proprio nome e solo messaggi nuovi; eventi e cancellazioni li fa il server.
+    match /{coll}/{id} {
+      allow read: if request.auth != null && request.auth.token.pal == true
+        && coll in ['chat', 'prova_chat'];
+      allow create: if request.auth != null && request.auth.token.pal == true
+        && coll in ['chat', 'prova_chat']
+        && request.resource.data.name == request.auth.token.name
+        && request.resource.data.text is string
+        && request.resource.data.text.size() > 0
+        && request.resource.data.text.size() <= 2000
+        && request.resource.data.at == request.time;
+      allow update, delete: if false;
+    }
+  }
+}

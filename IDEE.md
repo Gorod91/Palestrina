@@ -94,4 +94,5 @@ La chat oggi chiede al server ogni 5 secondi se ci sono novità (Apps Script + f
 - Accesso: il server di oggi verifica il codice e rilascia un permesso Firebase (custom token firmato con la chiave dell'account di servizio, tenuta solo nelle proprietà dello script, mai nel repo).
 - Il resto dell'app resta su Apps Script; le notifiche restano su GitHub (più avanti, forse FCM).
 - Fasi: 1 progetto Firebase (Francesco) → 2 messaggi in tempo reale solo per Francesco in prova → 3 sondaggio, piani, eventi automatici, cancella/silenzia → 4 copia dello storico e passaggio per tutti.
+- **Fase 2 fatta (17/10)**: in modalità prova i messaggi scritti vanno su Firestore (`prova_chat`), sondaggio ed eventi restano su Apps Script. Regole in `firestore.rules` (copiate a mano nella console). Provata in locale con l'emulatore: 0,2 s tra due telefoni.
 - Da verificare: se il Wi-Fi aziendale di Michy blocca anche Firebase.
