@@ -332,9 +332,12 @@ const REGIONS2 = {
 // - con la luce molto diversa dal riferimento il rossore non si può misurare: si ignora e il lucido vale di più;
 // - lucido pieno a 10 invece che a 15 (il Ceppo, sudato, prendeva solo 30).
 export const WEIGHTS3 = {
-  redness: { points: 60, full: 6 },
-  shine: { points: 40, full: 10 },
-  shineOnly: 70, // punti del lucido quando il rossore non è misurabile
+  // Tarato il 19/10 sulla classifica a occhio di Francesco (7 coppie): conta la zona che si lucida di più,
+  // non la media; il rossore da solo non vuol dire sudore (aggiunge solo se c'è anche lucido).
+  shine: { points: 85, full: 30 }, // aumento dei riflessi nella zona che cambia di più (+ 1/4 del riflesso a specchio)
+  spec: 0.25, // peso del riflesso "a specchio" (colore perso dai riflessi) sommato al lucido
+  redness: { points: 15, full: 6, minShine: 5 }, // bonus solo se la zona più lucida è cresciuta di almeno 5
+  lightZero: 15, // differenza di luce a cui il confronto non vale più (fra 0 e 15 il punteggio cala in proporzione)
 };
 export const QUALITY3 = { maxLight: 8, minSharp: 0.35 };
 // tempie: lati della fronte sopra la coda delle sopracciglia (più in fuori si finiva sullo sfondo o sui capelli)
@@ -556,27 +559,29 @@ export function lessBadV2(rest, a, b) {
 /** Sudometro 3: stesse foto analizzate, zone e pesi diversi (vedi WEIGHTS3). */
 export function scoreV3(rest, sweat) {
   const clamp01 = (v) => Math.max(0, Math.min(1, v));
-  const dRed = rest.hue - sweat.hue;
   const keys = Object.keys(sweat.zones3 || {});
-  const dShine = keys.length ? keys.reduce((s, k) => s + Math.max(0, sweat.zones3[k] - ((rest.zones3 || {})[k] || 0)), 0) / keys.length : 0;
+  const diff = (k) => sweat.zones3[k] - ((rest.zones3 || {})[k] || 0);
+  const spec = (k) => (((sweat.gloss3 || {})[k] || {}).w || 0) - (((rest.gloss3 || {})[k] || {}).w || 0);
+  const hlMax = Math.max(0, ...keys.map(diff));
+  const wMax = Math.max(0, ...keys.map(spec));
+  const dRed = rest.hue - sweat.hue;
   const dL = sweat.L - rest.L;
-  const redOk = Math.abs(dL) <= QUALITY3.maxLight;
+  const light = clamp01(1 - Math.abs(dL) / WEIGHTS3.lightZero); // con luce molto diversa il confronto vale meno
   let retake = null;
   if (dL < -QUALITY3.maxLight) retake = 'luce+';
   else if (dL > QUALITY3.maxLight) retake = 'luce-';
   else if (rest.sharp && sweat.sharp < rest.sharp * QUALITY3.minSharp) retake = 'mossa';
-  const shine = clamp01(dShine / WEIGHTS3.shine.full);
   const parts = {
-    redness: redOk ? clamp01(dRed / WEIGHTS3.redness.full) * WEIGHTS3.redness.points : 0,
-    shine: shine * (redOk ? WEIGHTS3.shine.points : WEIGHTS3.shineOnly),
+    shine: clamp01(((hlMax + WEIGHTS3.spec * wMax) * light) / WEIGHTS3.shine.full) * WEIGHTS3.shine.points,
+    redness: hlMax >= WEIGHTS3.redness.minShine ? clamp01(dRed / WEIGHTS3.redness.full) * WEIGHTS3.redness.points * light : 0,
   };
-  const total = Math.round(parts.redness + parts.shine);
+  const total = Math.min(100, Math.round(parts.shine + parts.redness));
   return {
     score: total,
     title: TITLES.find(([min]) => total >= min)[1],
     retake,
     parts,
-    details: { red: round(dRed), shine: round(dShine), light: round(dL), redOk },
+    details: { red: round(dRed), shine: round(hlMax), spec: round(wMax), light: round(dL), lf: round(light) },
   };
 }
 
