@@ -151,7 +151,7 @@ function autorizzaDrive() {
   Logger.log('Cartella foto: ' + photosRoot().getUrl());
 }
 
-const TRIGGERS_VERSION = '5';
+const TRIGGERS_VERSION = '6';
 
 /**
  * Recap ogni domenica alle 19 e premiazioni del mese l'ultimo giorno del mese alle 21 (fuso orario dello script).
@@ -159,7 +159,7 @@ const TRIGGERS_VERSION = '5';
  */
 function ensureTriggers(force) {
   if (!force && props.getProperty('TRIGGERS_VERSION') === TRIGGERS_VERSION) return;
-  const handlers = ['sendWeeklyRecap', 'sendMonthlyRecap', 'eveningCheck', 'sfideTick'];
+  const handlers = ['sendWeeklyRecap', 'sendMonthlyRecap', 'eveningCheck', 'sfideTick', 'releaseDueNews'];
   ScriptApp.getProjectTriggers()
     .filter((t) => handlers.includes(t.getHandlerFunction()))
     .forEach((t) => ScriptApp.deleteTrigger(t));
@@ -168,6 +168,11 @@ function ensureTriggers(force) {
   ScriptApp.newTrigger('eveningCheck').timeBased().everyDays(1).atHour(21).nearMinute(5).create();
   // Sfide: promemoria delle conferme e chiusura di quelle di ieri
   ScriptApp.newTrigger('sfideTick').timeBased().everyHours(1).create();
+  // Novità con un orario preciso (`at`): un trigger una tantum per ognuna ancora da rilasciare
+  NEWS.forEach((n) => {
+    const at = n.at && newsAt(n);
+    if (at && at > new Date() && !releasedNews().includes(n.id)) ScriptApp.newTrigger('releaseDueNews').timeBased().at(at).create();
+  });
   props.setProperty('TRIGGERS_VERSION', TRIGGERS_VERSION);
 }
 
@@ -232,6 +237,7 @@ function computeRecap(from, to) {
 
 /** Ogni sera alle 21: se domani è il primo del mese, premiazioni del mese e Re del mese. */
 function eveningCheck() {
+  releaseDueNews();
   const today = dayString(new Date());
   if (addDays(today, 1).slice(8) !== '01') return;
   sendMonthlyRecap();
@@ -242,7 +248,15 @@ function eveningCheck() {
 // Una novità resta invisibile finché non viene rilasciata: l'ultimo giorno di `month`, subito dopo le premiazioni
 // del mese (eveningCheck, verso le 21:05), con le slide in chat (public/news/<id>.html) e una notifica a tutti.
 // I punti nuovi contano dal giorno `from`. In modalità prova si rilascia in anticipo e contano da subito.
+// Una novità con `at` (data e ora con il fuso) invece esce a quell'ora precisa, senza aspettare la fine del mese.
 const NEWS = [
+  {
+    id: 'sudometro-2',
+    at: '2026-10-18T21:00:00+02:00',
+    features: [],
+    title: 'Sudometro 2.0',
+    body: 'Il nuovo Sudometro riconosce il sudore dai riflessi della pelle. Tocca per vedere.',
+  },
   {
     id: '2026-11',
     month: '2026-10',
@@ -270,14 +284,24 @@ function featureFrom(feature) {
   return TEST || !n ? '' : n.from;
 }
 
-/** Rilascia le novità di un mese (tutte quelle in attesa se month è vuoto): evento in chat e notifica. */
-function releaseNews(month) {
-  NEWS.filter((n) => (!month || n.month === month) && !releasedNews().includes(n.id)).forEach((n) => {
+/** Rilascia le novità di un mese (tutte quelle in attesa se month è vuoto, solo `id` se indicato): evento in chat e notifica. */
+function releaseNews(month, id) {
+  NEWS.filter((n) => (!month || n.month === month) && (!id || n.id === id) && !releasedNews().includes(n.id)).forEach((n) => {
     props.setProperty('NEWS_RELEASED', JSON.stringify(releasedNews().concat(n.id)));
     forget('news');
     addChatEvent('', { kind: 'news', id: n.id, title: n.title, body: n.body });
     dispatch('news', n.id);
   });
+}
+
+/** Data di uscita di una novità con orario. */
+function newsAt(n) {
+  return new Date(n.at);
+}
+
+/** Rilascia le novità con orario già passato (trigger una tantum, controllo serale e richieste). */
+function releaseDueNews() {
+  NEWS.filter((n) => n.at && !releasedNews().includes(n.id) && newsAt(n) <= new Date()).forEach((n) => releaseNews('', n.id));
 }
 
 /** Paracadute se il trigger delle 21 non è partito: rilascia dopo le premiazioni, o comunque dalle 23 o dal mese dopo. */
@@ -286,8 +310,9 @@ function ensureNews() {
   const lastDay = addDays(today, 1).slice(8) === '01';
   const hour = Number(Utilities.formatDate(new Date(), TZ, 'HH'));
   const monthly = safeJson(props.getProperty('LAST_MONTHLY') || '{}') || {};
+  releaseDueNews();
   NEWS.forEach((n) => {
-    if (releasedNews().includes(n.id)) return;
+    if (!n.month || releasedNews().includes(n.id)) return;
     const late = today.slice(0, 7) > n.month;
     const due = today.slice(0, 7) === n.month && lastDay && (monthly.key === n.month || hour >= 23);
     if (late || due) releaseNews(n.month);
