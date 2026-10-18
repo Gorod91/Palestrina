@@ -378,7 +378,7 @@ export async function analyzeV2(source) {
           const g = Math.min(255, data[o + 1] * gains[1]);
           const b = Math.min(255, data[o + 2] * gains[2]);
           const [L, a, bb] = rgbToLab(r, g, b);
-          px.push({ L, a, h: (Math.atan2(bb, a) * 180) / Math.PI });
+          px.push({ x, y, L, a, h: (Math.atan2(bb, a) * 180) / Math.PI, C: Math.hypot(a, bb) });
         }
       }
     });
@@ -406,12 +406,58 @@ export async function analyzeV2(source) {
     n: highlight3(sample(REGIONS2.nose)),
     z: highlight3(sample(REGIONS2.malar)),
   };
+  // Lucentezza (Sudometro 3, solo misurata): com'è fatto il riflesso, non solo quanto è chiaro.
+  // w = quanto colore perdono i riflessi rispetto alla pelle (pelle bagnata: riflesso "a specchio", quasi bianco);
+  // e = pendenza della luce sui riflessi (bordo netto = lucido, sfumato = opaco), in % della pelle;
+  // nb, sz = quanti gruppi di riflessi e quanto grandi (sudore: tanti puntini; pelle asciutta: macchia larga).
+  const Lcache = new Map();
+  const Lat = (x, y) => {
+    const k = y * W + x;
+    if (!Lcache.has(k)) {
+      const o = k * 4;
+      Lcache.set(k, rgbToLab(Math.min(255, data[o] * gains[0]), Math.min(255, data[o + 1] * gains[1]), Math.min(255, data[o + 2] * gains[2]))[0]);
+    }
+    return Lcache.get(k);
+  };
+  const grad = (x, y) => (x < 1 || y < 1 || x >= W - 1 || y >= H - 1 ? 0 : Math.hypot(Lat(x + 1, y) - Lat(x - 1, y), Lat(x, y + 1) - Lat(x, y - 1)) / 2);
+  const gloss = (all) => {
+    const px = all.filter((p) => p.L > med - 20);
+    if (px.length < 20) return null;
+    const Ls = px.map((p) => p.L).sort((a, b) => a - b);
+    const q95 = quantile(Ls, 0.95);
+    const mL = quantile(Ls, 0.5) || 1;
+    const hl = px.filter((p) => p.L >= q95);
+    const cAll = median(px.map((p) => p.C));
+    const w = cAll ? round((1 - median(hl.map((p) => p.C)) / cAll) * 100, 1) : 0;
+    const e = round((median(hl.map((p) => grad(p.x, p.y))) / mL) * 100, 1);
+    const keys = new Set(hl.map((p) => p.y * W + p.x));
+    const seen = new Set();
+    let nb = 0;
+    keys.forEach((k) => {
+      if (seen.has(k)) return;
+      nb++;
+      const stack = [k];
+      seen.add(k);
+      while (stack.length) {
+        const c = stack.pop();
+        [c - 1, c + 1, c - W, c + W].forEach((n) => {
+          if (keys.has(n) && !seen.has(n)) {
+            seen.add(n);
+            stack.push(n);
+          }
+        });
+      }
+    });
+    return { w, e, nb, sz: nb ? round(keys.size / nb, 1) : 0 };
+  };
+  const gloss3 = { f: gloss(sample(REGIONS2.forehead)), t: gloss(sample(TEMPLES3)), n: gloss(sample(REGIONS2.nose)), z: gloss(sample(REGIONS2.malar)) };
   return {
     v: 2,
     L: round(med),
     hue: round(hue),
     zones,
     zones3,
+    gloss3,
     sharp: round(sharpness(data, W, H, box), 1),
     gains: gains.map((g) => round(g, 3)),
   };

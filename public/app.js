@@ -810,7 +810,7 @@ function compactV2(v2) {
 /** Sudometro 3 (stesse foto del 2): punteggio, parti e riflessi per zona delle due foto. */
 function compactV3(v2) {
   if (!v2 || !v2.res3) return { err: (v2 && v2.error) || 'non calcolato' };
-  return { score: v2.res3.score, retake: v2.res3.retake || '', ...v2.res3.details, rif: v2.rest.zones3, sud: v2.sweat.zones3 };
+  return { score: v2.res3.score, retake: v2.res3.retake || '', ...v2.res3.details, rif: v2.rest.zones3, sud: v2.sweat.zones3, glr: v2.rest.gloss3, gls: v2.sweat.gloss3 };
 }
 
 /** Avviso per gli utenti debug se la foto non è finita su Drive (es. Drive non ancora autorizzato). */
