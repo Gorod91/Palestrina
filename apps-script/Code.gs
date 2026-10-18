@@ -98,7 +98,15 @@ function testReset() {
   Object.keys(realProps.getProperties())
     .filter((k) => k.indexOf(TEST_PREFIX) === 0)
     .forEach((k) => realProps.deleteProperty(k));
+  // Nuova "generazione" della prova: le copie della chat di prova tenute in cache non valgono più
+  realProps.setProperty('PROVA_GEN', String(Number(realProps.getProperty('PROVA_GEN') || 0) + 1));
   MEMO = {};
+  try {
+    firestoreClear('prova_chat'); // messaggi di prova su Firebase: altrimenti tornerebbero nel foglio di prova
+  } catch (err) {
+    console.error('Chat di prova su Firebase non cancellata', err);
+  }
+  CHAT_DIRTY = true; // a fine richiesta lo stato della prova su Firebase riparte dai dati veri
   return { ok: true };
 }
 
@@ -1166,7 +1174,7 @@ function chatState(user, v) {
   // Uguale per tutti: si calcola una volta per versione e giorno e si tiene in cache qualche minuto
   const today = dayString(new Date());
   const cache = CacheService.getScriptCache();
-  const key = `${TEST ? 'prova_' : ''}chat_${version}_${today}`;
+  const key = `${TEST ? 'prova' + (realProps.getProperty('PROVA_GEN') || '') + '_' : ''}chat_${version}_${today}`;
   const hit = cache.get(key);
   if (hit) return JSON.parse(hit);
   const out = buildChatState(version, today);
@@ -2574,6 +2582,15 @@ function copiaChatSuFirebase() {
   }
   Logger.log(`Copiati su Firebase ${msgs.length} messaggi`);
   return msgs.length;
+}
+
+/** Cancella tutti i documenti di una raccolta, 300 alla volta. */
+function firestoreClear(coll) {
+  for (let i = 0; i < 50; i++) {
+    const docs = (firestoreCall('get', `${coll}?pageSize=300&mask.fieldPaths=at`).documents || []).map((d) => d.name);
+    if (!docs.length) return;
+    firestoreCall('post', ':commit', { writes: docs.map((name) => ({ delete: name })) });
+  }
 }
 
 function firestoreDelete(coll, id) {
