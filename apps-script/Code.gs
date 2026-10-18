@@ -885,7 +885,7 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
-    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: fbChatOn() }, // sfide: sorpresa, si vedono dalla prima
+    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),

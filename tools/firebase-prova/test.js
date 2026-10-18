@@ -20,14 +20,18 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 let fails = 0;
 const ok = (cond, msg) => { console.log(cond ? '  ✓' : '  ✗', msg); if (!cond) fails++; };
 
-async function phone(browser, code, { blockFirestore = false, blockSdk = false } = {}) {
+async function phone(browser, code, { blockFirestore = false, blockSdk = false, testMode = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
   const logs = [];
-  await ctx.addInitScript((code) => {
+  await ctx.addInitScript(([code, testMode]) => {
     sessionStorage.setItem('palestrina.browser', '1');
+    if (testMode && !sessionStorage.getItem('prova-impostata')) {
+      sessionStorage.setItem('prova-impostata', '1'); // solo al primo caricamento
+      localStorage.setItem('palestrina.testMode', 'true');
+    }
     localStorage.setItem('palestrina.session', JSON.stringify({ code }));
     window.PALESTRINA_FB_EMU = { auth: 'http://localhost:9099', host: 'localhost', port: 8080 };
-  }, code);
+  }, [code, testMode]);
   await ctx.route('**/*', async (route) => {
     const u = new URL(route.request().url());
     if (u.host === 'localhost:8000' && u.pathname === '/config.js') {
@@ -143,6 +147,23 @@ const sheetMsgs = async () => ((await post('/run/sheet', { name: 'Chat' })) || [
   ok(st.features && st.features.firebase === false, 'stato: firebase spento');
   const tk = await post('', { action: 'fbToken', code: 'PAO-1' });
   ok(!!tk.error, 'fbToken rifiutato');
+  await post('/run/prop', { key: 'FIREBASE_CHAT', value: 'tutti' });
+
+  console.log('7. Firebase solo in prova: spegnendo la prova si torna alla chat vera');
+  await post('/run/prop', { key: 'FIREBASE_CHAT', value: null });
+  const E = await phone(browser, 'FRA-1', { testMode: true });
+  ok((await E.page.$eval('#chat-input', (i) => i.placeholder)) === 'Messaggio · Firebase' || (await E.page.waitForFunction(() => document.querySelector('#chat-input').placeholder === 'Messaggio · Firebase', null, { timeout: 15000 }).then(() => true).catch(() => false)), 'in prova: chat su Firebase');
+  await send(E.page, 'Scritto in prova');
+  ok((await waitText(E.page, 'Scritto in prova', 5000)) >= 0, 'in prova: messaggio visibile');
+  await E.page.$eval('#test-mode', (i) => { i.checked = false; i.dispatchEvent(new Event('change')); });
+  await E.page.waitForFunction(() => document.querySelector('#chat-input').placeholder === 'Messaggio', null, { timeout: 15000 }).catch(() => {});
+  await sleep(3000);
+  ok((await count(E.page, 'Scritto in prova')) === 0, 'fuori dalla prova: il messaggio di prova non c\'è');
+  ok((await waitText(E.page, 'Ciao da D', 15000)) >= 0, 'fuori dalla prova: si vede la chat vera');
+  await send(E.page, 'Scritto fuori prova');
+  await sleep(4000);
+  ok((await sheetMsgs()).some((r) => r[5] === 'Scritto fuori prova'), 'il messaggio va nel foglio vero');
+  ok((await post('/run/sheet', { name: 'Prova · Chat' }) || []).every((r) => r[5] !== 'Scritto fuori prova'), 'e non nel foglio di prova');
   await post('/run/prop', { key: 'FIREBASE_CHAT', value: 'tutti' });
 
   for (const [n, P] of [['A', A], ['B', B], ['C', C]]) ok(!P.logs.some((l) => l.startsWith('ERRORE')), `${n}: nessun errore della pagina`);

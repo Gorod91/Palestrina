@@ -184,6 +184,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   // ---------- Dati ----------
 
   async function load(force = false) {
+    if (loading && force) forceNext = true; // finita la richiesta in corso (magari della prova), si ricarica tutto
     if (loading || !me) return;
     loading = true;
     lastLoad = Date.now();
@@ -204,6 +205,10 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       loading = false;
       retrying = false;
       renderSync();
+      if (forceNext) {
+        forceNext = false;
+        load(true);
+      }
     }
   }
 
@@ -213,6 +218,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   const STALE_MS = 20000; // la chat si aggiorna ogni 5 s: 20 s senza risposta = 3-4 tentativi andati a vuoto
   const FB_POLL_EVERY = 60000; // con Firebase collegato
   let lastLoad = 0;
+  let forceNext = false;
   let syncedAt = 0; // ultima risposta del server alla chat (anche "niente di nuovo")
   let syncFails = 0; // tentativi falliti di fila: l'avviso giallo arriva al secondo (un intoppo isolato non conta)
   let retrying = false; // "Riprova" toccato: mostra "Aggiorno…" invece dell'avviso giallo
@@ -1168,6 +1174,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     },
     reload() {
       fbRetryAt = 0;
+      v = 0; // prova e chat vera hanno versioni diverse che possono coincidere
       fbStop();
       fbStart();
       load(true);
