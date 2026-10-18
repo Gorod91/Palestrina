@@ -337,8 +337,8 @@ export const WEIGHTS3 = {
   shineOnly: 70, // punti del lucido quando il rossore non è misurabile
 };
 export const QUALITY3 = { maxLight: 8, minSharp: 0.35 };
-// tempie: punto fra il lato alto della fronte (54/284) e il lato del viso all'altezza degli occhi (127/356)
-const TEMPLES3 = [[54, 127, 0.3], [284, 356, 0.3]];
+// tempie: lati della fronte sopra la coda delle sopracciglia (più in fuori si finiva sullo sfondo o sui capelli)
+const TEMPLES3 = [104, 333];
 
 /** Caratteristiche della versione 2 da un canvas o da un'immagine (es. la foto di riferimento salvata). */
 export async function analyzeV2(source) {
