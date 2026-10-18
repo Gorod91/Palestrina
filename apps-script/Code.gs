@@ -151,7 +151,7 @@ function autorizzaDrive() {
   Logger.log('Cartella foto: ' + photosRoot().getUrl());
 }
 
-const TRIGGERS_VERSION = '6';
+const TRIGGERS_VERSION = '7';
 
 /**
  * Recap ogni domenica alle 19 e premiazioni del mese l'ultimo giorno del mese alle 21 (fuso orario dello script).
@@ -159,6 +159,18 @@ const TRIGGERS_VERSION = '6';
  */
 function ensureTriggers(force) {
   if (!force && props.getProperty('TRIGGERS_VERSION') === TRIGGERS_VERSION) return;
+  // Due richieste insieme dopo un aggiornamento creerebbero i trigger due volte (premiazioni doppie)
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return;
+  try {
+    if (!force && props.getProperty('TRIGGERS_VERSION') === TRIGGERS_VERSION) return;
+    createTriggers();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function createTriggers() {
   const handlers = ['sendWeeklyRecap', 'sendMonthlyRecap', 'eveningCheck', 'sfideTick', 'releaseDueNews'];
   ScriptApp.getProjectTriggers()
     .filter((t) => handlers.includes(t.getHandlerFunction()))
@@ -353,6 +365,9 @@ function recapText(recap, period) {
 }
 
 function sendWeeklyRecap() {
+  const week = weekKey(dayString(new Date()));
+  if (props.getProperty('LAST_WEEKLY') === week) return; // già fatte questa settimana
+  props.setProperty('LAST_WEEKLY', week);
   addChatEvent('', { kind: 'weekly', ...weekRecap() });
   dispatch('recap', '');
 }
@@ -506,7 +521,10 @@ function handle(req, user) {
           props.deleteProperty('NEWS_RELEASED'); // nella prova il rilascio si può ripetere
           forget('news');
           releaseNews('');
-        } else sendWeeklyRecap();
+        } else {
+          props.deleteProperty('LAST_WEEKLY');
+          sendWeeklyRecap();
+        }
         return json({ ok: true });
       case 'fbToken':
         if (!fbChatOn()) return json({ error: 'Non disponibile' });
