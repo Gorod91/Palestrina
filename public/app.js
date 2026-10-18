@@ -450,7 +450,7 @@ function renderGallery() {
     li.querySelector('.name').textContent = who;
     li.querySelector('.sub').textContent = `${title} · ${day}`;
     el.append(li);
-    li.querySelector('.photo').replaceWith(photoPair(r.photoId, (state.refPhotos || {})[r.name], `${who} · ${r.score} · ${title}`));
+    li.querySelector('.photo').replaceWith(photoPair(r.photoId, r.refId || (state.refPhotos || {})[r.name], `${who} · ${r.score} · ${title}`));
   });
 }
 
@@ -553,7 +553,7 @@ function renderSudometro() {
     if (me.sudometroToday.saving) el.insertAdjacentHTML('beforeend', `<p class="saving-line">${bicep()}<span>Pubblico la foto…</span></p>`);
     if (me.sudometroToday.photoId) {
       const t = me.sudometroToday;
-      el.append(photoPair(t.photoId, me.reference && me.reference.photoId, `${me.display} · ${t.score} · ${clean(t.title)}`, true));
+      el.append(photoPair(t.photoId, t.refId || (me.reference && me.reference.photoId), `${me.display} · ${t.score} · ${clean(t.title)}`, true));
     }
     if (debugOn()) {
       el.insertAdjacentHTML('beforeend', '<button id="btn-redo" class="secondary" style="margin-top:14px">Rifai e sovrascrivi (debug)</button>');

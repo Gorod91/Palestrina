@@ -974,7 +974,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       const text = el('div');
       text.append(el('p', 'event-text', `${name} ha fatto il Sudometro`));
       text.append(el('p', 'event-score', `${d.score} · ${clean(d.title)}`));
-      if (d.photoId) box.append(photoPair(d.photoId, (data.refPhotos || {})[m.name], `${name} · ${d.score} · ${clean(d.title)}`));
+      if (d.photoId) box.append(photoPair(d.photoId, d.ref || (data.refPhotos || {})[m.name], `${name} · ${d.score} · ${clean(d.title)}`));
       box.append(text);
       row.append(box);
     } else if (d.kind === 'achievement') {

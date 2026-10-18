@@ -14,7 +14,7 @@
 const SHEETS = {
   utenti: { name: 'Utenti', header: ['Nome', 'Codice', 'Obiettivo settimanale', 'Debug', 'Alias'] },
   presenze: { name: 'Presenze', header: ['Data', 'Ora', 'Nome', 'Fonte'] },
-  sudometro: { name: 'Sudometro', header: ['Data', 'Ora', 'Nome', 'Punteggio', 'Titolo', 'Dettagli', 'Debug', 'Foto'] },
+  sudometro: { name: 'Sudometro', header: ['Data', 'Ora', 'Nome', 'Punteggio', 'Titolo', 'Dettagli', 'Debug', 'Foto', 'Riferimento'] },
   iscrizioni: { name: 'Iscrizioni', header: ['Nome', 'Endpoint', 'Sottoscrizione', 'Aggiornata'] },
   // Tipo: msg (messaggio), poll (domanda "chi va in palestra oggi?"), answer (risposta: Testo = si/forse/no, Rif = ID della domanda)
   chat: { name: 'Chat', header: ['ID', 'Data', 'Ora', 'Nome', 'Tipo', 'Testo', 'Rif', 'Orario'] },
@@ -678,6 +678,7 @@ function saveSudometro(user, req) {
   if (done) return { error: 'Il Sudometro di oggi è già fatto' };
   const score = Math.max(0, Math.min(100, Math.round(Number(req.score) || 0)));
   const saved = savePhoto(user, req.photo, `sudato ${score}${debug ? ' debug' : ''}`);
+  const refId = getReference(user).photoId || ''; // il riferimento di oggi: domani se ne farà un altro
   const now = new Date();
   sheet('sudometro').appendRow([
     dayString(now),
@@ -688,9 +689,10 @@ function saveSudometro(user, req) {
     JSON.stringify(req.details || {}).slice(0, 3000),
     debug ? 'sì' : '',
     saved.id || '',
+    refId,
   ]);
   if (!debug) {
-    addChatEvent(user.name, { kind: 'sudometro', score, title: String(req.title || '').slice(0, 60), photoId: saved.id || '' });
+    addChatEvent(user.name, { kind: 'sudometro', score, title: String(req.title || '').slice(0, 60), photoId: saved.id || '', ref: refId });
     dispatch('sudometro', user.name);
   }
   return { ok: true, score, debug, photoError: saved.error };
@@ -713,7 +715,8 @@ function overwriteSudometro(user, req, today) {
     const row = values.findIndex((r, i) => i > 0 && !r[6] && toDay(r[0]) === today && String(r[2]) === user.name);
     if (row < 1) return { error: 'Sudometro di oggi non trovato' };
     oldPhoto = String(values[row][7] || '');
-    sh.getRange(row + 1, 2, 1, 7).setValues([[
+    const refId = (getReference(user) || {}).photoId || '';
+    sh.getRange(row + 1, 2, 1, 8).setValues([[
       Utilities.formatDate(new Date(), TZ, 'HH:mm'),
       user.name,
       score,
@@ -721,13 +724,14 @@ function overwriteSudometro(user, req, today) {
       JSON.stringify(req.details || {}).slice(0, 3000),
       '',
       saved.id || '',
+      refId,
     ]]);
     const chat = sheet('chat');
     chat.getDataRange().getValues().forEach((r, i) => {
       if (i === 0 || String(r[4]) !== 'event' || String(r[3]) !== user.name || toDay(r[1]) !== today) return;
       const data = safeJson(r[5]);
       if (data && data.kind === 'sudometro') {
-        Object.assign(data, { score, title, photoId: saved.id || '' });
+        Object.assign(data, { score, title, photoId: saved.id || '', ref: refId });
         chat.getRange(i + 1, 6).setValue(JSON.stringify(data));
       }
     });
@@ -798,7 +802,7 @@ function buildState(user) {
       tester: user.admin || PROVA_USERS.includes(user.name),
       actingAs: !!user.actingAs,
       checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
-      sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title, photoId: mySudoToday.photoId } : null,
+      sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title, photoId: mySudoToday.photoId, refId: mySudoToday.refId } : null,
       reference: getReference(user),
       timerSeconds: Number(props.getProperty('timer_' + user.name)) || null,
       chatMuted: !!props.getProperty('mute_' + user.name),
@@ -822,7 +826,7 @@ function buildState(user) {
       sudometro: sudo
         .slice()
         .sort((a, b) => b.score - a.score)
-        .map((r) => ({ name: r.name, display: dn(r.name), day: r.day, score: r.score, title: r.title, photoId: r.photoId })),
+        .map((r) => ({ name: r.name, display: dn(r.name), day: r.day, score: r.score, title: r.title, photoId: r.photoId, refId: r.refId })),
     },
   };
 }
@@ -1116,7 +1120,7 @@ function buildChatState(version, today) {
         type: r.type,
         text: r.type === 'msg' ? r.text : '',
         target: r.type === 'poll' ? pollDay(r) : '',
-        data: r.type === 'event' ? safeJson(r.text) : null,
+        data: r.type === 'event' ? withRef(safeJson(r.text)) : null,
       })),
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
@@ -1124,6 +1128,13 @@ function buildChatState(version, today) {
     refPhotos: refPhotoIds(),
     sfide: sfideForChat(today),
   };
+}
+
+/** Sudometro in chat: il riferimento usato quel giorno (per gli eventi salvati prima che lo avessero, dal foglio). */
+function withRef(data) {
+  if (!data || data.kind !== 'sudometro' || data.ref || !data.photoId) return data;
+  const row = rows('sudometro').find((r) => r.photoId === data.photoId);
+  return row && row.refId ? { ...data, ref: row.refId } : data;
 }
 
 /** Evento automatico in chat (check-in, Sudometro, premiazioni). I dati restano strutturati: il testo lo fa l'app. */
@@ -1880,7 +1891,7 @@ function savePhoto(user, base64, label) {
 /** Più foto in una sola chiamata (al massimo 12): una richiesta invece di tante. */
 function getPhotos(ids) {
   const list = (Array.isArray(ids) ? ids : []).map(String).slice(0, 12);
-  const allowed = new Set(rows('sudometro').map((r) => r.photoId).filter(Boolean).concat(Object.values(refPhotoIds())));
+  const allowed = new Set(rows('sudometro').flatMap((r) => [r.photoId, r.refId]).filter(Boolean).concat(Object.values(refPhotoIds())));
   const photos = {};
   list.forEach((id) => {
     if (!allowed.has(id)) return;
@@ -1896,7 +1907,7 @@ function getPhotos(ids) {
 
 function getPhoto(id) {
   // Solo file elencati nel foglio Sudometro: lo script non deve leggere altri file del Drive.
-  const allowed = id && (rows('sudometro').some((r) => r.photoId === id) || Object.values(refPhotoIds()).includes(id));
+  const allowed = id && (rows('sudometro').some((r) => r.photoId === id || r.refId === id) || Object.values(refPhotoIds()).includes(id));
   if (!allowed) return { error: 'Foto non trovata' };
   const blob = DriveApp.getFileById(id).getBlob();
   return { mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
@@ -2262,7 +2273,7 @@ function readRows(key) {
   if (key === 'presenze') return values.map((r) => ({ day: toDay(r[0]), time: toTime(r[1]), name: r[2] }));
   if (key === 'sudometro') {
     // Le prove di debug restano nel foglio ma non contano.
-    return values.filter((r) => !r[6]).map((r) => ({ day: toDay(r[0]), name: r[2], score: Number(r[3]), title: r[4], photoId: r[7] || '' }));
+    return values.filter((r) => !r[6]).map((r) => ({ day: toDay(r[0]), name: r[2], score: Number(r[3]), title: r[4], photoId: r[7] || '', refId: r[8] || '' }));
   }
   if (key === 'iscrizioni') return values.map((r) => ({ name: r[0], sub: JSON.parse(r[2]) }));
   if (key === 'cambi') return values.map((r) => ({ at: String(r[0]), day: toDay(r[1]), name: String(r[2]), from: String(r[3]), to: String(r[4]), timeBefore: r[5] ? toTime(r[5]) : '', timeAfter: r[6] ? toTime(r[6]) : '' }));
