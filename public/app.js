@@ -718,7 +718,12 @@ async function takeSweat(debug, overwrite = false) {
         v2.retaken = true;
       }
     }
-    const shown = v2live && v2 && v2.res ? { score: v2.res.score, title: v2.res.title, warnings: [] } : result;
+    // Dal 19/10 il punteggio ufficiale è il Sudometro 3 (senza annunci): si calcola prima di mostrare il risultato.
+    // Se non riesce (riferimento non scaricabile, viso non trovato) resta il punteggio della versione 1.
+    if (!v2) v2 = await sudometroV2(photo);
+    const shown = v2.res3
+      ? { score: v2.res3.score, title: v2.res3.title, warnings: [] }
+      : v2live && v2.res ? { score: v2.res.score, title: v2.res.title, warnings: [] } : result;
     let before = null;
     if (!debug) {
       // Il risultato si vede subito; la foto si pubblica intanto (bicipite finché non è caricata)
@@ -727,7 +732,6 @@ async function takeSweat(debug, overwrite = false) {
       optimistic++;
       renderSudometro();
     } else sudoBusy('Pubblico la foto…');
-    if (!v2) v2 = await sudometroV2(photo); // in silenzio, a risultato già sullo schermo
     const r = await api('sudometro', {
       score: shown.score,
       title: shown.title,
