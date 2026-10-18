@@ -62,17 +62,33 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   };
   const who = (name) => (data && data.names && data.names[name]) || name;
 
-  // ---------- Messaggi su Firebase (per ora solo in modalità prova) ----------
-  // Sondaggio, piani ed eventi restano su Apps Script; i messaggi arrivano da Firestore in tempo reale.
+  // ---------- Messaggi su Firebase ----------
+  // I messaggi arrivano da Firestore in tempo reale; sondaggio, piani ed eventi li scrive Apps Script, che ne
+  // mette lo stato anche su Firestore. Se Firebase non è raggiungibile (rete che lo blocca) si torna da soli
+  // ad Apps Script ogni 5 secondi: il server copia i messaggi tra Firebase e il foglio, nei due sensi.
   let fbOn = false; // chat Firebase collegata (o in collegamento)
   let fbMsgs = null; // ultimi messaggi da Firestore
+  let fbOnline = false; // ultima risposta di Firestore arrivata dal server (non dalla copia sul telefono)
+  let fbOfflineAt = 0; // da quando Firestore non risponde (con la rete accesa)
+  let fbRetryAt = 0; // dopo un errore si riprova più tardi, intanto si usa Apps Script
+  const fbOut = new Map(); // miei messaggi scritti su Firebase e non ancora salvati
+  const rescued = new Set(); // messaggi rimasti in attesa su Firebase e mandati da Apps Script con lo stesso id
   let rawMsgs = []; // messaggi come arrivano da Apps Script (salvati così sul telefono, mai mescolati con Firebase)
+  const FB_RESCUE_MS = 10000;
+  /** Firebase collegato e aggiornato: niente polling veloce, i messaggi si scrivono lì. */
+  const fbLive = () => fbOn && !!fbMsgs && fbOnline;
   const fb = createFbChat({
     getToken: () => api('fbToken'),
     onChange(list, fromCache) {
       if (!fbOn) return;
       const first = !fbMsgs;
       fbMsgs = list;
+      if (fbOnline === fromCache) {
+        fbOnline = !fromCache;
+        fbOfflineAt = fromCache ? Date.now() : 0;
+        tlog('firebase', fbOnline ? 'collegato' : 'non raggiungibile: uso Apps Script');
+        if (!fbOnline && active) load();
+      }
       tlog('firebase', `${list.length} messaggi${fromCache ? ' (dal telefono)' : ''}`);
       if (data) {
         data.messages = withFb();
@@ -96,23 +112,31 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       fbFail(err);
     },
   });
-  /** Messaggi di Apps Script senza quelli scritti (che ora arrivano da Firebase), più quelli di Firebase. */
+  /**
+   * Messaggi di Apps Script e di Firebase insieme, senza doppioni (stesso id): il server copia i messaggi
+   * da una parte all'altra. Vince la versione di Firebase, tranne quando lì è ancora in attesa.
+   */
   function withFb() {
     if (!fbOn || !fbMsgs) return rawMsgs;
+    const fbById = new Map(fbMsgs.map((m) => [m.id, m]));
+    fbOut.forEach((m) => !fbById.has(m.id) && fbById.set(m.id, m));
+    const rawIds = new Set(rawMsgs.map((m) => m.id));
     return rawMsgs
-      .filter((m) => m.type !== 'msg')
-      .concat(fbMsgs)
+      .filter((m) => !fbById.has(m.id) || fbById.get(m.id).pending)
+      .concat([...fbById.values()].filter((m) => !(m.pending && rawIds.has(m.id))))
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
   function fbStart() {
-    const want = !!(useFirebase && useFirebase());
-    if (!want) return fbStop();
-    if (fbOn || !me) return;
+    const mode = useFirebase ? useFirebase() : ''; // 'prova', 'tutti' o '' (spenta)
+    if (!mode) return fbStop();
+    if (fbOn || !me || Date.now() < fbRetryAt) return;
     fbOn = true;
-    $('chat-input').placeholder = 'Messaggio · Firebase';
-    fb.start(me, true).catch(fbFail);
+    fbOnline = false;
+    fbOfflineAt = Date.now();
+    if (mode === 'prova') $('chat-input').placeholder = 'Messaggio · Firebase';
+    fb.start(me, mode === 'prova').catch(fbFail);
     try {
-      if (!localStorage.getItem('palestrina.fbIntro')) {
+      if (mode === 'prova' && !localStorage.getItem('palestrina.fbIntro')) {
         localStorage.setItem('palestrina.fbIntro', '1');
         toast('Chat in prova con Firebase: i messaggi li vede solo chi è in modalità prova');
       }
@@ -123,14 +147,38 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     fb.stop();
     fbOn = false;
     fbMsgs = null;
+    fbOnline = false;
+    fbOut.clear();
     $('chat-input').placeholder = 'Messaggio';
     if (data) data.messages = withFb();
   }
+  /** Firebase non si carica (SDK bloccato, accesso negato…): si resta su Apps Script e si riprova fra 5 minuti. */
   function fbFail(err) {
     if (!fbOn) return;
     fbStop();
-    toast(`Chat Firebase non disponibile: ${err.message}`);
+    fbRetryAt = Date.now() + 5 * 60000;
+    tlog('firebase', `non disponibile, uso Apps Script: ${err.message}`);
+    if (isDebug()) toast(`Chat Firebase non disponibile: ${err.message}`);
     load(true);
+  }
+  /**
+   * Firestore non risponde ma la rete c'è (per esempio un Wi-Fi che blocca Firebase): i miei messaggi rimasti
+   * in attesa partono da Apps Script con lo stesso id. Se poi Firebase si sblocca, lo stesso id non si doppia.
+   */
+  function rescuePending() {
+    if (!fbOn || !fbMsgs || fbOnline || !navigator.onLine || Date.now() - fbOfflineAt < FB_RESCUE_MS) return;
+    [...fbOut.values()]
+      .filter((m) => !rescued.has(m.id))
+      .forEach((m) => {
+        rescued.add(m.id);
+        tlog('firebase', `messaggio ${m.id} mandato da Apps Script`);
+        api('chatSend', { text: m.text, id: m.id })
+          .then((r) => {
+            v = -1;
+            apply(r);
+          })
+          .catch(() => rescued.delete(m.id));
+      });
   }
 
   // ---------- Dati ----------
@@ -174,7 +222,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     if (!active || !data) return 'ok'; // senza chat ci pensa già "Carico la chat…"
     if (!navigator.onLine) return 'off';
     if (syncFails >= 2) return retrying ? 'busy' : 'stale';
-    if (syncedAt && Date.now() - syncedAt <= (fbOn && fbMsgs ? FB_POLL_EVERY + STALE_MS : STALE_MS)) return 'ok';
+    if (syncedAt && Date.now() - syncedAt <= (fbLive() ? FB_POLL_EVERY + STALE_MS : STALE_MS)) return 'ok';
     return loading || syncFails ? 'busy' : 'stale'; // dopo un solo errore riprova da sola: resta "Aggiorno…"
   }
 
@@ -254,12 +302,27 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     if (!t) return;
     $('chat-input').value = '';
     autosize();
-    if (fbOn && fbMsgs) {
+    if (fbOn && fbMsgs && (fbOnline || !navigator.onLine)) {
       // Firebase lo mostra subito (in attesa) e lo invia appena c'è rete
+      const shown = () => {
+        if (!data) return;
+        data.messages = withFb();
+        render();
+      };
       fb.send(t)
-        .then(() => api('chatNotify').catch(() => {})) // la notifica agli altri la manda il server
+        .then(({ msg, saved }) => {
+          fbOut.set(msg.id, msg);
+          shown();
+          setTimeout(scrollToBottom, 0);
+          return saved
+            .then(() => api('chatNotify').catch(() => {})) // copia nel foglio e notifica agli altri: il server
+            .catch((err) => !rescued.has(msg.id) && toast(`Messaggio non inviato: ${err.message}`))
+            .finally(() => {
+              fbOut.delete(msg.id);
+              shown();
+            });
+        })
         .catch((err) => toast(`Messaggio non inviato: ${err.message}`));
-      setTimeout(scrollToBottom, 0);
       return;
     }
     // Il messaggio compare subito, con il bicipite che si flette finché Apps Script non lo salva.
@@ -1049,8 +1112,9 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
 
   function tick() {
     // Con Firebase le novità arrivano da sole: ad Apps Script si chiede solo ogni tanto (per il cambio di giorno)
-    const fbLive = fbOn && fbMsgs && Date.now() - lastLoad < FB_POLL_EVERY;
-    if (active && document.visibilityState === 'visible' && !fbLive) load();
+    const quiet = fbLive() && Date.now() - lastLoad < FB_POLL_EVERY;
+    if (active && document.visibilityState === 'visible' && !quiet) load();
+    rescuePending();
     renderSync();
   }
 
@@ -1092,11 +1156,12 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     redraw() {
       if (data) render();
     },
-    /** Accende o spegne la chat Firebase se è cambiato chi può usarla (stato dal server, modalità prova). */
+    /** Accende o spegne la chat Firebase se è cambiato chi può usarla (stato dal server o modalità prova). */
     checkFirebase() {
       fbStart();
     },
     reload() {
+      fbRetryAt = 0;
       fbStop();
       fbStart();
       load(true);

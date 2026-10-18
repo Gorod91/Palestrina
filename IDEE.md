@@ -103,5 +103,9 @@ La chat oggi chiede al server ogni 5 secondi se ci sono novità (Apps Script + f
 - Fasi: 1 progetto Firebase (Francesco) → 2 messaggi in tempo reale solo per Francesco in prova → 3 sondaggio, piani, eventi automatici, cancella/silenzia → 4 copia dello storico e passaggio per tutti.
 - **Fase 2 fatta (17/10)**: in modalità prova i messaggi scritti vanno su Firestore (`prova_chat`), sondaggio ed eventi restano su Apps Script. Regole in `firestore.rules` (copiate a mano nella console). Provata in locale con l'emulatore: 0,2 s tra due telefoni.
 - **Fase 3 fatta (17/10)**: in prova il server scrive lo stato della chat (sondaggio, piani, eventi, sfide) su Firestore (`prova_state/chat`) a ogni cambiamento; i telefoni lo ricevono subito e chiedono ad Apps Script solo ogni minuto. Cancellazione dei messaggi Firebase e notifiche passano dal server.
-- Prossimo: passaggio per tutti (raccolte `chat` e `state`, copia dello storico, messaggi su Firebase anche fuori dalla prova).
+- **Fase 4 pronta (18/10, ramo `claude/firebase-fase4`, non attiva)**: passaggio per tutti con l'interruttore `FIREBASE_CHAT` nelle proprietà dello script (`tutti` = acceso, `spento` = tutti tornano al foglio subito) oppure come novità dormiente (feature `firebase` in `NEWS`).
+  - Il foglio Chat resta lo storico completo: i messaggi scritti su Firebase ci vengono copiati dal server (a ogni invio, ogni 30 s quando qualcuno chiede la chat, ogni ora); quelli scritti da Apps Script (versioni vecchie, Firebase bloccato) vanno su Firebase con lo stesso id. Niente doppioni.
+  - Ritorno automatico ad Apps Script: SDK che non si carica → si riprova fra 5 minuti; Firestore che non risponde → si torna a chiedere ogni 5 s e si scrive dal server; i messaggi rimasti in attesa partono da Apps Script dopo 10 s con lo stesso id.
+  - Storico: `copiaChatSuFirebase()` dall'editor, ripetibile.
+  - Provata in locale: `tools/firebase-prova` (emulatore, finto Apps Script, tre telefoni).
 - Da verificare: se il Wi-Fi aziendale di Michy blocca anche Firebase.

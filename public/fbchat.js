@@ -1,5 +1,5 @@
 // Chat su Firebase (Firestore): il telefono resta collegato e i messaggi arrivano appena qualcuno scrive,
-// invece di chiedere al server ogni 5 secondi. Per ora solo in modalità prova (raccolta "prova_chat").
+// invece di chiedere al server ogni 5 secondi. Raccolta "chat" (in modalità prova "prova_chat").
 // L'accesso lo dà il nostro server dopo il codice personale (azione "fbToken"): niente account Google.
 
 const SDK = 'https://www.gstatic.com/firebasejs/10.14.1/';
@@ -126,11 +126,17 @@ export function createFbChat({ getToken, onChange, onState, onError, days = 7 })
     unsubState = null;
   }
 
-  /** Il messaggio compare subito (in attesa) e parte appena c'è rete; la promessa finisce quando è salvato. */
+  /**
+   * Il messaggio parte appena c'è rete. Restituisce `msg` (da mostrare subito, in attesa: senza rete la query per
+   * data non lo include finché il server non gli dà l'orario) e `saved`, la promessa che finisce quando è salvato.
+   */
   async function send(text) {
     const { fs, db } = await sdk();
     if (!coll) throw new Error('Chat non collegata');
-    return fs.setDoc(fs.doc(db, coll, newId()), { name, text, at: fs.serverTimestamp() });
+    const id = newId();
+    const now = new Date();
+    const msg = { id, day: dayFmt.format(now), time: timeFmt.format(now), name, type: 'msg', text, pending: true, fb: true };
+    return { msg, saved: fs.setDoc(fs.doc(db, coll, id), { name, text, at: fs.serverTimestamp() }) };
   }
 
   return { start, stop, send };

@@ -829,7 +829,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
-const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => testOn() });
+const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => (testOn() ? 'prova' : state && state.features && state.features.firebase ? 'tutti' : '') });
 
 // ---------- Tab ----------
 

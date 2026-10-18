@@ -237,11 +237,15 @@ function computeRecap(from, to) {
 
 /** Ogni sera alle 21: se domani è il primo del mese, premiazioni del mese e Re del mese. */
 function eveningCheck() {
-  releaseDueNews();
-  const today = dayString(new Date());
-  if (addDays(today, 1).slice(8) !== '01') return;
-  sendMonthlyRecap();
-  releaseNews(today.slice(0, 7)); // le novità si sbloccano subito dopo l'incoronazione del Re
+  try {
+    releaseDueNews();
+    const today = dayString(new Date());
+    if (addDays(today, 1).slice(8) !== '01') return;
+    sendMonthlyRecap();
+    releaseNews(today.slice(0, 7)); // le novità si sbloccano subito dopo l'incoronazione del Re
+  } finally {
+    pushChatIfChanged(); // eventi nuovi in chat: subito anche su Firebase
+  }
 }
 
 // ---------- Novità dormienti ----------
@@ -302,6 +306,7 @@ function newsAt(n) {
 /** Rilascia le novità con orario già passato (trigger una tantum, controllo serale e richieste). */
 function releaseDueNews() {
   NEWS.filter((n) => n.at && !releasedNews().includes(n.id) && newsAt(n) <= new Date()).forEach((n) => releaseNews('', n.id));
+  pushChatIfChanged();
 }
 
 /** Paracadute se il trigger delle 21 non è partito: rilascia dopo le premiazioni, o comunque dalle 23 o dal mese dopo. */
@@ -457,9 +462,10 @@ function handle(req, user) {
       case 'photos':
         return json(getPhotos(req.ids));
       case 'chat':
+        fbSyncSoon(); // messaggi scritti su Firebase anche per chi legge da qui (Firebase bloccato, versioni vecchie)
         return json(chatState(user, req.v));
       case 'chatSend':
-        return json(chatSend(user, req.text));
+        return json(chatSend(user, req.text, req.id));
       case 'pollAsk':
         return json(pollAsk(user, req.day));
       case 'pollAnswer':
@@ -469,16 +475,17 @@ function handle(req, user) {
       case 'sfida':
         return json(sfidaAction(user, req));
       case 'chatDelete':
-        if (req.fb) {
-          // Messaggio scritto su Firebase (chat di prova)
-          if (!TEST || !user.debug) return json({ error: 'Solo per gli utenti debug, in prova' });
-          firestoreDelete('prova_chat', String(req.id || ''));
-          return json({ ok: true });
+        if (fbChatOn() && user.debug) {
+          // Via da Firebase (da tutti i telefoni) e dal foglio, dove arriva la copia
+          firestoreDelete(fbColl(), String(req.id || ''));
+          const r = chatDelete(user, req.id);
+          return json(req.fb && r.error === 'Messaggio non trovato' ? { ok: true } : r);
         }
         return json(chatDelete(user, req.id));
       case 'chatNotify':
-        // Messaggio appena scritto su Firebase: la notifica la manda il server, come per quelli di Apps Script
-        if (!TEST) return json({ error: 'Non disponibile' });
+        // Messaggio appena scritto su Firebase: la copia nel foglio e la notifica le fa il server
+        if (!fbChatOn()) return json({ error: 'Non disponibile' });
+        fbSync();
         notifyChat(user);
         return json({ ok: true });
       case 'chatMute':
@@ -502,8 +509,7 @@ function handle(req, user) {
         } else sendWeeklyRecap();
         return json({ ok: true });
       case 'fbToken':
-        // Chat su Firebase: per ora solo in modalità prova
-        if (!TEST) return json({ error: 'Non disponibile' });
+        if (!fbChatOn()) return json({ error: 'Non disponibile' });
         return json(firebaseToken(user));
       case 'setTimer': {
         const s = Math.round(Number(req.seconds));
@@ -835,7 +841,7 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
-    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2') }, // sfide: sorpresa, si vedono dalla prima
+    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: fbChatOn() }, // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
@@ -1026,7 +1032,7 @@ function bumpChat() {
   return v;
 }
 
-// La chat è cambiata in questa richiesta: a fine richiesta lo stato va anche su Firebase (per ora solo in prova)
+// La chat è cambiata in questa richiesta: a fine richiesta lo stato va anche su Firebase
 let CHAT_DIRTY = false;
 
 function newId() {
@@ -1136,6 +1142,7 @@ function buildChatState(version, today) {
     v: version,
     messages: chatRows()
       .filter((r) => r.type === 'msg' || r.type === 'poll' || r.type === 'event')
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0)) // le copie da Firebase arrivano nel foglio dopo
       .map((r) => ({
         id: r.id,
         day: r.day,
@@ -1178,21 +1185,26 @@ function addChatEvent(name, data) {
   }
 }
 
-function appendChat(user, type, text, ref, at) {
+function appendChat(user, type, text, ref, at, id0) {
   const now = new Date();
-  const id = newId();
+  const id = id0 || newId();
   sheet('chat').appendRow([id, dayString(now), Utilities.formatDate(now, TZ, 'HH:mm'), user.name, type, text || '', ref || '', at || '']);
   return id;
 }
 
-function chatSend(user, text) {
+/** `id` dal telefono (facoltativo): un messaggio rimasto in attesa su Firebase e mandato da qui non si doppia. */
+function chatSend(user, text, id) {
   const t = String(text || '').trim().slice(0, 500);
   if (!t) return { error: 'Messaggio vuoto' };
+  const cid = /^[a-z0-9]{8,20}$/.test(String(id || '')) ? String(id) : '';
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   try {
-    appendChat(user, 'msg', t);
-    bumpChat();
+    if (!cid || !chatRows().some((r) => r.id === cid)) {
+      const mid = appendChat(user, 'msg', t, '', '', cid);
+      bumpChat();
+      fbMirror(mid, user.name, t, new Date());
+    }
   } finally {
     lock.releaseLock();
   }
@@ -1602,6 +1614,15 @@ function closeOldSfide() {
 /** Ogni ora: chiude le sfide di ieri e, 2 ore dopo l'apertura, ricorda le conferme mancanti. */
 function sfideTick() {
   MEMO = {};
+  try {
+    fbSync(); // paracadute: messaggi Firebase rimasti fuori dal foglio
+    sfideTickInner();
+  } finally {
+    pushChatIfChanged();
+  }
+}
+
+function sfideTickInner() {
   closeOldSfide();
   if (!featureOn('sfide')) return;
   const today = dayString(new Date());
@@ -2400,15 +2421,115 @@ function firestoreToken() {
   return token;
 }
 
+/** `path` è un documento (`chat/abc`) o un metodo della radice (`:commit`, `:runQuery`). */
 function firestoreCall(method, path, body) {
   const opts = { method, headers: { Authorization: 'Bearer ' + firestoreToken() }, muteHttpExceptions: true };
   if (body) {
     opts.contentType = 'application/json';
     opts.payload = JSON.stringify(body);
   }
-  const r = UrlFetchApp.fetch(`${firestoreBase()}/${path}`, opts);
+  const r = UrlFetchApp.fetch(`${firestoreBase()}${path[0] === ':' ? '' : '/'}${path}`, opts);
   const code = r.getResponseCode();
   if (code >= 300 && !(method === 'delete' && code === 404)) throw new Error(`Firestore ${code}: ${r.getContentText().slice(0, 200)}`);
+  return safeJson(r.getContentText());
+}
+
+/**
+ * Chat su Firebase: sempre in prova; per tutti con la novità "firebase" o con la proprietà FIREBASE_CHAT = "tutti".
+ * FIREBASE_CHAT = "spento" la toglie a tutti (fuori dalla prova) in un attimo: si torna al foglio.
+ */
+function fbChatOn() {
+  if (TEST) return true;
+  const p = realProps.getProperty('FIREBASE_CHAT');
+  return p !== 'spento' && (p === 'tutti' || featureOn('firebase'));
+}
+
+const fbColl = () => (TEST ? 'prova_chat' : 'chat');
+
+/** Documento di un messaggio come lo scrive il telefono. */
+function fbMsgDoc(name, text, at) {
+  return { fields: { name: { stringValue: name }, text: { stringValue: text }, at: { timestampValue: at.toISOString() } } };
+}
+
+/** Messaggio scritto da qui (versioni vecchie dell'app, Firebase bloccato): copia su Firebase con lo stesso id. */
+function fbMirror(id, name, text, at) {
+  if (!fbChatOn()) return;
+  try {
+    firestoreCall('patch', `${fbColl()}/${id}`, fbMsgDoc(name, text, at));
+  } catch (err) {
+    console.error('Messaggio non copiato su Firebase', err);
+  }
+}
+
+const FB_SYNC_DAYS = 2;
+
+/**
+ * Messaggi scritti su Firebase negli ultimi giorni che mancano nel foglio: li aggiunge con lo stesso id.
+ * Così il foglio resta lo storico completo e chi non riesce a usare Firebase li vede lo stesso.
+ */
+function fbSync() {
+  if (!fbChatOn()) return 0;
+  try {
+    const from = new Date(Date.now() - FB_SYNC_DAYS * 86400000).toISOString();
+    const res = firestoreCall('post', ':runQuery', {
+      structuredQuery: {
+        from: [{ collectionId: fbColl() }],
+        where: { fieldFilter: { field: { fieldPath: 'at' }, op: 'GREATER_THAN_OR_EQUAL', value: { timestampValue: from } } },
+      },
+    });
+    const docs = (Array.isArray(res) ? res : []).map((x) => x.document).filter(Boolean);
+    if (!docs.length) return 0;
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    try {
+      MEMO = {};
+      const have = new Set(chatRows().map((r) => r.id));
+      const add = docs
+        .map((d) => ({ id: d.name.split('/').pop(), name: d.fields.name.stringValue, text: d.fields.text.stringValue, at: new Date(d.fields.at.timestampValue) }))
+        .filter((m) => !have.has(m.id))
+        .sort((a, b) => a.at - b.at);
+      if (!add.length) return 0;
+      const sh = sheet('chat');
+      add.forEach((m) => sh.appendRow([m.id, dayString(m.at), Utilities.formatDate(m.at, TZ, 'HH:mm'), m.name, 'msg', m.text, '', '']));
+      bumpChat();
+      return add.length;
+    } finally {
+      lock.releaseLock();
+    }
+  } catch (err) {
+    console.error('Chat Firebase non copiata nel foglio', err);
+    return 0;
+  }
+}
+
+/** fbSync al massimo ogni 30 secondi (la chiamano tutti i telefoni che chiedono la chat). */
+function fbSyncSoon() {
+  if (!fbChatOn()) return;
+  const cache = CacheService.getScriptCache();
+  const key = (TEST ? 'prova_' : '') + 'fbSync';
+  if (cache.get(key)) return;
+  cache.put(key, '1', 30);
+  fbSync();
+}
+
+/**
+ * Da lanciare dall'editor (una tantum, ripetibile): copia su Firebase tutti i messaggi del foglio della chat.
+ * L'id del documento è quello del messaggio, quindi rifarla non crea doppioni.
+ */
+function copiaChatSuFirebase() {
+  TEST = false;
+  MEMO = {};
+  const msgs = sheetRaw('chat').getDataRange().getValues().slice(1)
+    .filter((r) => String(r[4]) === 'msg' && /^[A-Za-z0-9_-]+$/.test(String(r[0])))
+    .map((r) => ({ id: String(r[0]), name: String(r[3]), text: String(r[5]), at: Utilities.parseDate(`${toDay(r[1])} ${toTime(r[2])}`, TZ, 'yyyy-MM-dd HH:mm') }));
+  const root = `projects/${FIREBASE_PROJECT}/databases/(default)/documents`;
+  for (let i = 0; i < msgs.length; i += 400) {
+    firestoreCall('post', ':commit', {
+      writes: msgs.slice(i, i + 400).map((m) => ({ update: { name: `${root}/chat/${m.id}`, ...fbMsgDoc(m.name, m.text, m.at) } })),
+    });
+  }
+  Logger.log(`Copiati su Firebase ${msgs.length} messaggi`);
+  return msgs.length;
 }
 
 function firestoreDelete(coll, id) {
@@ -2416,14 +2537,14 @@ function firestoreDelete(coll, id) {
   firestoreCall('delete', `${coll}/${id}`);
 }
 
-/** Stato della chat su Firestore (documento prova_state/chat), se in questa richiesta è cambiato. */
+/** Stato della chat su Firestore (documento state/chat o prova_state/chat), se in questa richiesta è cambiato. */
 function pushChatIfChanged() {
-  if (!CHAT_DIRTY || !TEST) return;
+  if (!CHAT_DIRTY || !fbChatOn()) return;
   CHAT_DIRTY = false;
   try {
     MEMO = {}; // dopo le scritture si rilegge tutto
     const st = chatState(null, -1);
-    firestoreCall('patch', 'prova_state/chat', {
+    firestoreCall('patch', `${TEST ? 'prova_' : ''}state/chat`, {
       fields: { json: { stringValue: JSON.stringify(st) }, v: { integerValue: String(st.v) }, at: { timestampValue: new Date().toISOString() } },
     });
   } catch (err) {

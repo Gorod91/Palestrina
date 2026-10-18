@@ -1,0 +1,6 @@
+{
+  "name": "palestrina-firebase-prova",
+  "private": true,
+  "description": "Prova in locale della chat su Firebase: emulatore, finto Apps Script e tre telefoni (Chromium)",
+  "dependencies": { "firebase": "10.14.1", "firebase-tools": "^13.0.0", "playwright-core": "^1.48.0" }
+}
