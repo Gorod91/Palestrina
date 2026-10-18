@@ -57,10 +57,15 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
  * onChange(messaggi) a ogni novità, nel formato della chat di Apps Script ({ id, day, time, name, type, text })
  * più `pending` finché il messaggio non è arrivato a Firebase.
  */
-export function createFbChat({ getToken, onChange, onState, onError, days = 7 }) {
+export function createFbChat({ getToken, onChange, onState, onPlans, onError, onPlansError, days = 7 }) {
   let unsub = null;
   let unsubState = null;
+  let unsubAsks = null;
+  let unsubPlans = null;
   let coll = '';
+  let asksColl = '';
+  let plansColl = '';
+  let uid = '';
   let name = '';
   let gen = 0;
 
@@ -80,7 +85,10 @@ export function createFbChat({ getToken, onChange, onState, onError, days = 7 })
     }
     if (my !== gen) return; // nel frattempo si è chiusa o cambiata la chat
     coll = test ? 'prova_chat' : 'chat';
+    asksColl = test ? 'prova_domande' : 'domande';
+    plansColl = test ? 'prova_piani' : 'piani';
     name = me.name;
+    uid = fbUid(me.name);
     const from = fs.Timestamp.fromMillis(Date.now() - days * 86400000);
     const q = fs.query(fs.collection(db, coll), fs.where('at', '>=', from), fs.orderBy('at'));
     unsub = fs.onSnapshot(
@@ -116,14 +124,65 @@ export function createFbChat({ getToken, onChange, onState, onError, days = 7 })
       },
       (err) => onError(err),
     );
+    // Sondaggio: domande ("Chiedi a tutti") e risposte da oggi in poi, scritte dai telefoni.
+    // Un errore qui (per esempio regole non ancora pubblicate) non spegne la chat: il sondaggio torna al server.
+    const today = dayFmt.format(new Date());
+    let asks = null;
+    let plans = null;
+    const emit = (fromCache) => asks && plans && onPlans(asks, plans, fromCache);
+    unsubAsks = fs.onSnapshot(
+      fs.query(fs.collection(db, asksColl), fs.where('day', '>=', today)),
+      { includeMetadataChanges: true },
+      (snap) => {
+        asks = new Map(
+          snap.docs.map((d) => {
+            const x = d.data({ serverTimestamps: 'estimate' });
+            const at = x.at && x.at.toDate ? x.at.toDate() : new Date();
+            return [x.day, { id: String(x.id || ''), day: x.day, name: String(x.name || ''), atDay: dayFmt.format(at), clock: timeFmt.format(at), pending: d.metadata.hasPendingWrites }];
+          }),
+        );
+        emit(snap.metadata.fromCache);
+      },
+      (err) => onPlansError(err),
+    );
+    unsubPlans = fs.onSnapshot(
+      fs.query(fs.collection(db, plansColl), fs.where('day', '>=', today)),
+      { includeMetadataChanges: true },
+      (snap) => {
+        plans = new Map(
+          snap.docs.map((d) => {
+            const x = d.data();
+            return [`${x.day}|${x.name}`, { choice: String(x.choice || ''), time: String(x.time || ''), pending: d.metadata.hasPendingWrites }];
+          }),
+        );
+        emit(snap.metadata.fromCache);
+      },
+      (err) => onPlansError(err),
+    );
   }
 
   function stop() {
     gen++;
-    if (unsub) unsub();
-    if (unsubState) unsubState();
+    [unsub, unsubState, unsubAsks, unsubPlans].forEach((u) => u && u());
     unsub = null;
     unsubState = null;
+    unsubAsks = null;
+    unsubPlans = null;
+  }
+
+  /** La mia risposta per un giorno ('' la toglie): si vede subito; `saved` finisce quando è salvata. */
+  async function setPlan(day, choice, time) {
+    const { fs, db } = await sdk();
+    if (!plansColl) throw new Error('Chat non collegata');
+    return { saved: fs.setDoc(fs.doc(db, plansColl, `${day}_${uid}`), { day, name, choice, time, at: fs.serverTimestamp() }) };
+  }
+
+  /** "Chiedi a tutti" per un giorno. Se qualcuno ha già chiesto, `saved` fallisce (una domanda per giorno). */
+  async function ask(day) {
+    const { fs, db } = await sdk();
+    if (!asksColl) throw new Error('Chat non collegata');
+    const id = newId();
+    return { id, saved: fs.setDoc(fs.doc(db, asksColl, day), { day, name, id, at: fs.serverTimestamp() }) };
   }
 
   /**
@@ -139,5 +198,5 @@ export function createFbChat({ getToken, onChange, onState, onError, days = 7 })
     return { msg, saved: fs.setDoc(fs.doc(db, coll, id), { name, text, at: fs.serverTimestamp() }) };
   }
 
-  return { start, stop, send };
+  return { start, stop, send, setPlan, ask };
 }

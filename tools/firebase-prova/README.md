@@ -5,7 +5,7 @@ chiave dell'account di servizio generata al volo) e tre telefoni Chromium con Pl
 
 ```sh
 cd tools/firebase-prova && npm i
-npx firebase emulators:start --only firestore,auth --project palestrina-cb43c &   # serve Java
+cp ../../firestore.rules . && npx firebase emulators:start --only firestore,auth --project palestrina-cb43c &   # serve Java
 node fake-gas.js ../../apps-script/Code.gs 8787 &
 # storico di prova nel foglio Chat, poi la copia su Firebase (come dall'editor)
 curl -s localhost:8787/run/append -d '{"name":"Chat","row":["ID","Data","Ora","Nome","Tipo","Testo","Rif","Orario"]}'

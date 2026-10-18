@@ -62,10 +62,11 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   };
   const who = (name) => (data && data.names && data.names[name]) || name;
 
-  // ---------- Messaggi su Firebase ----------
-  // I messaggi arrivano da Firestore in tempo reale; sondaggio, piani ed eventi li scrive Apps Script, che ne
-  // mette lo stato anche su Firestore. Se Firebase non è raggiungibile (rete che lo blocca) si torna da soli
-  // ad Apps Script ogni 5 secondi: il server copia i messaggi tra Firebase e il foglio, nei due sensi.
+  // ---------- Messaggi e sondaggio su Firebase ----------
+  // Messaggi, domande ("Chiedi a tutti") e risposte si scrivono su Firestore e arrivano agli altri in tempo reale;
+  // eventi, sfide e il resto dello stato li scrive Apps Script, che ne mette una copia anche su Firestore.
+  // Il server copia messaggi, domande e risposte tra Firebase e i fogli, nei due sensi. Se Firebase non è
+  // raggiungibile (rete che lo blocca) si torna da soli ad Apps Script ogni 5 secondi.
   let fbOn = false; // chat Firebase collegata (o in collegamento)
   let fbMsgs = null; // ultimi messaggi da Firestore
   let fbOnline = false; // ultima risposta di Firestore arrivata dal server (non dalla copia sul telefono)
@@ -74,9 +75,17 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   const fbOut = new Map(); // miei messaggi scritti su Firebase e non ancora salvati
   const rescued = new Set(); // messaggi rimasti in attesa su Firebase e mandati da Apps Script con lo stesso id
   let rawMsgs = []; // messaggi come arrivano da Apps Script (salvati così sul telefono, mai mescolati con Firebase)
+  let rawState = null; // ultimo stato della chat da Apps Script, senza le aggiunte di Firebase
+  let fbAsks = null; // domande su Firebase: giorno → { id, name, clock… }
+  let fbPlans = null; // risposte su Firebase: "giorno|nome" → { choice, time }
+  let fbPlansErr = false; // sondaggio su Firebase non leggibile (per esempio regole vecchie): si usa il server
+  const fbPlanOut = new Map(); // mie risposte scritte su Firebase e non ancora salvate: giorno → { choice, time }
+  const fbAskOut = new Map(); // mie domande scritte su Firebase e non ancora salvate: giorno → id
   const FB_RESCUE_MS = 10000;
   /** Firebase collegato e aggiornato: niente polling veloce, i messaggi si scrivono lì. */
   const fbLive = () => fbOn && !!fbMsgs && fbOnline;
+  /** Anche domande e risposte si scrivono su Firebase. */
+  const fbPlansLive = () => fbLive() && !!fbAsks && !!fbPlans && !fbPlansErr;
   const fb = createFbChat({
     getToken: () => api('fbToken'),
     onChange(list, fromCache) {
@@ -107,11 +116,57 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       apply(r);
       renderSync();
     },
+    onPlans(asks, plans, fromCache) {
+      if (!fbOn) return;
+      fbAsks = asks;
+      fbPlans = plans;
+      tlog('firebase', `sondaggio: ${asks.size} domande, ${plans.size} risposte${fromCache ? ' (dal telefono)' : ''}`);
+      recompose();
+    },
     onError(err) {
       tlog('firebase', `ERRORE ${err.code || ''} ${err.message}`);
       fbFail(err);
     },
+    onPlansError(err) {
+      tlog('firebase', `sondaggio non disponibile, uso Apps Script: ${err.code || ''} ${err.message}`);
+      fbPlansErr = true;
+      fbAsks = null;
+      fbPlans = null;
+      recompose();
+    },
   });
+  /** Stato del server con sopra domande e risposte di Firebase (che sono più fresche). */
+  function compose(r) {
+    return { ...r, messages: withFb(), ...withFbPlans(r) };
+  }
+  function recompose() {
+    if (!rawState || outbox.length || sending || asking || sfidaSending) return; // azioni in invio: vale lo schermo
+    data = compose(rawState);
+    render();
+  }
+  function withFbPlans(r) {
+    if (!fbOn || !fbAsks || !fbPlans || !r.plans) return { plans: r.plans, poll: r.poll };
+    const name = (n) => (r.names && r.names[n]) || n;
+    const plans = r.plans.map((p) => {
+      const a = fbAsks.get(p.day);
+      return {
+        ...p,
+        poll: p.poll || (a ? { id: a.id, by: a.name, byDisplay: name(a.name), clock: a.clock } : null),
+        people: p.people.map((x) => {
+          const f = fbPlans.get(`${p.day}|${x.name}`);
+          return f ? { ...x, choice: f.choice || null, time: f.choice ? f.time : '' } : x;
+        }),
+      };
+    });
+    const t = plans[0];
+    return { plans, poll: t && t.poll ? { ...(r.poll || {}), ...t.poll, people: t.people } : null };
+  }
+  /** Dopo una domanda o risposta su Firebase il server la copia nei fogli e manda le notifiche (una richiesta sola). */
+  let syncTimer = null;
+  function syncSoon() {
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(() => api('fbSync').catch(() => {}), 1000);
+  }
   /**
    * Messaggi di Apps Script e di Firebase insieme, senza doppioni (stesso id): il server copia i messaggi
    * da una parte all'altra. Vince la versione di Firebase, tranne quando lì è ancora in attesa.
@@ -120,6 +175,12 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     if (!fbOn || !fbMsgs) return rawMsgs;
     const fbById = new Map(fbMsgs.map((m) => [m.id, m]));
     fbOut.forEach((m) => !fbById.has(m.id) && fbById.set(m.id, m));
+    // Domande fatte su Firebase: in chat come quelle del server (stesso id quando il server le copia)
+    if (fbAsks) {
+      fbAsks.forEach((a) => {
+        if (a.id && !fbById.has(a.id)) fbById.set(a.id, { id: a.id, day: a.atDay, time: a.clock, name: a.name, display: '', type: 'poll', text: '', target: a.day, data: null, pending: a.pending, fb: true });
+      });
+    }
     const rawIds = new Set(rawMsgs.map((m) => m.id));
     return rawMsgs
       .filter((m) => !fbById.has(m.id) || fbById.get(m.id).pending)
@@ -149,8 +210,13 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     fbMsgs = null;
     fbOnline = false;
     fbOut.clear();
+    fbAsks = null;
+    fbPlans = null;
+    fbPlansErr = false;
+    fbPlanOut.clear();
+    fbAskOut.clear();
     $('chat-input').placeholder = 'Messaggio';
-    if (data) data.messages = withFb();
+    if (rawState) data = compose(rawState);
   }
   /** Firebase non si carica (SDK bloccato, accesso negato…): si resta su Apps Script e si riprova fra 5 minuti. */
   function fbFail(err) {
@@ -179,6 +245,18 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
           })
           .catch(() => rescued.delete(m.id));
       });
+    // Risposte e domande in attesa: le salva il server, che le copia anche su Firebase
+    fbPlanOut.forEach((p, day) => {
+      if (p.rescued) return;
+      p.rescued = true;
+      tlog('firebase', `risposta del ${day} mandata da Apps Script`);
+      queuePlan(day, p.choice, p.time);
+    });
+    fbAskOut.forEach((id, day) => {
+      fbAskOut.delete(day);
+      tlog('firebase', `domanda del ${day} mandata da Apps Script`);
+      askViaServer(day);
+    });
   }
 
   // ---------- Dati ----------
@@ -298,8 +376,9 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     if (outbox.length || sending || asking || sfidaSending) return; // azioni ancora da inviare: vale quello che vede l'utente
     v = r.v;
     rawMsgs = r.messages || [];
+    rawState = r;
     saveCache(r);
-    data = { ...r, messages: withFb() };
+    data = compose(r);
     render();
   }
 
@@ -404,6 +483,28 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     const now = new Date();
     plan.poll = { id: '', by: me.name, byDisplay: me.display, clock: `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}` };
     renderPoll(true);
+    if (fbPlansLive()) {
+      // Su Firebase la domanda arriva subito agli altri; notifica e copia nel foglio le fa il server
+      fb.ask(day)
+        .then(({ id, saved }) => {
+          fbAskOut.set(day, id);
+          return saved
+            .then(() => {
+              toast('Domanda mandata a tutti');
+              syncSoon();
+            })
+            .finally(() => fbAskOut.delete(day));
+        })
+        .catch((err) => {
+          tlog('firebase', `domanda non salvata su Firebase (${err.code || err.message}): la mando al server`);
+          askViaServer(day); // per esempio qualcuno ha chiesto un attimo prima: il server non la doppia
+        });
+      return;
+    }
+    askViaServer(day);
+  }
+
+  async function askViaServer(day) {
     asking++;
     try {
       const r = await api('pollAsk', { day });
@@ -472,15 +573,40 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   let sendingDay = '';
   let answeredAt = 0;
   const SLOW_MS = 1500;
-  const unsaved = (day) =>
-    (sendingDay === day || outbox.some((j) => j.day === day)) && !(fbLive() && Date.now() - answeredAt < SLOW_MS);
+  const unsaved = (day) => {
+    const slow = Date.now() - answeredAt >= SLOW_MS;
+    return ((sendingDay === day || outbox.some((j) => j.day === day)) && (!fbLive() || slow)) || (fbPlanOut.has(day) && slow);
+  };
+
+  /** Salva una risposta: su Firebase se si può (gli altri la vedono subito), altrimenti dal server. */
+  function savePlan(day, choice, time) {
+    if (!fbPlansLive()) return queuePlan(day, choice, time);
+    const entry = { choice, time };
+    fbPlanOut.set(day, entry);
+    const done = () => {
+      if (fbPlanOut.get(day) === entry) fbPlanOut.delete(day);
+      renderPoll();
+    };
+    fb.setPlan(day, choice, time)
+      .then(({ saved }) => saved)
+      .then(() => {
+        done();
+        syncSoon();
+      })
+      .catch((err) => {
+        done();
+        if (entry.rescued) return; // già mandata dal server
+        tlog('firebase', `risposta non salvata su Firebase (${err.code || err.message}): la mando al server`);
+        queuePlan(day, choice, time);
+      });
+  }
 
   // Risposta per un giorno; ritoccare la risposta già data la toglie.
   function answer(choice, current, time, day = selectedDay()) {
     const c = choice === current ? '' : choice;
     setLocal(day, c, time);
     answeredAt = Date.now();
-    queuePlan(day, c, c ? time : ''); // prima in coda, così il ridisegno mostra già l'orologio "in invio"
+    savePlan(day, c, c ? time : ''); // prima in coda, così il ridisegno mostra già l'orologio "in invio"
     renderPoll(true);
     if (fbLive()) setTimeout(() => unsaved(day) && renderPoll(), SLOW_MS + 50);
   }
@@ -614,7 +740,8 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       const now = ((data.plans || []).find((d) => d.day === day) || { people: [] }).people.find((p) => p.name === me.name) || {};
       const c = now.choice || 'si';
       setLocal(day, c, t);
-      queuePlan(day, c, t);
+      answeredAt = Date.now();
+      savePlan(day, c, t);
       toast(t ? `Orario: ${t}` : 'Orario tolto', 1800); // si vede subito cosa è stato salvato
       if (!focused()) renderPoll(true);
     };
@@ -1185,6 +1312,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       v = 0;
       data = null;
       rawMsgs = [];
+      rawState = null;
       syncedAt = 0;
       syncFails = 0;
       cachedAt = 0;
@@ -1196,7 +1324,8 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         // Copia salvata da una versione di prova che mescolava Firebase: senza i messaggi normali, va riscaricata
         const mixed = (cached.messages || []).some((m) => m.fb);
         rawMsgs = (cached.messages || []).filter((m) => !m.fb);
-        data = { ...cached, messages: withFb() };
+        rawState = cached;
+        data = compose(cached);
         v = mixed ? 0 : cached.v;
         render();
       }
@@ -1243,6 +1372,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       me = null;
       data = null;
       rawMsgs = [];
+      rawState = null;
       v = 0;
       setBadge(0);
     },

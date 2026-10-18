@@ -22,6 +22,7 @@ const ok = (cond, msg) => { console.log(cond ? '  ✓' : '  ✗', msg); if (!con
 
 async function phone(browser, code, { blockFirestore = false, blockSdk = false, testMode = false } = {}) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
+  const slow = { ms: 0 }; // ritardo delle richieste ad Apps Script (per vedere cosa passa solo da Firebase)
   const logs = [];
   await ctx.addInitScript(([code, testMode]) => {
     sessionStorage.setItem('palestrina.browser', '1');
@@ -44,6 +45,7 @@ async function phone(browser, code, { blockFirestore = false, blockSdk = false, 
       return route.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(path.join(SDK, path.basename(u.pathname))) });
     }
     if (u.host === 'finto.apps') {
+      if (slow.ms) await sleep(slow.ms);
       const r = await fetch(GAS, { method: 'POST', body: route.request().postData() });
       return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: await r.text() });
     }
@@ -55,7 +57,7 @@ async function phone(browser, code, { blockFirestore = false, blockSdk = false, 
   await page.goto('http://localhost:8000/');
   await page.waitForSelector('.tabbar button[data-tab=chat]', { state: 'visible', timeout: 20000 });
   await page.click('.tabbar button[data-tab=chat]');
-  return { page, ctx, logs };
+  return { page, ctx, logs, slow };
 }
 
 const bubbles = (p) => p.$$eval('#chat-list .msg .bubble', (n) => n.map((x) => x.textContent));
@@ -120,19 +122,46 @@ const sheetMsgs = async () => ((await post('/run/sheet', { name: 'Chat' })) || [
   const fbDocs = await fetch('http://localhost:8080/v1/projects/palestrina-cb43c/databases/(default)/documents/chat?pageSize=100', { headers: { Authorization: 'Bearer owner' } }).then((r) => r.json());
   ok(fbDocs.documents.filter((d) => d.fields.text.stringValue === 'In attesa da B').length === 1, 'su Firebase una volta');
 
-  console.log('4b. Sondaggio: la risposta si vede subito, gli altri la ricevono da Firebase');
+  console.log('4b. Sondaggio su Firebase: domanda e risposta arrivano subito, il server le copia dopo');
+  A.slow.ms = 5000; // Apps Script lentissimo per A: agli altri arriva solo se passa da Firebase
+  const tQ = Date.now();
   await A.page.$eval('#poll-ask', (b) => b.click());
-  await B.page.waitForSelector('#poll-card .choice.si', { state: 'attached', timeout: 15000 });
-  await A.page.waitForSelector('#poll-card .choice.si', { state: 'attached', timeout: 15000 });
-  await sleep(1000);
+  const qB = await B.page.waitForSelector('#poll-card .choice.si', { state: 'attached', timeout: 15000 }).then(() => Date.now() - tQ).catch(() => -1);
+  ok(qB >= 0 && qB < 2000, `B vede la domanda di A in ${qB} ms`);
+  await sleep(500);
   const tA = Date.now();
   await A.page.$eval('#poll-card .choice.si', (b) => b.click());
   const selA = await A.page.$eval('#poll-card .choice.si', (b) => b.classList.contains('selected') && !b.querySelector('.bicep'));
   ok(selA, 'A: "Ci sono" scelto subito, senza bicipite');
-  await B.page.waitForFunction(() => /^1$/.test((document.querySelector('#poll-card .pday.on i') || {}).textContent || ''), null, { timeout: 15000 }).catch(() => {});
-  const dP = Date.now() - tA;
-  ok((await B.page.$eval('#poll-card .pday.on i', (n) => n.textContent)) === '1', `B vede la risposta di A in ${dP} ms`);
-  ok((await C.page.waitForFunction(() => (document.querySelector('#poll-card .pday.on i') || {}).textContent === '1', null, { timeout: 15000 }).then(() => true).catch(() => false)), 'C (Firebase bloccato) la vede da Apps Script');
+  const onePerson = () => (document.querySelector('#poll-card .pday.on i') || {}).textContent === '1';
+  const dP = await B.page.waitForFunction(onePerson, null, { timeout: 15000 }).then(() => Date.now() - tA).catch(() => -1);
+  ok(dP >= 0 && dP < 2000, `B vede la risposta di A in ${dP} ms`);
+  const qC = await C.page.waitForFunction(onePerson, null, { timeout: 30000 }).then(() => true).catch(() => false);
+  ok(qC, 'C (Firebase bloccato) la vede da Apps Script, dopo la copia del server');
+  A.slow.ms = 0;
+  await sleep(3000);
+  const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Europe/Rome' });
+  const piani = ((await post('/run/sheet', { name: 'Piani' })) || []).filter((r) => r[1] === 'Francesco' && String(r[0]) === today);
+  ok(piani.length === 1 && piani[0][2] === 'si', 'nel foglio Piani: Francesco "si"');
+  const polls = ((await post('/run/sheet', { name: 'Chat' })) || []).filter((r) => r[4] === 'poll');
+  ok(polls.length === 1, 'nel foglio Chat: una domanda sola');
+  ok(((await post('/run/sheet', { name: 'Cambi' })) || []).some((r) => r[2] === 'Francesco' && r[4] === 'si'), 'nel foglio Cambi: il cambio');
+  for (const [n, P] of [['A', A], ['B', B], ['C', C]]) ok((await P.page.$$eval('#chat-list .poll-ev', (x) => x.length)) === 1, `${n}: la domanda in chat una volta`);
+
+  console.log('4c. C (Firebase bloccato) risponde: passa dal server, che la copia su Firebase');
+  await C.page.$eval('#poll-card .choice.forse', (b) => b.click());
+  const twoPeople = () => /Forse/.test((document.querySelector('#poll-card .poll-names') || {}).textContent || '');
+  ok(await A.page.waitForFunction(twoPeople, null, { timeout: 15000 }).then(() => true).catch(() => false), 'A vede il "Forse" di Michy');
+  const docs = await fetch('http://localhost:8080/v1/projects/palestrina-cb43c/databases/(default)/documents/piani', { headers: { Authorization: 'Bearer owner' } }).then((r) => r.json());
+  ok((docs.documents || []).some((d) => d.fields.name.stringValue === 'Michy' && d.fields.choice.stringValue === 'forse'), 'su Firebase la risposta di Michy');
+
+  console.log('4d. A cambia idea due volte di fila: vale l\'ultima');
+  await A.page.$eval('#poll-card .choice.no', (b) => b.click());
+  await A.page.$eval('#poll-card .choice.forse', (b) => b.click());
+  await sleep(4000);
+  const pa = ((await post('/run/sheet', { name: 'Piani' })) || []).filter((r) => r[1] === 'Francesco' && String(r[0]) === today);
+  ok(pa.length === 1 && pa[0][2] === 'forse', 'nel foglio: "forse"');
+  ok(await B.page.evaluate(() => /Forse.*Francesco|Francesco.*Forse/s.test(document.querySelector('#poll-card .poll-names').textContent) || document.querySelector('#poll-card .poll-names').textContent.includes('Forse')), 'B vede il cambio');
 
   console.log('5. SDK di Firebase bloccato: chat normale da Apps Script');
   const D = await phone(browser, 'MIC-1', { blockSdk: true });

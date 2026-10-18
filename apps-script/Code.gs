@@ -102,7 +102,8 @@ function testReset() {
   realProps.setProperty('PROVA_GEN', String(Number(realProps.getProperty('PROVA_GEN') || 0) + 1));
   MEMO = {};
   try {
-    firestoreClear('prova_chat'); // messaggi di prova su Firebase: altrimenti tornerebbero nel foglio di prova
+    // messaggi, domande e risposte di prova su Firebase: altrimenti tornerebbero nei fogli di prova
+    ['prova_chat', 'prova_domande', 'prova_piani'].forEach(firestoreClear);
   } catch (err) {
     console.error('Chat di prova su Firebase non cancellata', err);
   }
@@ -526,11 +527,19 @@ function handle(req, user) {
       case 'chatDelete':
         if (fbChatOn() && user.debug) {
           // Via da Firebase (da tutti i telefoni) e dal foglio, dove arriva la copia
+          fbSync(); // una domanda fatta su Firebase deve essere già nel foglio per annullarla
           firestoreDelete(fbColl(), String(req.id || ''));
+          const poll = chatRows().find((x) => x.id === String(req.id || '') && x.type === 'poll');
           const r = chatDelete(user, req.id);
+          if (poll && !r.error) fbDeleteDay(pollDay(poll)); // domanda annullata: via anche domanda e risposte di quel giorno
           return json(req.fb && r.error === 'Messaggio non trovato' ? { ok: true } : r);
         }
         return json(chatDelete(user, req.id));
+      case 'fbSync':
+        // Domanda o risposta appena scritta su Firebase: la copia nei fogli (con cambi e notifiche) la fa il server
+        if (!fbChatOn()) return json({ error: 'Non disponibile' });
+        fbSync();
+        return json({ ok: true });
       case 'chatNotify':
         // Messaggio appena scritto su Firebase: la copia nel foglio e la notifica le fa il server
         if (!fbChatOn()) return json({ error: 'Non disponibile' });
@@ -1279,17 +1288,19 @@ function pollAsk(user, day) {
   if (planDays().indexOf(d) < 0) return { error: 'Si può chiedere solo da oggi a 6 giorni' };
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
-  let created = false;
+  let created = '';
   try {
     if (!pollFor(d)) {
-      appendChat(user, 'poll', `Chi va in palestra ${dayLabel(d)}?`, d);
+      created = appendChat(user, 'poll', `Chi va in palestra ${dayLabel(d)}?`, d);
       bumpChat();
-      created = true;
     }
   } finally {
     lock.releaseLock();
   }
-  if (created) dispatch('poll', user.name);
+  if (created) {
+    dispatch('poll', user.name);
+    fbMirrorAsk(d, user.name, created, new Date());
+  }
   return chatState(user, -1);
 }
 
@@ -1306,6 +1317,16 @@ function planSet(user, day, choice, time) {
   if (planDays().indexOf(d) < 0) return { error: 'Si può pianificare solo da oggi a 6 giorni' };
   if (c && !pollFor(d)) return { error: 'Per quel giorno nessuno ha ancora chiesto: tocca "Chiedi a tutti"' };
   const at = c && /^([01]\d|2[0-3]):[0-5]\d$/.test(String(time || '')) ? String(time) : '';
+  planApply(user, d, c, at, new Date());
+  fbMirrorPlan(d, user.name, c, at); // anche su Firebase, per chi la chat la legge da lì
+  return chatState(user, -1);
+}
+
+/**
+ * Salva la risposta di `user` per il giorno `d` (già controllata), con storico dei cambi e notifica a chi ha
+ * chiesto. `when` è il momento della risposta (per le risposte date su Firebase, quello di Firebase).
+ */
+function planApply(user, d, c, at, when) {
   const lock = LockService.getScriptLock();
   lock.waitLock(10000);
   let changed = false;
@@ -1314,7 +1335,7 @@ function planSet(user, day, choice, time) {
     const sh = sheet('piani');
     const values = sh.getDataRange().getValues();
     const row = values.findIndex((r, i) => i > 0 && toDay(r[0]) === d && String(r[1]) === user.name);
-    const now = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm');
+    const now = Utilities.formatDate(when, TZ, 'yyyy-MM-dd HH:mm');
     const before = row > 0 ? { choice: String(values[row][2]), time: values[row][3] ? toTime(values[row][3]) : '' } : { choice: '', time: '' };
     if (row > 0) {
       changed = String(values[row][2]) !== c || (values[row][3] ? toTime(values[row][3]) : '') !== at;
@@ -1337,7 +1358,6 @@ function planSet(user, day, choice, time) {
     props.setProperty(key, String(Date.now()));
     dispatch('answer', user.name);
   }
-  return chatState(user, -1);
 }
 
 const CHANGE_MERGE_MIN = 3; // cambi della stessa persona per lo stesso giorno così ravvicinati diventano uno solo
@@ -2522,6 +2542,11 @@ const FB_SYNC_DAYS = 2;
 function fbSync() {
   if (!fbChatOn()) return 0;
   try {
+    fbSyncPlans();
+  } catch (err) {
+    console.error('Sondaggio Firebase non copiato nel foglio', err);
+  }
+  try {
     const from = new Date(Date.now() - FB_SYNC_DAYS * 86400000).toISOString();
     const res = firestoreCall('post', ':runQuery', {
       structuredQuery: {
@@ -2551,6 +2576,133 @@ function fbSync() {
   } catch (err) {
     console.error('Chat Firebase non copiata nel foglio', err);
     return 0;
+  }
+}
+
+// ---------- Sondaggio su Firebase ----------
+// Domande ("Chiedi a tutti") in domande/<giorno>, risposte in piani/<giorno>_<uid>: le scrive il telefono e gli altri
+// le vedono subito. Il server le copia nei fogli (Chat e Piani), con lo storico dei cambi e le notifiche, e copia
+// su Firebase quelle arrivate da qui (versioni vecchie, Firebase bloccato).
+
+const fbAsksColl = () => (TEST ? 'prova_domande' : 'domande');
+const fbPlansColl = () => (TEST ? 'prova_piani' : 'piani');
+const fbDocRoot = () => `projects/${FIREBASE_PROJECT}/databases/(default)/documents`;
+
+function fbAskDoc(day, name, id, at) {
+  return { fields: { day: { stringValue: day }, name: { stringValue: name }, id: { stringValue: id }, at: { timestampValue: at.toISOString() } } };
+}
+
+function fbPlanDoc(day, name, choice, time, at) {
+  return { fields: { day: { stringValue: day }, name: { stringValue: name }, choice: { stringValue: choice }, time: { stringValue: time }, at: { timestampValue: at.toISOString() } } };
+}
+
+function fbMirrorAsk(day, name, id, at) {
+  if (!fbChatOn()) return;
+  try {
+    firestoreCall('patch', `${fbAsksColl()}/${day}`, fbAskDoc(day, name, id, at));
+  } catch (err) {
+    console.error('Domanda non copiata su Firebase', err);
+  }
+}
+
+function fbMirrorPlan(day, name, choice, time) {
+  if (!fbChatOn()) return;
+  try {
+    const p = pollFor(day);
+    const writes = [{ update: { name: `${fbDocRoot()}/${fbPlansColl()}/${day}_${fbUid(name)}`, ...fbPlanDoc(day, name, choice, time, new Date()) } }];
+    // la domanda di quel giorno deve esserci anche su Firebase (le regole lo chiedono per rispondere)
+    if (p) writes.push({ update: { name: `${fbDocRoot()}/${fbAsksColl()}/${day}`, ...fbAskDoc(day, p.name, p.id, chatRowDate(p)) } });
+    firestoreCall('post', ':commit', { writes });
+  } catch (err) {
+    console.error('Risposta non copiata su Firebase', err);
+  }
+}
+
+/** Momento di una riga della chat (giorno e ora, al minuto). */
+function chatRowDate(r) {
+  return Utilities.parseDate(`${r.day} ${r.clock || r.time}`, TZ, 'yyyy-MM-dd HH:mm');
+}
+
+/** Documenti di una raccolta con giorno da `from` in poi: [{ id, f: { campo: valore } }]. */
+function fbDocsFrom(coll, from) {
+  const res = firestoreCall('post', ':runQuery', {
+    structuredQuery: {
+      from: [{ collectionId: coll }],
+      where: { fieldFilter: { field: { fieldPath: 'day' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: from } } },
+    },
+  });
+  return (Array.isArray(res) ? res : [])
+    .map((x) => x.document)
+    .filter(Boolean)
+    .map((d) => {
+      const f = {};
+      Object.keys(d.fields || {}).forEach((k) => (f[k] = d.fields[k].stringValue !== undefined ? d.fields[k].stringValue : d.fields[k].timestampValue));
+      return { id: d.name.split('/').pop(), f };
+    });
+}
+
+/** Domande e risposte dei prossimi 7 giorni: da Firebase ai fogli e viceversa (quelle che mancano da una parte). */
+function fbSyncPlans() {
+  const days = planDays();
+  const asks = fbDocsFrom(fbAsksColl(), days[0]).filter((a) => days.indexOf(a.f.day) >= 0);
+  const plans = fbDocsFrom(fbPlansColl(), days[0]).filter((p) => days.indexOf(p.f.day) >= 0);
+  const users = allUsers();
+  const writes = [];
+  // Domande fatte su Firebase che il foglio non ha ancora: riga nella chat con lo stesso id e notifica a tutti
+  asks.forEach((a) => {
+    const user = users.find((u) => u.name === a.f.name);
+    if (!user || !/^[a-z0-9]{8,20}$/.test(a.f.id || '')) return;
+    const lock = LockService.getScriptLock();
+    lock.waitLock(10000);
+    let created = false;
+    try {
+      MEMO = {};
+      if (!pollFor(a.f.day)) {
+        const at = new Date(a.f.at);
+        sheet('chat').appendRow([a.f.id, dayString(at), Utilities.formatDate(at, TZ, 'HH:mm'), user.name, 'poll', `Chi va in palestra ${dayLabel(a.f.day)}?`, a.f.day, '']);
+        bumpChat();
+        created = true;
+      }
+    } finally {
+      lock.releaseLock();
+    }
+    if (created) dispatch('poll', user.name);
+  });
+  MEMO = {};
+  // Domande del foglio che Firebase non ha (fatte da qui o prima del passaggio)
+  days.forEach((day) => {
+    const p = pollFor(day);
+    if (p && !asks.some((a) => a.f.day === day)) writes.push({ update: { name: `${fbDocRoot()}/${fbAsksColl()}/${day}`, ...fbAskDoc(day, p.name, p.id, chatRowDate(p)) } });
+  });
+  // Risposte: quella di Firebase vince (quelle date da qui ci vengono copiate subito); se manca, la si copia dal foglio
+  const sheetPlans = rows('piani').filter((r) => days.indexOf(r.day) >= 0);
+  plans.forEach((p) => {
+    const user = users.find((u) => u.name === p.f.name);
+    if (!user) return;
+    const cur = sheetPlans.find((r) => r.day === p.f.day && r.name === user.name) || { choice: '', time: '' };
+    const c = CHOICE_LABELS[p.f.choice] ? p.f.choice : '';
+    const t = c && /^([01]\d|2[0-3]):[0-5]\d$/.test(p.f.time || '') ? p.f.time : '';
+    if (cur.choice === c && (cur.time || '') === t) return;
+    if (c && !pollFor(p.f.day)) return; // domanda annullata nel frattempo
+    planApply(user, p.f.day, c, t, new Date(p.f.at));
+  });
+  sheetPlans.forEach((r) => {
+    if (!plans.some((p) => p.f.day === r.day && p.f.name === r.name)) {
+      writes.push({ update: { name: `${fbDocRoot()}/${fbPlansColl()}/${r.day}_${fbUid(r.name)}`, ...fbPlanDoc(r.day, r.name, r.choice, r.time || '', new Date()) } });
+    }
+  });
+  if (writes.length) firestoreCall('post', ':commit', { writes });
+}
+
+/** Domanda annullata: via da Firebase la domanda e le risposte di quel giorno. */
+function fbDeleteDay(day) {
+  try {
+    const plans = fbDocsFrom(fbPlansColl(), day).filter((p) => p.f.day === day);
+    const writes = plans.map((p) => ({ delete: `${fbDocRoot()}/${fbPlansColl()}/${p.id}` }));
+    writes.push({ delete: `${fbDocRoot()}/${fbAsksColl()}/${day}` });
+    firestoreCall('post', ':commit', { writes });
+  } catch (err) {
+    console.error('Domanda non tolta da Firebase', err);
   }
 }
 
