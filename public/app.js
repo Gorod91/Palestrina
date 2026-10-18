@@ -731,7 +731,7 @@ async function takeSweat(debug, overwrite = false) {
     const r = await api('sudometro', {
       score: shown.score,
       title: shown.title,
-      details: { ...result.details, v2: compactV2(v2) },
+      details: { ...result.details, v2: compactV2(v2), v3: compactV3(v2) },
       debug,
       overwrite,
       photo,
@@ -748,6 +748,7 @@ async function takeSweat(debug, overwrite = false) {
       lastDebug = [
         `${result.score}: ${result.title}`,
         `rossore +${result.details.red} · lucidità +${result.details.shine} · luce ${result.details.light}`,
+        v2.res3 ? `Sudometro 3: ${v2.res3.score} (tinta ${v2.res3.details.red}${v2.res3.details.redOk ? '' : ' ignorata'} · riflessi ${v2.res3.details.shine})` : '',
         v2.res ? `Sudometro 2: ${v2.res.score} (tinta ${v2.res.details.red} · riflessi ${v2.res.details.shine} · luce ${v2.res.details.light} · nitidezza ×${v2.res.details.sharp}${v2.res.retake ? ` · da rifare: ${v2.res.retake}` : ''})` : `Sudometro 2: ${v2.error}`,
         ...result.warnings,
         photoWarning(r),
@@ -793,7 +794,7 @@ async function sudometroV2(photo, rest = null) {
   try {
     rest = rest || (await within(refV2(), 20000));
     const sweat = await within(imageFrom(`data:image/jpeg;base64,${photo}`).then((img) => sudometro.analyzeV2(img)), 15000);
-    return { rest, sweat, res: sudometro.scoreV2(rest, sweat) };
+    return { rest, sweat, res: sudometro.scoreV2(rest, sweat), res3: rest.zones3 && sweat.zones3 ? sudometro.scoreV3(rest, sweat) : null };
   } catch (err) {
     return { error: String((err && err.message) || err) };
   }
@@ -804,6 +805,12 @@ function compactV2(v2) {
   if (!v2 || v2.error) return { err: v2 ? v2.error : 'non calcolato' };
   const raw = (f) => ({ L: f.L, h: f.hue, hl: f.zones, sh: f.sharp, g: f.gains });
   return { score: v2.res.score, retake: v2.res.retake || '', again: !!v2.retaken, ...v2.res.details, rif: raw(v2.rest), sud: raw(v2.sweat) };
+}
+
+/** Sudometro 3 (stesse foto del 2): punteggio, parti e riflessi per zona delle due foto. */
+function compactV3(v2) {
+  if (!v2 || !v2.res3) return { err: (v2 && v2.error) || 'non calcolato' };
+  return { score: v2.res3.score, retake: v2.res3.retake || '', ...v2.res3.details, rif: v2.rest.zones3, sud: v2.sweat.zones3 };
 }
 
 /** Avviso per gli utenti debug se la foto non è finita su Drive (es. Drive non ancora autorizzato). */

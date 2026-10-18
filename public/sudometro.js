@@ -325,6 +325,21 @@ const REGIONS2 = {
   nose: [1, 4, 5, 195, 197, 6],
 };
 
+// ---------- Sudometro 3 (anche lui in silenzio, accanto al 2) ----------
+// Dalle foto diagnostiche del 18/10:
+// - riflessi senza capelli e sopracciglia: i pixel scuri nei cerchi (attaccatura, sopracciglia) non contano;
+// - tempie in più (lati della fronte, sopra la coda delle sopracciglia), dove il sudore si vede spesso;
+// - con la luce molto diversa dal riferimento il rossore non si può misurare: si ignora e il lucido vale di più;
+// - lucido pieno a 10 invece che a 15 (il Ceppo, sudato, prendeva solo 30).
+export const WEIGHTS3 = {
+  redness: { points: 60, full: 6 },
+  shine: { points: 40, full: 10 },
+  shineOnly: 70, // punti del lucido quando il rossore non è misurabile
+};
+export const QUALITY3 = { maxLight: 8, minSharp: 0.35 };
+// tempie: punto fra il lato alto della fronte (54/284) e il lato del viso all'altezza degli occhi (127/356)
+const TEMPLES3 = [[54, 127, 0.3], [284, 356, 0.3]];
+
 /** Caratteristiche della versione 2 da un canvas o da un'immagine (es. la foto di riferimento salvata). */
 export async function analyzeV2(source) {
   let canvas = source;
@@ -351,8 +366,10 @@ export async function analyzeV2(source) {
   const sample = (ids) => {
     const px = [];
     ids.forEach((i) => {
-      const cx = Math.round(lm[i].x * W);
-      const cy = Math.round(lm[i].y * H);
+      // un landmark, oppure [a, b, t]: il punto a + (b − a)·t
+      const [a, b, t] = Array.isArray(i) ? i : [i, i, 0];
+      const cx = Math.round((lm[a].x + (lm[b].x - lm[a].x) * t) * W);
+      const cy = Math.round((lm[a].y + (lm[b].y - lm[a].y) * t) * H);
       for (let y = cy - radius; y <= cy + radius; y++) {
         for (let x = cx - radius; x <= cx + radius; x++) {
           if (x < 0 || y < 0 || x >= W || y >= H || (x - cx) ** 2 + (y - cy) ** 2 > radius ** 2) continue;
@@ -381,11 +398,20 @@ export async function analyzeV2(source) {
   // a differenza di a* che cala quando il selfie è più scuro: più è bassa (verso il rosso), più la pelle è rossa.
   const skin = skinTone.filter((p) => p.L > med - 18 && p.L < med + 15);
   const hue = median((skin.length ? skin : skinTone).map((p) => p.h));
+  // Sudometro 3: riflessi solo sulla pelle (fuori i pixel molto più scuri della pelle: capelli, sopracciglia, ombre)
+  const highlight3 = (px) => highlightOf(px.filter((p) => p.L > med - 20));
+  const zones3 = {
+    f: highlight3(sample(REGIONS2.forehead)),
+    t: highlight3(sample(TEMPLES3)),
+    n: highlight3(sample(REGIONS2.nose)),
+    z: highlight3(sample(REGIONS2.malar)),
+  };
   return {
     v: 2,
     L: round(med),
     hue: round(hue),
     zones,
+    zones3,
     sharp: round(sharpness(data, W, H, box), 1),
     gains: gains.map((g) => round(g, 3)),
   };
@@ -479,6 +505,33 @@ export function scoreV2(rest, sweat, { reduced = false } = {}) {
 export function lessBadV2(rest, a, b) {
   const badness = (f) => Math.max(0, Math.abs(f.L - rest.L) - QUALITY2.maxLight) / QUALITY2.maxLight + Math.max(0, QUALITY2.minSharp - (rest.sharp ? f.sharp / rest.sharp : 1)) * 3;
   return badness(b) < badness(a) ? 'b' : 'a';
+}
+
+/** Sudometro 3: stesse foto analizzate, zone e pesi diversi (vedi WEIGHTS3). */
+export function scoreV3(rest, sweat) {
+  const clamp01 = (v) => Math.max(0, Math.min(1, v));
+  const dRed = rest.hue - sweat.hue;
+  const keys = Object.keys(sweat.zones3 || {});
+  const dShine = keys.length ? keys.reduce((s, k) => s + Math.max(0, sweat.zones3[k] - ((rest.zones3 || {})[k] || 0)), 0) / keys.length : 0;
+  const dL = sweat.L - rest.L;
+  const redOk = Math.abs(dL) <= QUALITY3.maxLight;
+  let retake = null;
+  if (dL < -QUALITY3.maxLight) retake = 'luce+';
+  else if (dL > QUALITY3.maxLight) retake = 'luce-';
+  else if (rest.sharp && sweat.sharp < rest.sharp * QUALITY3.minSharp) retake = 'mossa';
+  const shine = clamp01(dShine / WEIGHTS3.shine.full);
+  const parts = {
+    redness: redOk ? clamp01(dRed / WEIGHTS3.redness.full) * WEIGHTS3.redness.points : 0,
+    shine: shine * (redOk ? WEIGHTS3.shine.points : WEIGHTS3.shineOnly),
+  };
+  const total = Math.round(parts.redness + parts.shine);
+  return {
+    score: total,
+    title: TITLES.find(([min]) => total >= min)[1],
+    retake,
+    parts,
+    details: { red: round(dRed), shine: round(dShine), light: round(dL), redOk },
+  };
 }
 
 export const RETAKE_HINT = {
