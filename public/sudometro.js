@@ -335,6 +335,7 @@ export const WEIGHTS3 = {
   // Tarato il 19/10 sulla classifica a occhio di Francesco (9 coppie): media dell'aumento dei riflessi sulle zone
   // + quanto si fa netto il bordo dei riflessi (pelle bagnata) + rossore solo se c'è anche lucido; luce diversa = conta meno.
   edge: 2, // peso del bordo più netto (aumento massimo di "e" fra le zone)
+  zoneCap: 15, // una sola zona molto lucida non può valere troppo (aumento massimo contato per zona)
   redness: { perDegree: 3, maxDegrees: 6, minShine: 5 }, // bonus solo se la media dei riflessi è cresciuta di almeno 5
   lightZero: 10, // differenza di luce a cui il confronto non vale più (fra 0 e 10 cala in proporzione)
   full: 16, // valore grezzo che vale 100
@@ -562,7 +563,7 @@ export function scoreV3(rest, sweat) {
   const keys = Object.keys(sweat.zones3 || {});
   const diff = (k) => sweat.zones3[k] - ((rest.zones3 || {})[k] || 0);
   const gl = (f, k, x) => (((f.gloss3 || {})[k] || {})[x] || 0);
-  const hlMean = keys.length ? keys.reduce((t, k) => t + Math.max(0, diff(k)), 0) / keys.length : 0;
+  const hlMean = keys.length ? keys.reduce((t, k) => t + Math.min(WEIGHTS3.zoneCap, Math.max(0, diff(k))), 0) / keys.length : 0;
   const eMax = Math.max(0, ...keys.map((k) => gl(sweat, k, 'e') - gl(rest, k, 'e')));
   const wMax = Math.max(0, ...keys.map((k) => gl(sweat, k, 'w') - gl(rest, k, 'w'))); // solo registrato, per ora non pesa
   const dRed = rest.hue - sweat.hue;
