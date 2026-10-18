@@ -404,6 +404,7 @@ function doPost(e) {
   TEST = false;
   TESTER = '';
   CHAT_DIRTY = false;
+  LATER = [];
   try {
     const req = JSON.parse(e.postData.contents);
     try {
@@ -438,7 +439,7 @@ function doPost(e) {
     }
     if (!TRACE_USERS.includes(user.name) || TEST) {
       const res = handle(req, user);
-      pushChatIfChanged();
+      finishRequest();
       return res;
     }
     let out;
@@ -449,11 +450,36 @@ function doPost(e) {
       failed = String(err.message || err);
       out = json({ error: failed });
     }
-    pushChatIfChanged();
+    finishRequest();
     traceServer(user, req, out, Date.now() - t0, failed);
     return out;
   } catch (err) {
+    finishRequest();
     return json({ error: String(err.message || err) });
+  }
+}
+
+// Chiamate esterne di fine richiesta (stato su Firebase, notifiche): partono tutte insieme alla fine, non una per volta.
+// Fuori da doPost (trigger, editor) LATER è null e partono subito.
+let LATER = null;
+
+function fetchLater(request) {
+  if (LATER) LATER.push(request);
+  else UrlFetchApp.fetch(request.url, request);
+}
+
+/** Fine richiesta: prima lo stato della chat su Firebase, insieme alle notifiche. */
+function finishRequest() {
+  const list = [];
+  const st = chatStateRequest();
+  if (st) list.push(st);
+  if (LATER) list.push(...LATER);
+  LATER = null;
+  if (!list.length) return;
+  try {
+    UrlFetchApp.fetchAll(list.map((r) => ({ muteHttpExceptions: true, ...r })));
+  } catch (err) {
+    console.error('Chiamate di fine richiesta non riuscite', err);
   }
 }
 
@@ -2557,16 +2583,33 @@ function firestoreDelete(coll, id) {
 
 /** Stato della chat su Firestore (documento state/chat o prova_state/chat), se in questa richiesta è cambiato. */
 function pushChatIfChanged() {
-  if (!CHAT_DIRTY || !fbChatOn()) return;
+  const r = chatStateRequest();
+  if (!r) return;
+  try {
+    const res = UrlFetchApp.fetch(r.url, { ...r, muteHttpExceptions: true });
+    if (res.getResponseCode() >= 300) throw new Error(`Firestore ${res.getResponseCode()}`);
+  } catch (err) {
+    console.error('Chat non aggiornata su Firebase', err);
+  }
+}
+
+/** La scrittura dello stato della chat su Firestore, da fare se in questa richiesta è cambiato (altrimenti null). */
+function chatStateRequest() {
+  if (!CHAT_DIRTY || !fbChatOn()) return null;
   CHAT_DIRTY = false;
   try {
     MEMO = {}; // dopo le scritture si rilegge tutto
     const st = chatState(null, -1);
-    firestoreCall('patch', `${TEST ? 'prova_' : ''}state/chat`, {
-      fields: { json: { stringValue: JSON.stringify(st) }, v: { integerValue: String(st.v) }, at: { timestampValue: new Date().toISOString() } },
-    });
+    return {
+      url: `${firestoreBase()}/${TEST ? 'prova_' : ''}state/chat`,
+      method: 'patch',
+      headers: { Authorization: 'Bearer ' + firestoreToken() },
+      contentType: 'application/json',
+      payload: JSON.stringify({ fields: { json: { stringValue: JSON.stringify(st) }, v: { integerValue: String(st.v) }, at: { timestampValue: new Date().toISOString() } } }),
+    };
   } catch (err) {
     console.error('Chat non aggiornata su Firebase', err);
+    return null;
   }
 }
 
@@ -2576,7 +2619,8 @@ function dispatch(event, name) {
   const repo = props.getProperty('GITHUB_REPO');
   if (!token || !repo) return; // notifiche non ancora configurate
   try {
-    UrlFetchApp.fetch(`https://api.github.com/repos/${repo}/dispatches`, {
+    fetchLater({
+      url: `https://api.github.com/repos/${repo}/dispatches`,
       method: 'post',
       contentType: 'application/json',
       headers: { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json' },

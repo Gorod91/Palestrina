@@ -44,7 +44,7 @@ sheets.Utenti = users;
 const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const P = {
   RESET_ID: '2026-10-13',
-  TRIGGERS_VERSION: '6',
+  TRIGGERS_VERSION: '7',
   FIRESTORE_EMULATOR: 'localhost:8080',
   FIREBASE_CLIENT_EMAIL: 'prova@palestrina-cb43c.iam.gserviceaccount.com',
   FIREBASE_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }),
@@ -102,6 +102,7 @@ const UrlFetchApp = {
     return { getResponseCode: () => code, getContentText: () => body };
   },
 };
+UrlFetchApp.fetchAll = (list) => list.map((r) => UrlFetchApp.fetch(r.url, r));
 const lock = { waitLock() {}, tryLock: () => true, releaseLock() {} };
 const ctx = {
   console,
@@ -111,7 +112,7 @@ const ctx = {
   LockService: { getScriptLock: () => lock },
   Session: { getScriptTimeZone: () => TZ },
   ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (t) => ({ text: t, setMimeType() { return this; } }) },
-  ScriptApp: { getProjectTriggers: () => [], deleteTrigger() {}, newTrigger: () => new Proxy({}, { get: (_, k) => (k === 'create' ? () => ({}) : () => this) }), WeekDay: {} },
+  ScriptApp: { getProjectTriggers: () => [], deleteTrigger() {}, newTrigger: () => { const t = new Proxy({}, { get: (_, k) => (k === 'create' ? () => ({}) : () => t) }); return t; }, WeekDay: {} },
   DriveApp: {},
   Logger: { log: (...a) => console.log('[Logger]', ...a) },
   Utilities,

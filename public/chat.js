@@ -461,16 +461,22 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     renderPoll(); // toglie il bicipite anche se la risposta del server non ha ridisegnato
   }
 
-  // Risposta al sondaggio non ancora salvata: bicipite che si flette sul pulsante scelto finché il server non la salva
+  // Risposta al sondaggio non ancora salvata: bicipite che si flette sul pulsante scelto finché il server non la salva.
+  // Con Firebase la scelta si vede subito e il bicipite compare solo se il server ci mette più di SLOW_MS.
   let sendingDay = '';
-  const unsaved = (day) => sendingDay === day || outbox.some((j) => j.day === day);
+  let answeredAt = 0;
+  const SLOW_MS = 1500;
+  const unsaved = (day) =>
+    (sendingDay === day || outbox.some((j) => j.day === day)) && !(fbLive() && Date.now() - answeredAt < SLOW_MS);
 
   // Risposta per un giorno; ritoccare la risposta già data la toglie.
   function answer(choice, current, time, day = selectedDay()) {
     const c = choice === current ? '' : choice;
     setLocal(day, c, time);
+    answeredAt = Date.now();
     queuePlan(day, c, c ? time : ''); // prima in coda, così il ridisegno mostra già l'orologio "in invio"
     renderPoll(true);
+    if (fbLive()) setTimeout(() => unsaved(day) && renderPoll(), SLOW_MS + 50);
   }
   const selectedDay = () => {
     const days = (data && data.plans) || [];

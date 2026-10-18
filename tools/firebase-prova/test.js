@@ -116,6 +116,20 @@ const sheetMsgs = async () => ((await post('/run/sheet', { name: 'Chat' })) || [
   const fbDocs = await fetch('http://localhost:8080/v1/projects/palestrina-cb43c/databases/(default)/documents/chat?pageSize=100', { headers: { Authorization: 'Bearer owner' } }).then((r) => r.json());
   ok(fbDocs.documents.filter((d) => d.fields.text.stringValue === 'In attesa da B').length === 1, 'su Firebase una volta');
 
+  console.log('4b. Sondaggio: la risposta si vede subito, gli altri la ricevono da Firebase');
+  await A.page.$eval('#poll-ask', (b) => b.click());
+  await B.page.waitForSelector('#poll-card .choice.si', { state: 'attached', timeout: 15000 });
+  await A.page.waitForSelector('#poll-card .choice.si', { state: 'attached', timeout: 15000 });
+  await sleep(1000);
+  const tA = Date.now();
+  await A.page.$eval('#poll-card .choice.si', (b) => b.click());
+  const selA = await A.page.$eval('#poll-card .choice.si', (b) => b.classList.contains('selected') && !b.querySelector('.bicep'));
+  ok(selA, 'A: "Ci sono" scelto subito, senza bicipite');
+  await B.page.waitForFunction(() => /^1$/.test((document.querySelector('#poll-card .pday.on i') || {}).textContent || ''), null, { timeout: 15000 }).catch(() => {});
+  const dP = Date.now() - tA;
+  ok((await B.page.$eval('#poll-card .pday.on i', (n) => n.textContent)) === '1', `B vede la risposta di A in ${dP} ms`);
+  ok((await C.page.waitForFunction(() => (document.querySelector('#poll-card .pday.on i') || {}).textContent === '1', null, { timeout: 15000 }).then(() => true).catch(() => false)), 'C (Firebase bloccato) la vede da Apps Script');
+
   console.log('5. SDK di Firebase bloccato: chat normale da Apps Script');
   const D = await phone(browser, 'MIC-1', { blockSdk: true });
   ok((await waitText(D.page, 'Ciao da A', 15000)) >= 0, 'D vede la chat');
