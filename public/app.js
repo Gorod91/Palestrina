@@ -748,7 +748,7 @@ async function takeSweat(debug, overwrite = false) {
       lastDebug = [
         `${result.score}: ${result.title}`,
         `rossore +${result.details.red} · lucidità +${result.details.shine} · luce ${result.details.light}`,
-        v2.res3 ? `Sudometro 3: ${v2.res3.score} (riflessi zona max ${v2.res3.details.shine} · specchio ${v2.res3.details.spec} · tinta ${v2.res3.details.red} · luce ×${v2.res3.details.lf})` : '',
+        v2.res3 ? `Sudometro 3: ${v2.res3.score} (riflessi ${v2.res3.details.shine} · bordo ${v2.res3.details.edge} · tinta ${v2.res3.details.red} · luce ×${v2.res3.details.lf})` : '',
         v2.res ? `Sudometro 2: ${v2.res.score} (tinta ${v2.res.details.red} · riflessi ${v2.res.details.shine} · luce ${v2.res.details.light} · nitidezza ×${v2.res.details.sharp}${v2.res.retake ? ` · da rifare: ${v2.res.retake}` : ''})` : `Sudometro 2: ${v2.error}`,
         ...result.warnings,
         photoWarning(r),
