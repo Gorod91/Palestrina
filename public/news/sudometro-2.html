@@ -1,0 +1,441 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Sudometro 2.0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300..900&display=swap" rel="stylesheet">
+<style>
+  :root { --fg: #f5f5f7; --muted: #8e8e93; --lime: #a6ff00; --cyan: #3be0ff; --pink: #ff2d6b; }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; background: #000; color: var(--fg); font-family: Inter, -apple-system, system-ui, sans-serif; overflow: hidden; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  .bars { position: fixed; top: calc(env(safe-area-inset-top) + 10px); left: 16px; right: 64px; display: flex; gap: 6px; z-index: 3; }
+  .bars i { flex: 1; height: 3px; border-radius: 3px; background: #ffffff33; overflow: hidden; }
+  .bars i b { display: block; height: 100%; width: 0; background: var(--fg); transition: width .4s; }
+  .bars i.done b { width: 100%; }
+  .close { position: fixed; top: calc(env(safe-area-inset-top) + 2px); right: 12px; z-index: 3; width: 40px; height: 40px; border: 0; border-radius: 50%; background: #ffffff1f; color: var(--fg); font-size: 22px; }
+  .slide { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: calc(env(safe-area-inset-top) + 60px) 28px calc(env(safe-area-inset-bottom) + 48px); opacity: 0; pointer-events: none; transition: opacity .5s; }
+  .slide.on { opacity: 1; }
+  .eyebrow { margin-bottom: 12px; font-size: 14px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--lime); }
+  h1 { font-size: clamp(52px, 16.5vw, 110px); font-weight: 900; letter-spacing: -.05em; line-height: .95; margin: 14px 0 18px; background: linear-gradient(90deg, var(--lime), var(--cyan) 55%, var(--pink)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  h2 { font-size: clamp(34px, 10vw, 52px); font-weight: 800; letter-spacing: -.035em; line-height: 1.05; }
+  .lead { font-size: 22px; font-weight: 300; line-height: 1.35; color: #d1d1d6; }
+  .glow { position: absolute; inset: auto -20% -30% -20%; height: 60%; background: radial-gradient(ellipse at 50% 100%, #a6ff0033, transparent 65%); pointer-events: none; }
+  /* Animazioni: ripartono ogni volta che la slide si accende */
+  .slide [data-a] { opacity: 0; }
+  .slide.on [data-a] { animation: var(--anim, rise) .8s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--d, 0) * 1s); }
+  @keyframes rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+  @keyframes pop { 0% { opacity: 0; transform: scale(.3); } 60% { opacity: 1; transform: scale(1.12); } 100% { opacity: 1; transform: scale(1); } }
+  @keyframes left { from { opacity: 0; transform: translateX(-60px); } to { opacity: 1; transform: none; } }
+  @keyframes right { from { opacity: 0; transform: translateX(60px); } to { opacity: 1; transform: none; } }
+    /* Apertura: volto di punti che si compone, scansione e riflessi di sudore */
+  .slide.hero { justify-content: flex-end; }
+  #scan { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .hero .eyebrow, .hero h1, .hero .lead { position: relative; }
+  /* Volto 3D con le zone */
+  .portrait { position: relative; margin: 14px -8px 12px; }
+  .portrait canvas { display: block; width: 100%; height: 300px; }
+  .stat { display: flex; align-items: baseline; gap: 10px; margin: 6px 0; }
+  .stat b { font-size: 46px; font-weight: 900; letter-spacing: -.04em; color: var(--lime); }
+  .stat span { font-size: 17px; color: #d1d1d6; }
+  .formula { margin: 22px 0 18px; padding: 16px 18px; border-radius: 18px; background: #1c1c1e; border: 1px solid #3be0ff44; font-size: 19px; font-weight: 600; letter-spacing: -.01em; }
+  .formula i { color: var(--cyan); font-style: normal; }
+  .formula small { display: block; margin-top: 6px; font-size: 13px; font-weight: 400; color: var(--muted); }
+  .bars9 { display: flex; align-items: flex-end; gap: 6px; height: 120px; margin: 26px 0 20px; }
+  .bars9 span { flex: 1; border-radius: 6px 6px 2px 2px; background: linear-gradient(180deg, var(--lime), #3be0ff88); transform-origin: bottom; }
+  .slide.on .bars9 span { animation: grow .9s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--d, 0) * 1s); }
+  @keyframes grow { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+  /* Cosa cambia: prima → ora */
+  .rows { display: grid; gap: 10px; margin: 26px 0 24px; }
+  .rows p { display: grid; grid-template-columns: 1fr 64px 64px; align-items: center; gap: 8px; padding: 16px; border-radius: 18px; background: #1c1c1e; }
+  .rows p.rh { padding: 0 16px; background: none; font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .rows p.rh span:not(:first-child) { text-align: center; }
+  .rows span { font-size: 16px; line-height: 1.3; color: #d1d1d6; }
+  .rows b, .rows em { text-align: center; font-style: normal; font-size: 24px; font-weight: 900; letter-spacing: -.03em; }
+  .rows b { color: var(--muted); }
+  .rows em { color: var(--lime); }
+  .rules { list-style: none; padding: 0; display: grid; gap: 10px; font-size: 17px; color: #d1d1d6; }
+  .rules li::before { content: ''; display: inline-block; width: 8px; height: 8px; margin-right: 10px; border-radius: 50%; background: var(--cyan); vertical-align: middle; }
+  /* Ultima slide: disponibile da ora */
+  .slide.live { align-items: center; text-align: center; }
+  .slide.live h1 { font-size: clamp(48px, 15vw, 96px); }
+  .beacon { position: relative; width: 150px; height: 150px; margin-bottom: 26px; }
+  .beacon span { position: absolute; inset: 0; border-radius: 50%; border: 2px solid var(--lime); opacity: 0; }
+  .beacon span:nth-child(2) { border-color: var(--cyan); }
+  .beacon span:nth-child(3) { border-color: var(--pink); }
+  .slide.on .beacon span { animation: wave 2.4s ease-out infinite; }
+  .slide.on .beacon span:nth-child(2) { animation-delay: .8s; }
+  .slide.on .beacon span:nth-child(3) { animation-delay: 1.6s; }
+  @keyframes wave { 0% { opacity: .9; transform: scale(.45); } 100% { opacity: 0; transform: scale(1.35); } }
+  .beacon b { position: absolute; inset: 37px; display: grid; place-items: center; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #2a2a2e, #111); box-shadow: 0 0 40px #a6ff0055, inset 0 0 0 2px #a6ff0088; }
+  .beacon svg { width: 44px; height: 44px; overflow: visible; filter: drop-shadow(0 0 8px var(--cyan)); }
+  .beacon svg path:first-child { fill: var(--cyan); }
+  .beacon svg .shine { fill: none; stroke: #fff; stroke-width: 1.6; stroke-linecap: round; }
+  .onair { display: inline-flex; align-items: center; gap: 10px; margin-top: 22px; padding: 10px 18px; border-radius: 999px; background: #a6ff0018; border: 1px solid #a6ff0066; font-size: 15px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; color: var(--lime); }
+  .onair i { width: 10px; height: 10px; border-radius: 50%; background: var(--lime); }
+  .slide.on .onair i { animation: blink 1.2s ease-in-out infinite; animation-delay: 2.3s; }
+  @keyframes blink { 50% { opacity: .2; } }
+  .hint { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 16px); text-align: center; font-size: 14px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <div class="bars"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
+  <button class="close" aria-label="Chiudi">×</button>
+
+  <section class="slide hero">
+    <canvas id="scan" aria-hidden="true"></canvas>
+    <div class="glow"></div>
+    <p class="eyebrow" data-a style="--d:2.4">Laboratorio Palestrina</p>
+    <h1 data-a style="--d:2.7;--anim:pop">Sudometro 2.0</h1>
+    <p class="lead" data-a style="--d:3.3">Abbiamo insegnato alla fotocamera a riconoscere il sudore.<br>Su di voi.</p>
+    <p class="hint" data-a style="--d:4">Tocca per continuare</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow" data-a style="--d:0">Fotonica cutanea</p>
+    <h2 data-a style="--d:.1">Il sudore è<br>uno specchio.</h2>
+    <div class="portrait" data-a style="--d:.2"><canvas id="face" aria-hidden="true"></canvas></div>
+    <p class="lead" data-a style="--d:1.9">La pelle asciutta diffonde la luce. Quella bagnata la riflette, bianca e netta. Il nuovo Sudometro cerca questi riflessi su fronte, tempie, naso e zigomi.</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow" data-a style="--d:0">Calibrato su di voi</p>
+    <h2 data-a style="--d:.1">Indice di Lucentezza Speculare.</h2>
+    <p class="formula" data-a style="--d:.6">ILS = <i>riflessi</i> + 2 × <i>nitidezza</i> + <i>rossore</i>*<small>* solo se c'è anche lucido. Con luce diversa dal riferimento, vale di meno.</small></p>
+    <div class="bars9">
+      <span style="height:96%;--d:1.0"></span><span style="height:52%;--d:1.08"></span><span style="height:40%;--d:1.16"></span><span style="height:36%;--d:1.24"></span><span style="height:30%;--d:1.32"></span><span style="height:30%;--d:1.4"></span><span style="height:20%;--d:1.48"></span><span style="height:8%;--d:1.56"></span><span style="height:4%;--d:1.64"></span>
+    </div>
+    <p class="stat" data-a style="--d:2"><b>478</b><span>punti del viso tracciati</span></p>
+    <p class="stat" data-a style="--d:2.3"><b>4</b><span>zone di lucentezza confrontate con il vostro riferimento</span></p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow" data-a style="--d:.1">Cosa cambia</p>
+    <div class="rows">
+      <p class="rh" data-a style="--d:.3"><span></span><span>Prima</span><span>Da ora</span></p>
+      <p data-a style="--d:.6;--anim:left"><span>Zone del viso analizzate</span><b>3</b><em>4</em></p>
+      <p data-a style="--d:.9;--anim:left"><span>Riflessi a specchio e bordo netto</span><b>✗</b><em>✓</em></p>
+      <p data-a style="--d:1.2;--anim:left"><span>Tiene conto della luce del riferimento</span><b>✗</b><em>✓</em></p>
+    </div>
+    <ul class="rules">
+      <li data-a style="--d:1.8">I punteggi già fatti restano com'erano</li>
+      <li data-a style="--d:2.1">Fate il selfie da sudato nello stesso punto e con la stessa luce del riferimento</li>
+    </ul>
+    <p class="hint" data-a style="--d:2.7">Tocca per continuare</p>
+  </section>
+
+  <section class="slide live">
+    <div class="beacon" data-a style="--d:.1;--anim:pop"><span></span><span></span><span></span><b><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C8.5 7.3 6 10.6 6 14a6 6 0 0 0 12 0c0-3.4-2.5-6.7-6-11.5Z"/><path class="shine" d="M9.2 13.4a3 3 0 0 0 2 3.2"/></svg></b></div>
+    <p class="eyebrow" data-a style="--d:.7">Sudometro 2.0</p>
+    <h1 data-a style="--d:.9;--anim:pop">Disponibile<br>da ora.</h1>
+    <p class="lead" data-a style="--d:1.5">Al prossimo allenamento fate il selfie da sudati: il punteggio lo calcola già il nuovo Sudometro.</p>
+    <p class="onair" data-a style="--d:2"><i></i>Attivo per tutti</p>
+    <p class="hint" data-a style="--d:2.6">Tocca per chiudere</p>
+  </section>
+
+<script>
+  const slides = [...document.querySelectorAll('.slide')];
+  const bars = [...document.querySelectorAll('.bars i')];
+  let i = 0;
+  function close() {
+    if (window.parent !== window) window.parent.postMessage({ palestrinaNews: 'close' }, '*');
+    else history.back();
+  }
+  function go(n) {
+    if (n >= slides.length) return close();
+    i = Math.max(0, n);
+    slides.forEach((s, k) => s.classList.toggle('on', k === i));
+    bars.forEach((b, k) => b.classList.toggle('done', k <= i));
+  }
+  document.querySelector('.close').addEventListener('click', (e) => { e.stopPropagation(); close(); });
+  document.addEventListener('click', (e) => go(e.clientX < innerWidth * 0.3 ? i - 1 : i + 1));
+  addEventListener('keydown', (e) => { if (e.key === 'ArrowRight' || e.key === ' ') go(i + 1); if (e.key === 'ArrowLeft') go(i - 1); if (e.key === 'Escape') close(); });
+  go(0);
+
+  // ---------- Apertura astratta (slide 1): una goccia di luce che si forma, brilla e si increspa ----------
+  (() => {
+    const cv = document.getElementById('scan');
+    const g = cv.getContext('2d');
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let W, H, pts, D, start = 0, raf = 0;
+    const rnd = (() => { let x = 11; return () => ((x = (x * 16807) % 2147483647) / 2147483647); })();
+    function build() {
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      W = cv.clientWidth; H = cv.clientHeight;
+      cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      const cx = W / 2, cy = H * 0.3, a = Math.min(W * 0.26, 130), b = a * 1.25;
+      // contorno della goccia (punta in alto)
+      const edge = [];
+      for (let i = 0; i < 120; i++) { const t = (i / 120) * Math.PI * 2; edge.push([cx + a * Math.sin(t) * Math.sin(t / 2), cy - b * Math.cos(t)]); }
+      const inside = (x, y) => { let c = false; for (let i = 0, j = edge.length - 1; i < edge.length; j = i++) { const [xi, yi] = edge[i], [xj, yj] = edge[j]; if ((yi > y) !== (yj > y) && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) c = !c; } return c; };
+      pts = edge.map(([x, y]) => ({ x, y, e: 1 }));
+      while (pts.length < 520) { const x = cx - a + rnd() * 2 * a, y = cy - b + rnd() * 2 * b; if (inside(x, y)) pts.push({ x, y, e: 0 }); }
+      pts.forEach((p) => { const ang = rnd() * Math.PI * 2, d = Math.max(W, H) * (0.5 + rnd() * 0.7); p.sx = cx + Math.cos(ang) * d; p.sy = cy + Math.sin(ang) * d; p.delay = rnd() * 0.7; p.tw = rnd() * 6.28; p.hue = rnd(); });
+      D = { cx, cy, a, b, bottom: cy + b };
+    }
+    const ease = (t) => 1 - Math.pow(1 - Math.min(1, Math.max(0, t)), 3);
+    const col = (h, al) => (h < 0.55 ? `rgba(166,255,0,${al})` : h < 0.85 ? `rgba(59,224,255,${al})` : `rgba(255,45,107,${al})`);
+    function frame(now) {
+      const t = (now - start) / 1000;
+      g.clearRect(0, 0, W, H);
+      // alone della goccia
+      const glowA = Math.min(1, Math.max(0, (t - 1.2) / 0.8));
+      if (glowA > 0) {
+        const rg = g.createRadialGradient(D.cx, D.cy + D.b * 0.3, 0, D.cx, D.cy + D.b * 0.3, D.a * 2.2);
+        rg.addColorStop(0, `rgba(59,224,255,${0.22 * glowA})`); rg.addColorStop(1, 'rgba(59,224,255,0)');
+        g.fillStyle = rg; g.fillRect(0, 0, W, H);
+      }
+      // particelle che arrivano e formano la goccia, poi respirano piano
+      const breath = 1 + Math.sin(t * 1.6) * 0.012 * glowA;
+      pts.forEach((p) => {
+        const k = ease((t - p.delay) / 1.2);
+        const tx = D.cx + (p.x - D.cx) * breath, ty = D.cy + (p.y - D.cy) * breath;
+        const x = p.sx + (tx - p.sx) * k, y = p.sy + (ty - p.sy) * k;
+        g.fillStyle = col(p.hue, p.e ? 0.95 : 0.7);
+        g.beginPath(); g.arc(x, y, p.e ? 1.9 : 1.4, 0, 7); g.fill();
+      });
+      // riflesso a specchio che attraversa la goccia
+      if (t > 1.8) {
+        const q = ((t - 1.8) % 3.2) / 1.2;
+        if (q < 1) {
+          const sx = D.cx - D.a * 0.9 + q * D.a * 1.8;
+          g.save();
+          g.beginPath(); pts.filter((p) => p.e).forEach((p, i) => (i ? g.lineTo(p.x, p.y) : g.moveTo(p.x, p.y))); g.closePath(); g.clip();
+          const lg = g.createLinearGradient(sx - 40, 0, sx + 40, 0);
+          lg.addColorStop(0, 'rgba(255,255,255,0)'); lg.addColorStop(0.5, 'rgba(255,255,255,.55)'); lg.addColorStop(1, 'rgba(255,255,255,0)');
+          g.fillStyle = lg; g.fillRect(sx - 40, D.cy - D.b, 80, D.b * 2.2);
+          g.restore();
+        }
+      }
+      // increspature che partono da sotto la goccia
+      if (t > 2.1) {
+        for (let i = 0; i < 4; i++) {
+          const q = ((t - 2.1 - i * 0.55) % 2.2) / 2.2;
+          if (t - 2.1 - i * 0.55 < 0) continue;
+          const r = D.a * (0.3 + q * 2.4);
+          g.strokeStyle = i % 2 ? `rgba(255,45,107,${0.6 * (1 - q)})` : `rgba(166,255,0,${0.7 * (1 - q)})`;
+          g.lineWidth = 2;
+          g.beginPath(); g.ellipse(D.cx, D.bottom + 18, r, r * 0.22, 0, 0, 7); g.stroke();
+        }
+      }
+      // scintille
+      if (t > 2.4) {
+        pts.forEach((p, i) => {
+          if (i % 9) return;
+          const s2 = Math.max(0, Math.sin(t * 2.6 + p.tw * 4)) ** 8;
+          if (s2 < 0.06) return;
+          const L = 4 + s2 * 10;
+          g.strokeStyle = `rgba(255,255,255,${s2})`; g.lineWidth = 1.2;
+          g.beginPath(); g.moveTo(p.x - L, p.y); g.lineTo(p.x + L, p.y); g.moveTo(p.x, p.y - L); g.lineTo(p.x, p.y + L); g.stroke();
+        });
+      }
+      raf = requestAnimationFrame(frame);
+    }
+    function run() {
+      cancelAnimationFrame(raf);
+      build();
+      start = performance.now() - (still ? 9000 : 0);
+      raf = requestAnimationFrame(frame);
+    }
+    const hero = cv.closest('.slide');
+    new MutationObserver(() => { if (hero.classList.contains('on')) run(); else cancelAnimationFrame(raf); }).observe(hero, { attributes: true, attributeFilter: ['class'] });
+    addEventListener('resize', () => hero.classList.contains('on') && run());
+    if (hero.classList.contains('on')) run();
+  })();
+
+  // ---------- Volto (slide 2): viso 3D a faccette che ruota; il sudore accende riflessi a specchio sulle 4 zone ----------
+  (() => {
+    const FV=[0,-34,60,0,-11,75,0,-21,61,-5,10,66,0,-5,76,0,4,72,0,25,58,-43,26,33,0,40,53,0,49,54,0,83,45,0,-37,59,0,-39,56,0,-40,52,0,-45,54,0,-47,55,0,-50,56,0,-54,55,0,-61,51,0,-15,71,-4,-15,64,-71,54,1,-26,20,38,-32,20,38,-38,20,36,-45,24,32,-22,22,39,-32,32,41,-27,32,41,-37,32,40,-42,31,37,-51,19,28,-23,-74,44,-44,27,32,-72,23,1,-58,23,22,-28,-7,44,-7,-33,59,-6,-39,54,-14,-35,55,-19,-38,50,-11,-40,52,-16,-41,48,-27,-50,42,-4,-11,74,-5,-5,74,-53,39,34,-17,10,46,-16,-9,58,-17,-6,56,-48,-7,35,-5,3,71,-37,45,46,-46,43,40,-63,66,14,-12,41,51,-22,31,40,-31,-44,41,-67,-48,-17,-12,-13,57,-7,-16,58,-25,-43,43,-22,-43,42,-50,48,38,-16,-13,55,-26,45,49,-28,51,50,-35,80,37,-56,57,27,-31,66,45,-57,43,28,-64,48,16,-7,-37,57,-13,-38,54,-17,-40,50,-10,-15,57,-23,-43,43,-21,-45,45,-22,-43,40,-9,-10,65,-15,-40,46,-10,-40,49,-5,-40,51,-8,-61,50,-7,-53,54,-7,-49,55,-6,-47,54,-6,-45,53,-15,-44,47,-16,-45,48,-17,-46,49,-18,-48,48,-24,-31,49,-75,-10,-24,0,-17,66,-18,-44,44,-19,-44,45,-6,-20,59,-14,-17,52,-7,-18,59,-23,6,43,-33,1,41,-17,-9,53,-51,75,27,-45,63,37,-40,51,45,-22,-54,45,-14,50,53,-16,66,49,-19,82,43,-42,22,34,-57,14,24,-19,24,38,-50,31,31,-13,14,48,-13,-7,64,-65,9,17,-53,9,30,-44,7,35,-33,9,39,-24,11,40,-18,15,42,-6,23,56,-63,-5,19,-56,32,27,-2,-15,71,-16,3,49,-77,24,-20,-14,19,44,-18,-10,49,-47,27,31,-13,-3,61,-73,-29,-23,-19,26,38,-9,1,67,-50,-61,19,-51,-72,7,-72,-8,-1,-58,-52,9,-68,37,7,-24,-83,41,-2,-17,66,-21,-2,46,-64,22,16,-37,24,36,-32,23,38,-22,-46,45,-62,-19,17,-13,-93,41,-32,-85,28,-41,-80,19,0,65,50,0,-94,43,-27,23,38,-23,24,37,-20,25,37,-61,34,20,-23,29,38,-27,30,39,-32,30,39,-37,29,37,-40,29,35,-76,41,-10,-40,25,34,0,-25,59,-18,-27,52,-12,-12,60,-7,-25,58,0,33,52,-41,-70,27,-33,-77,34,-13,-86,47,-59,-62,-6,-20,27,37,-9,12,58,0,-88,49,-23,-90,36,-70,-24,-1,-11,-45,51,-12,-46,52,-13,-48,52,-13,-51,52,-15,-58,48,-20,-42,44,-21,-41,46,-23,-41,46,-29,-37,45,-53,-22,29,-9,19,52,-13,31,42,-18,29,39,-18,-41,42,-54,-40,21,-8,32,49,-19,-66,45,0,11,68,-5,16,61,0,17,63,-12,2,57,0,-79,52,0,-70,52,-10,-69,50,-33,-54,38,-23,-16,46,-27,-61,41,-38,-15,41,-30,-23,44,-44,-27,36,-12,-78,50,-15,-1,52,-39,-60,33,-31,-68,38,-37,-45,37,-61,-32,15,-46,-47,30,-66,-39,1,-35,-32,41,-13,8,53,-11,-9,65,-14,-11,59,-9,-5,70,-18,35,43,-26,37,44,-34,37,43,-41,37,41,-46,35,36,-52,25,27,-73,8,0,-47,17,31,-41,15,35,-33,15,37,-25,16,39,-20,19,40,-16,21,41,-77,7,-24,-14,-13,56,-9,7,62,-8,-10,71,-5,-13,68,-7,-11,68,-12,-16,55,-4,-14,70,-3,-16,65,-16,26,39,-13,25,42,-10,24,46,-43,28,33,-45,29,33,5,10,66,43,26,33,4,-15,64,71,54,1,26,20,38,32,20,38,38,20,36,45,24,32,22,22,39,32,32,41,27,32,41,37,32,40,42,31,37,51,19,28,23,-74,44,44,27,32,72,23,1,58,23,22,28,-7,44,7,-33,59,6,-39,54,14,-35,55,19,-38,50,11,-40,52,16,-41,48,27,-50,42,4,-11,74,5,-5,74,53,39,34,17,10,46,16,-9,58,17,-6,56,48,-7,35,5,3,71,37,45,46,46,43,40,63,66,14,12,41,51,22,31,40,31,-44,41,67,-48,-17,12,-13,57,7,-16,58,25,-43,43,22,-43,42,50,48,38,16,-13,55,26,45,49,28,51,50,35,80,37,56,57,27,31,66,45,57,43,28,64,48,16,7,-37,57,13,-38,54,17,-40,50,10,-15,57,23,-43,43,21,-45,45,22,-43,40,9,-10,65,15,-40,46,10,-40,49,5,-40,51,8,-61,50,7,-53,54,7,-49,55,6,-47,54,6,-45,53,15,-44,47,16,-45,48,17,-46,49,18,-48,48,24,-31,49,75,-10,-24,18,-44,44,19,-44,45,6,-20,59,14,-17,52,7,-18,59,23,6,43,33,1,41,17,-9,53,51,75,27,45,63,37,40,51,45,22,-54,45,14,50,53,16,66,49,19,82,43,42,22,34,57,14,24,19,24,38,50,31,31,13,14,48,13,-7,64,65,9,17,53,9,30,44,7,35,33,9,39,24,11,40,18,15,42,6,23,56,63,-5,19,56,32,27,2,-15,71,16,3,49,77,24,-20,14,19,44,18,-10,49,47,27,31,13,-3,61,73,-29,-23,19,26,38,9,1,67,50,-61,19,51,-72,7,72,-8,-1,58,-52,9,68,37,7,24,-83,41,2,-17,66,21,-2,46,64,22,16,37,24,36,32,23,38,22,-46,45,62,-19,17,13,-93,41,32,-85,28,41,-80,19,27,23,38,23,24,37,20,25,37,61,34,20,23,29,38,27,30,39,32,30,39,37,29,37,40,29,35,76,41,-10,40,25,34,18,-27,52,12,-12,60,7,-25,58,41,-70,27,33,-77,34,13,-86,47,59,-62,-6,20,27,37,9,12,58,23,-90,36,70,-24,-1,11,-45,51,12,-46,52,13,-48,52,13,-51,52,15,-58,48,20,-42,44,21,-41,46,23,-41,46,29,-37,45,53,-22,29,9,19,52,13,31,42,18,29,39,18,-41,42,54,-40,21,8,32,49,19,-66,45,5,16,61,12,2,57,10,-69,50,33,-54,38,23,-16,46,27,-61,41,38,-15,41,30,-23,44,44,-27,36,12,-78,50,15,-1,52,39,-60,33,31,-68,38,37,-45,37,61,-32,15,46,-47,30,66,-39,1,35,-32,41,13,8,53,11,-9,65,14,-11,59,9,-5,70,18,35,43,26,37,44,34,37,43,41,37,41,46,35,36,52,25,27,73,8,0,47,17,31,41,15,35,33,15,37,25,16,39,20,19,40,16,21,41,77,7,-24,14,-13,56,9,7,62,8,-10,71,5,-13,68,7,-11,68,12,-16,55,4,-14,70,3,-16,65,16,26,39,13,25,42,10,24,46,43,28,33,45,29,33];
+    const FF=[173,155,133,246,33,7,382,398,362,263,466,249,308,415,324,78,95,191,356,389,264,127,34,162,368,264,389,139,162,34,267,0,302,37,72,0,11,302,0,11,0,72,349,451,350,120,121,231,452,350,451,232,231,121,267,302,269,37,39,72,303,269,302,73,72,39,357,343,350,128,121,114,277,350,343,47,114,121,350,452,357,121,128,232,453,357,452,233,232,128,299,333,297,69,67,104,332,297,333,103,104,67,175,152,396,175,171,152,377,396,152,148,152,171,381,384,382,154,155,157,398,382,384,173,157,155,280,347,330,50,101,118,348,330,347,119,118,101,269,303,270,39,40,73,304,270,303,74,73,40,9,336,151,9,151,107,337,151,336,108,107,151,344,278,360,115,131,48,279,360,278,49,48,131,262,431,418,32,194,211,424,418,431,204,211,194,304,408,270,74,40,184,409,270,408,185,184,40,272,310,407,42,183,80,415,407,310,191,80,183,322,270,410,92,186,40,409,410,270,185,40,186,347,449,348,118,119,229,450,348,449,230,229,119,434,432,430,214,210,212,422,430,432,202,212,210,313,314,18,83,18,84,17,18,314,17,84,18,307,375,306,77,76,146,291,306,375,61,146,76,259,387,260,29,30,160,388,260,387,161,160,30,286,414,384,56,157,190,398,384,414,173,190,157,418,424,406,194,182,204,335,406,424,106,204,182,367,416,364,138,135,192,434,364,416,214,192,135,391,423,327,165,98,203,358,327,423,129,203,98,298,301,284,68,54,71,251,284,301,21,71,54,4,275,5,4,5,45,281,5,275,51,45,5,254,373,253,24,23,144,374,253,373,145,144,23,320,321,307,90,77,91,375,307,321,146,91,77,280,425,411,50,187,205,427,411,425,207,205,187,421,313,200,201,200,83,18,200,313,18,83,200,335,321,406,106,182,91,405,406,321,181,91,182,405,321,404,181,180,91,320,404,321,90,91,180,17,314,16,17,16,84,315,16,314,85,84,16,425,266,426,205,206,36,423,426,266,203,36,206,369,396,400,140,176,171,377,400,396,148,171,176,391,269,322,165,92,39,270,322,269,40,39,92,417,465,413,193,189,245,464,413,465,244,245,189,257,258,386,27,159,28,385,386,258,158,28,159,260,388,467,30,247,161,466,467,388,246,161,247,248,456,419,3,196,236,399,419,456,174,236,196,333,298,332,104,103,68,284,332,298,54,68,103,285,8,417,55,193,8,168,417,8,168,8,193,340,261,346,111,117,31,448,346,261,228,31,117,285,417,441,55,221,193,413,441,417,189,193,221,327,460,326,98,97,240,328,326,460,99,240,97,277,355,329,47,100,126,371,329,355,142,126,100,309,392,438,79,218,166,439,438,392,219,166,218,381,382,256,154,26,155,341,256,382,112,155,26,360,279,420,131,198,49,429,420,279,209,49,198,365,364,379,136,150,135,394,379,364,169,135,150,355,277,437,126,217,47,343,437,277,114,47,217,443,444,282,223,52,224,283,282,444,53,224,52,281,275,363,51,134,45,440,363,275,220,45,134,431,262,395,211,170,32,369,395,262,140,32,170,337,299,338,108,109,69,297,338,299,67,69,109,335,273,321,106,91,43,375,321,273,146,43,91,348,450,349,119,120,230,451,349,450,231,230,120,467,359,342,247,113,130,446,342,359,226,130,113,282,283,334,52,105,53,293,334,283,63,53,105,250,458,462,20,242,238,461,462,458,241,238,242,276,353,300,46,70,124,383,300,353,156,124,70,325,292,324,96,95,62,308,324,292,78,62,95,283,276,293,53,63,46,300,293,276,70,46,63,447,264,345,227,116,34,372,345,264,143,34,116,352,345,346,123,117,116,340,346,345,111,116,117,1,19,274,1,44,19,354,274,19,125,19,44,248,281,456,3,236,51,363,456,281,134,51,236,425,426,427,205,207,206,436,427,426,216,206,207,380,381,252,153,22,154,256,252,381,26,154,22,391,393,269,165,39,167,267,269,393,37,167,39,199,428,200,199,200,208,421,200,428,201,208,200,330,329,266,101,36,100,371,266,329,142,100,36,422,432,273,202,43,212,287,273,432,57,212,43,290,250,328,60,99,20,462,328,250,242,20,99,258,286,385,28,158,56,384,385,286,157,56,158,342,446,353,113,124,226,265,353,446,35,226,124,257,386,259,27,29,159,387,259,386,160,159,29,430,422,431,210,211,202,424,431,422,204,202,211,445,342,276,225,46,113,353,276,342,124,113,46,424,422,335,204,106,202,273,335,422,43,202,106,306,292,307,76,77,62,325,307,292,96,62,77,366,447,352,137,123,227,345,352,447,116,227,123,302,268,303,72,73,38,271,303,268,41,38,73,371,358,266,142,36,129,423,266,358,203,129,36,327,294,460,98,240,64,455,460,294,235,64,240,294,331,278,64,48,102,279,278,331,49,102,48,303,271,304,73,74,41,272,304,271,42,41,74,427,436,434,207,214,216,432,434,436,212,216,214,304,272,408,74,184,42,407,408,272,183,42,184,394,430,395,169,170,210,431,395,430,211,210,170,395,369,378,170,149,140,400,378,369,176,140,149,296,334,299,66,69,105,333,299,334,104,105,69,417,168,351,193,122,168,6,351,168,6,168,122,280,411,352,50,123,187,376,352,411,147,187,123,319,320,325,89,96,90,307,325,320,77,90,96,285,295,336,55,107,65,296,336,295,66,65,107,404,320,403,180,179,90,319,403,320,89,90,179,330,348,329,101,100,119,349,329,348,120,119,100,334,293,333,105,104,63,298,333,293,68,63,104,323,454,366,93,137,234,447,366,454,227,234,137,16,315,15,16,15,85,316,15,315,86,85,15,429,279,358,209,129,49,331,358,279,102,49,129,15,316,14,15,14,86,317,14,316,87,86,14,8,285,9,8,9,55,336,9,285,107,55,9,329,349,277,100,47,120,350,277,349,121,120,47,252,253,380,22,153,23,374,380,253,145,23,153,402,403,318,178,88,179,319,318,403,89,179,88,351,6,419,122,196,6,197,419,6,197,6,196,324,318,325,95,96,88,319,325,318,89,88,96,397,367,365,172,136,138,364,365,367,135,138,136,288,435,397,58,172,215,367,397,435,138,215,172,438,439,344,218,115,219,278,344,439,48,219,115,271,311,272,41,42,81,310,272,311,80,81,42,5,281,195,5,195,51,248,195,281,3,51,195,273,287,375,43,146,57,291,375,287,61,57,146,396,428,175,171,175,208,199,175,428,199,208,175,268,312,271,38,41,82,311,271,312,81,82,41,444,445,283,224,53,225,276,283,445,46,225,53,254,339,373,24,144,110,390,373,339,163,110,144,295,282,296,65,66,52,334,296,282,105,52,66,346,448,347,117,118,228,449,347,448,229,228,118,454,356,447,234,227,127,264,447,356,34,127,227,336,296,337,107,108,66,299,337,296,69,66,108,151,337,10,151,10,108,338,10,337,109,108,10,278,439,294,48,64,219,455,294,439,235,219,64,407,415,292,183,62,191,308,292,415,78,191,62,358,371,429,129,209,142,355,429,371,126,142,209,345,372,340,116,111,143,265,340,372,35,143,111,388,390,466,161,246,163,249,466,390,7,163,246,352,346,280,123,50,117,347,280,346,118,117,50,295,442,282,65,52,222,443,282,442,223,222,52,19,94,354,19,125,94,370,354,94,141,94,125,295,285,442,65,222,55,441,442,285,221,55,222,419,197,248,196,3,197,195,248,197,195,197,3,359,263,255,130,25,33,249,255,263,7,33,25,275,274,440,45,220,44,457,440,274,237,44,220,300,383,301,70,71,156,368,301,383,139,156,71,417,351,465,193,245,122,412,465,351,188,122,245,466,263,467,246,247,33,359,467,263,130,33,247,389,251,368,162,139,21,301,368,251,71,21,139,374,386,380,145,153,159,385,380,386,158,159,153,379,394,378,150,149,169,395,378,394,170,169,149,351,419,412,122,188,196,399,412,419,174,196,188,426,322,436,206,216,92,410,436,322,186,92,216,387,373,388,160,161,144,390,388,373,163,144,161,393,326,164,167,164,97,2,164,326,2,97,164,354,370,461,125,241,141,462,461,370,242,141,241,0,267,164,0,164,37,393,164,267,167,37,164,11,12,302,11,72,12,268,302,12,38,12,72,386,374,387,159,160,145,373,387,374,144,145,160,12,13,268,12,38,13,312,268,13,82,13,38,293,300,298,63,68,70,301,298,300,71,70,68,340,265,261,111,31,35,446,261,265,226,35,31,380,385,381,153,154,158,384,381,385,157,158,154,280,330,425,50,205,101,266,425,330,36,101,205,423,391,426,203,206,165,322,426,391,92,165,206,429,355,420,209,198,126,437,420,355,217,126,198,391,327,393,165,167,98,326,393,327,97,98,167,457,438,440,237,220,218,344,440,438,115,218,220,382,362,341,155,112,133,463,341,362,243,133,112,457,461,459,237,239,241,458,459,461,238,241,239,434,430,364,214,135,210,394,364,430,169,210,135,414,463,398,190,173,243,362,398,463,133,243,173,262,428,369,32,140,208,396,369,428,171,208,140,457,274,461,237,241,44,354,461,274,125,44,241,316,403,317,86,87,179,402,317,403,178,179,87,315,404,316,85,86,180,403,316,404,179,180,86,314,405,315,84,85,181,404,315,405,180,181,85,313,406,314,83,84,182,405,314,406,181,182,84,418,406,421,194,201,182,313,421,406,83,182,201,366,401,323,137,93,177,361,323,401,132,177,93,408,407,306,184,76,183,292,306,407,62,183,76,408,306,409,184,185,76,291,409,306,61,76,185,410,409,287,186,57,185,291,287,409,61,185,57,436,410,432,216,212,186,287,432,410,57,186,212,434,416,427,214,207,192,411,427,416,187,192,207,264,368,372,34,143,139,383,372,368,156,139,143,457,459,438,237,218,239,309,438,459,79,239,218,352,376,366,123,137,147,401,366,376,177,147,137,4,1,275,4,45,1,274,275,1,44,1,45,428,262,421,208,201,32,418,421,262,194,32,201,327,358,294,98,64,129,331,294,358,102,129,64,367,435,416,138,192,215,433,416,435,213,215,192,455,439,289,235,59,219,392,289,439,166,219,59,328,462,326,99,97,242,370,326,462,141,242,97,326,370,2,97,2,141,94,2,370,94,141,2,460,455,305,240,75,235,289,305,455,59,235,75,448,339,449,228,229,110,254,449,339,24,110,229,261,446,255,31,25,226,359,255,446,130,226,25,449,254,450,229,230,24,253,450,254,23,24,230,450,253,451,230,231,23,252,451,253,22,23,231,451,252,452,231,232,22,256,452,252,26,22,232,256,341,452,26,232,112,453,452,341,233,112,232,413,464,414,189,190,244,463,414,464,243,244,190,441,413,286,221,56,189,414,286,413,190,189,56,441,286,442,221,222,56,258,442,286,28,56,222,442,258,443,222,223,28,257,443,258,27,28,223,444,443,259,224,29,223,257,259,443,27,223,29,259,260,444,29,224,30,445,444,260,225,30,224,260,467,445,30,225,247,342,445,467,113,247,225,250,309,458,20,238,79,459,458,309,239,79,238,290,305,392,60,166,75,289,392,305,59,75,166,460,305,328,240,99,75,290,328,305,60,75,99,376,433,401,147,177,213,435,401,433,215,213,177,250,290,309,20,79,60,392,309,290,166,60,79,411,416,376,187,147,192,433,376,416,213,192,147,341,463,453,112,233,243,464,453,463,244,243,233,453,464,357,233,128,244,465,357,464,245,244,128,412,343,465,188,245,114,357,465,343,128,114,245,437,343,399,217,174,114,412,399,343,188,114,174,363,440,360,134,131,220,344,360,440,115,220,131,456,420,399,236,174,198,437,399,420,217,198,174,456,363,420,236,198,134,360,420,363,131,134,198,361,401,288,132,58,177,435,288,401,215,177,58,353,265,383,124,156,35,372,383,265,143,35,156,255,249,339,25,110,7,390,339,249,163,7,110,261,255,448,31,228,25,339,448,255,110,25,228,14,317,13,14,13,87,312,13,317,82,87,13,317,402,312,87,82,178,311,312,402,81,178,82,402,318,311,178,81,88,310,311,318,80,88,81,318,324,310,88,80,95,415,310,324,191,95,80];
+    const FL={"face_oval":[[10,338,297,332,284,251,389,356,454,323,361,288,397,365,379,378,400,377,152,148,176,149,150,136,172,58,132,93,234,127,162,21,54,103,67,109,10]],"lips":[[61,146,91,181,84,17,314,405,321,375,291],[61,185,40,39,37,0,267,269,270,409,291],[78,95,88,178,87,14,317,402,318,324,308],[78,191,80,81,82,13,312,311,310,415,308]],"left_eye":[[263,249,390,373,374,380,381,382,362],[263,466,388,387,386,385,384,398,362]],"right_eye":[[33,7,163,144,145,153,154,155,133],[33,246,161,160,159,158,157,173,133]],"left_eyebrow":[[276,283,282,295,285],[300,293,334,296,336]],"right_eyebrow":[[46,53,52,65,55],[70,63,105,66,107]],"left_iris":[[474,475,476,477,474]]};
+    const cv = document.getElementById('face');
+    const g = cv.getContext('2d');
+    const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const N = FV.length / 3;
+    const P = new Float32Array(FV.length);
+    for (let k = 0; k < FV.length; k++) P[k] = FV[k] / 10;
+    // centro del viso e scala
+    let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9, zc = 0;
+    for (let k = 0; k < N; k++) { x0 = Math.min(x0, P[3 * k]); x1 = Math.max(x1, P[3 * k]); y0 = Math.min(y0, P[3 * k + 1]); y1 = Math.max(y1, P[3 * k + 1]); zc += P[3 * k + 2] / N; }
+    const yc = (y0 + y1) / 2;
+    for (let k = 0; k < N; k++) { P[3 * k + 1] -= yc; P[3 * k + 2] -= zc; }
+    // zone: punto del modello, colore, etichetta (lato e altezza in proporzione al canvas)
+    const ZONES = [
+      { v: [151], c: '#3be0ff', name: 'Fronte', lx: 0.5, ly: 0.05, d: 0.9 },
+      { v: [104, 333], c: '#ff9f0a', name: 'Tempie', lx: 0.94, ly: 0.16, d: 1.15 },
+      { v: [4], c: '#a6ff00', name: 'Naso', lx: 0.94, ly: 0.64, d: 1.4 },
+      { v: [50, 280], c: '#ff2d6b', name: 'Zigomi', lx: 0.06, ly: 0.72, d: 1.65 },
+    ];
+    // quanto è "bagnata" ogni faccetta: vicinanza ai centri delle zone
+    const T = FF.length / 3, wet = new Float32Array(T), tint = [];
+    const centers = ZONES.flatMap((z) => z.v.map((v) => ({ v, z })));
+    for (let t = 0; t < T; t++) {
+      const a = FF[3 * t], b = FF[3 * t + 1], c = FF[3 * t + 2];
+      let best = 0, bz = null;
+      for (const { v, z } of centers) {
+        let d2 = 0;
+        for (let q = 0; q < 3; q++) { const m = (P[3 * a + q] + P[3 * b + q] + P[3 * c + q]) / 3 - P[3 * v + q]; d2 += m * m; }
+        const w = Math.exp(-d2 / 2.6);
+        if (w > best) { best = w; bz = z; }
+      }
+      wet[t] = best; tint.push(bz);
+    }
+    // normali dei vertici (per i riflessi morbidi) e quanto è bagnato ogni vertice
+    const VN = new Float32Array(FV.length), wetV = new Float32Array(N);
+    for (let t = 0; t < T; t++) {
+      const a = FF[3 * t], b = FF[3 * t + 1], c = FF[3 * t + 2];
+      const ux = P[3 * b] - P[3 * a], uy = P[3 * b + 1] - P[3 * a + 1], uz = P[3 * b + 2] - P[3 * a + 2];
+      const vx = P[3 * c] - P[3 * a], vy = P[3 * c + 1] - P[3 * a + 1], vz = P[3 * c + 2] - P[3 * a + 2];
+      const n = [uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx];
+      for (const v of [a, b, c]) { VN[3 * v] += n[0]; VN[3 * v + 1] += n[1]; VN[3 * v + 2] += n[2]; wetV[v] = Math.max(wetV[v], wet[t]); }
+    }
+    for (let k = 0; k < N; k++) { const n = norm([VN[3 * k], VN[3 * k + 1], VN[3 * k + 2]]); VN[3 * k] = n[0]; VN[3 * k + 1] = n[1]; VN[3 * k + 2] = n[2]; }
+    const glints = []; for (let k = 0; k < N; k++) if (wetV[k] > 0.35) glints.push(k);
+    const RN = new Float32Array(FV.length);
+    const R = new Float32Array(FV.length), S = new Float32Array(N * 2);
+    const order = new Uint16Array(T), depth = new Float32Array(T);
+    for (let t = 0; t < T; t++) order[t] = t;
+    let W, H, sc, start = 0, raf = 0;
+    const ease = (x) => (x <= 0 ? 0 : x >= 1 ? 1 : x * x * (3 - 2 * x));
+    const L = norm([-0.45, 0.55, 0.7]);
+    function norm(v) { const l = Math.hypot(v[0], v[1], v[2]); return [v[0] / l, v[1] / l, v[2] / l]; }
+    function build() {
+      const dpr = Math.min(2, devicePixelRatio || 1);
+      W = cv.clientWidth; H = cv.clientHeight;
+      cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      sc = Math.min((W * 0.62) / (x1 - x0), (H * 0.86) / (y1 - y0));
+    }
+    function frame(now) {
+      const s = (now - start) / 1000;
+      const yaw = still ? -0.22 : Math.sin(s * 0.55 - 0.6) * 0.42;
+      const pitch = 0.12 + (still ? 0 : Math.sin(s * 0.4) * 0.05);
+      const cy = Math.cos(yaw), sy = Math.sin(yaw), cp = Math.cos(pitch), sp = Math.sin(pitch);
+      const cx = W / 2, cyy = H * 0.5;
+      for (let k = 0; k < N; k++) {
+        const x = P[3 * k], y = P[3 * k + 1], z = P[3 * k + 2];
+        const x1_ = x * cy + z * sy, z1 = -x * sy + z * cy;
+        const y2 = y * cp - z1 * sp, z2 = y * sp + z1 * cp;
+        R[3 * k] = x1_; R[3 * k + 1] = y2; R[3 * k + 2] = z2;
+        const nx = VN[3 * k], ny = VN[3 * k + 1], nz = VN[3 * k + 2];
+        const nx1 = nx * cy + nz * sy, nz1 = -nx * sy + nz * cy;
+        RN[3 * k] = nx1; RN[3 * k + 1] = ny * cp - nz1 * sp; RN[3 * k + 2] = ny * sp + nz1 * cp;
+        const f = 1 + z2 / 60; // leggera prospettiva
+        S[2 * k] = cx + x1_ * sc * f; S[2 * k + 1] = cyy - y2 * sc * f;
+      }
+      for (let t = 0; t < T; t++) depth[t] = R[3 * FF[3 * t] + 2] + R[3 * FF[3 * t + 1] + 2] + R[3 * FF[3 * t + 2] + 2];
+      order.sort((a, b) => depth[a] - depth[b]);
+      g.clearRect(0, 0, W, H);
+      const appear = still ? 1 : ease(s / 0.9), wetK = still ? 1 : ease((s - 0.9) / 1.4);
+      // alone dietro al viso
+      const halo = g.createRadialGradient(cx, cyy, 10, cx, cyy, H * 0.55);
+      halo.addColorStop(0, `rgba(59,224,255,${0.13 * appear})`); halo.addColorStop(1, 'rgba(59,224,255,0)');
+      g.fillStyle = halo; g.fillRect(0, 0, W, H);
+      g.lineJoin = 'round';
+      const H3 = norm([L[0], L[1], L[2] + 1]); // vettore a metà tra luce e osservatore
+      for (let o = 0; o < T; o++) {
+        const t = order[o], a = FF[3 * t], b = FF[3 * t + 1], c = FF[3 * t + 2];
+        const ux = R[3 * b] - R[3 * a], uy = R[3 * b + 1] - R[3 * a + 1], uz = R[3 * b + 2] - R[3 * a + 2];
+        const vx = R[3 * c] - R[3 * a], vy = R[3 * c + 1] - R[3 * a + 1], vz = R[3 * c + 2] - R[3 * a + 2];
+        const n = norm([uy * vz - uz * vy, uz * vx - ux * vz, ux * vy - uy * vx]);
+        if (n[2] <= 0) continue;
+        const dif = Math.max(0, n[0] * L[0] + n[1] * L[1] + n[2] * L[2]);
+        const nh = Math.max(0, n[0] * H3[0] + n[1] * H3[1] + n[2] * H3[2]);
+        const spec = Math.pow(nh, 16) * wet[t] * wetK * 0.3;
+        const rim = Math.pow(1 - n[2], 3);
+        let r = 18 + 62 * dif, gg = 20 + 64 * dif, bb = 26 + 74 * dif;
+        r += rim * 40; gg += rim * 120; bb += rim * 140; // bordo azzurro
+        r += spec * 255; gg += spec * 255; bb += spec * 255;
+        const col = `rgba(${Math.min(255, r) | 0},${Math.min(255, gg) | 0},${Math.min(255, bb) | 0},${appear})`;
+        g.beginPath();
+        g.moveTo(S[2 * a], S[2 * a + 1]); g.lineTo(S[2 * b], S[2 * b + 1]); g.lineTo(S[2 * c], S[2 * c + 1]); g.closePath();
+        g.fillStyle = col; g.strokeStyle = col; g.lineWidth = 0.6;
+        g.fill(); g.stroke();
+      }
+      // trama sottile delle faccette
+      g.strokeStyle = `rgba(255,255,255,${0.05 * appear})`; g.lineWidth = 0.5;
+      g.beginPath();
+      for (let o = 0; o < T; o++) {
+        const t = order[o], a = FF[3 * t], b = FF[3 * t + 1], c = FF[3 * t + 2];
+        if ((S[2 * b] - S[2 * a]) * (S[2 * c + 1] - S[2 * a + 1]) - (S[2 * b + 1] - S[2 * a + 1]) * (S[2 * c] - S[2 * a]) > 0) continue;
+        g.moveTo(S[2 * a], S[2 * a + 1]); g.lineTo(S[2 * b], S[2 * b + 1]); g.lineTo(S[2 * c], S[2 * c + 1]); g.closePath();
+      }
+      g.stroke();
+      // riflessi del sudore: punti di luce morbidi dove la pelle bagnata fa da specchio
+      g.globalCompositeOperation = 'lighter';
+      for (const k of glints) {
+        const nh = Math.max(0, RN[3 * k] * H3[0] + RN[3 * k + 1] * H3[1] + RN[3 * k + 2] * H3[2]);
+        const a = Math.min(1, Math.pow(nh, 40) * wetV[k] * wetK * 1.3);
+        if (a < 0.02 || RN[3 * k + 2] <= 0) continue;
+        const r = 5 + 11 * a, x = S[2 * k], y = S[2 * k + 1];
+        const gl = g.createRadialGradient(x, y, 0, x, y, r);
+        gl.addColorStop(0, `rgba(255,255,255,${0.95 * a})`); gl.addColorStop(0.4, `rgba(220,245,255,${0.3 * a})`); gl.addColorStop(1, 'rgba(200,240,255,0)');
+        g.fillStyle = gl; g.fillRect(x - r, y - r, 2 * r, 2 * r);
+      }
+      g.globalCompositeOperation = 'source-over';
+      // contorni: ovale a gradiente, occhi, sopracciglia, labbra
+      const line = (chains, style, w, glow) => {
+        g.strokeStyle = style; g.lineWidth = w; g.shadowColor = glow || 'transparent'; g.shadowBlur = glow ? 10 : 0;
+        g.beginPath();
+        for (const ch of chains) ch.forEach((v, k) => (k && RN[3 * v + 2] > -0.05 && RN[3 * ch[k - 1] + 2] > -0.05 ? g.lineTo(S[2 * v], S[2 * v + 1]) : g.moveTo(S[2 * v], S[2 * v + 1])));
+        g.stroke(); g.shadowBlur = 0;
+      };
+      const grad = g.createLinearGradient(cx - sc * 8, cyy - sc * 9, cx + sc * 8, cyy + sc * 9);
+      grad.addColorStop(0, '#3be0ff'); grad.addColorStop(0.55, '#a6ff00'); grad.addColorStop(1, '#ff2d6b');
+      g.globalAlpha = appear;
+      line(FL.face_oval, grad, 2.2, '#3be0ff88');
+      line([...FL.left_eye, ...FL.right_eye], 'rgba(255,255,255,.75)', 1.3);
+      line([...FL.left_eyebrow, ...FL.right_eyebrow], 'rgba(255,255,255,.55)', 1.6);
+      line(FL.lips, 'rgba(255,255,255,.6)', 1.3);
+      g.globalAlpha = 1;
+      // zone: anello che si chiude, scintilla e etichetta con linea
+      g.font = '800 11px Inter, system-ui, sans-serif'; g.textBaseline = 'middle';
+      for (const z of ZONES) {
+        const k = still ? 1 : ease((s - z.d) / 0.6);
+        if (k <= 0) continue;
+        const pul = still ? 1 : 0.65 + 0.35 * Math.sin((s - z.d) * 3);
+        const lx = z.lx * W, ly = z.ly * H;
+        const side = z.v.length > 1 ? (z.lx > 0.5 ? (S[2 * z.v[0]] > S[2 * z.v[1]] ? z.v[0] : z.v[1]) : (S[2 * z.v[0]] < S[2 * z.v[1]] ? z.v[0] : z.v[1])) : z.v[0];
+        for (const v of z.v) {
+          const px = S[2 * v], py = S[2 * v + 1];
+          const rr = (z.v.length > 1 ? 10 : 13) * (1 + (1 - k) * 1.4);
+          g.globalAlpha = k * pul; g.strokeStyle = z.c; g.lineWidth = 2.4; g.shadowColor = z.c; g.shadowBlur = 12;
+          g.beginPath(); g.arc(px, py, rr, 0, Math.PI * 2); g.stroke();
+          g.shadowBlur = 0; g.globalAlpha = k * 0.55; g.lineWidth = 1;
+          if (v === side) {
+            // linea fino all'inizio dell'etichetta
+            const tw = g.measureText(z.name.toUpperCase()).width;
+            const ex = z.lx < 0.3 ? tw + 6 : z.lx > 0.7 ? W - tw - 6 : W / 2, ey = z.ly < 0.1 ? ly + 9 : ly;
+            const ang = Math.atan2(ey - py, ex - px);
+            g.beginPath(); g.moveTo(px + Math.cos(ang) * rr, py + Math.sin(ang) * rr); g.lineTo(ex, ey); g.stroke();
+          }
+          // scintilla bianca che pulsa
+          const tw = still ? 0.8 : Math.max(0, Math.sin(s * 2.2 + v));
+          if (tw > 0.05 && wetK > 0) {
+            const sz = 5 * tw * wetK, sx = px + 3, syy = py - 3;
+            g.globalAlpha = tw * wetK; g.fillStyle = '#fff';
+            g.beginPath(); g.moveTo(sx, syy - sz); g.lineTo(sx + sz * 0.25, syy - sz * 0.25); g.lineTo(sx + sz, syy); g.lineTo(sx + sz * 0.25, syy + sz * 0.25);
+            g.lineTo(sx, syy + sz); g.lineTo(sx - sz * 0.25, syy + sz * 0.25); g.lineTo(sx - sz, syy); g.lineTo(sx - sz * 0.25, syy - sz * 0.25); g.closePath(); g.fill();
+          }
+        }
+        g.globalAlpha = k; g.fillStyle = z.c;
+        g.textAlign = z.lx < 0.3 ? 'left' : z.lx > 0.7 ? 'right' : 'center';
+        g.fillText(z.name.toUpperCase(), z.lx < 0.3 ? 0 : z.lx > 0.7 ? W : W / 2, ly);
+        g.globalAlpha = 1;
+      }
+      if (!still) raf = requestAnimationFrame(frame);
+    }
+    function run() {
+      cancelAnimationFrame(raf);
+      build();
+      start = performance.now();
+      raf = requestAnimationFrame(frame);
+    }
+    const slide = cv.closest('.slide');
+    new MutationObserver(() => { if (slide.classList.contains('on')) run(); else cancelAnimationFrame(raf); }).observe(slide, { attributes: true, attributeFilter: ['class'] });
+    addEventListener('resize', () => slide.classList.contains('on') && run());
+  })();
+</script>
+</body>
+</html>
