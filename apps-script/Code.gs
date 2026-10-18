@@ -254,8 +254,8 @@ const NEWS = [
     id: 'sudometro-2',
     at: '2026-10-18T21:00:00+02:00',
     features: [],
-    title: 'Sudometro 2.0',
-    body: 'Il nuovo Sudometro riconosce il sudore dai riflessi della pelle. Tocca per vedere.',
+    title: 'Novità dal laboratorio',
+    body: 'È appena arrivata una cosa nuova. Tocca per scoprirla.',
   },
   {
     id: '2026-11',
