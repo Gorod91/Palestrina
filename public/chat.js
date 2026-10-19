@@ -23,7 +23,7 @@ const CHOICES = [
   ['no', 'No'],
 ];
 
-export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown, openNews, trace, useFirebase }) {
+export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown, openNews, trace, useFirebase, fbOnly }) {
   const tlog = trace || (() => {});
   let me = null; // { name, display }
   let v = 0; // versione dei dati in Apps Script
@@ -84,6 +84,8 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   const FB_RESCUE_MS = 10000;
   /** Firebase collegato e aggiornato: niente polling veloce, i messaggi si scrivono lì. */
   const fbLive = () => fbOn && !!fbMsgs && fbOnline;
+  /** Tutta l'app su Firebase: con Firebase collegato non si chiede mai la chat ad Apps Script. */
+  const onlyFb = () => fbLive() && !!(fbOnly && fbOnly());
   /** Anche domande e risposte si scrivono su Firebase. */
   const fbPlansLive = () => fbLive() && !!fbAsks && !!fbPlans && !fbPlansErr;
   const fb = createFbChat({
@@ -305,6 +307,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   function syncState() {
     if (!active || !data) return 'ok'; // senza chat ci pensa già "Carico la chat…"
     if (!navigator.onLine) return 'off';
+    if (onlyFb()) return 'ok'; // Firebase collegato: quello che si vede è aggiornato
     if (syncFails >= 2) return retrying ? 'busy' : 'stale';
     if (syncedAt && Date.now() - syncedAt <= (fbLive() ? FB_POLL_EVERY + STALE_MS : STALE_MS)) return 'ok';
     return loading || syncFails ? 'busy' : 'stale'; // dopo un solo errore riprova da sola: resta "Aggiorno…"
@@ -1251,7 +1254,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
 
   function tick() {
     // Con Firebase le novità arrivano da sole: ad Apps Script si chiede solo ogni tanto (per il cambio di giorno)
-    const quiet = fbLive() && Date.now() - lastLoad < FB_POLL_EVERY;
+    const quiet = onlyFb() || (fbLive() && Date.now() - lastLoad < FB_POLL_EVERY);
     if (active && document.visibilityState === 'visible' && !quiet) load();
     rescuePending();
     renderSync();
@@ -1338,7 +1341,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     },
     /** Carica la chat di nascosto (all'apertura dell'app), così il tab si apre già pieno. */
     preload() {
-      if (!active) load(false); // con la chat già in memoria il server risponde solo se ci sono novità
+      if (!active && !onlyFb()) load(false); // con la chat già in memoria il server risponde solo se ci sono novità
     },
     setActive(on) {
       active = on;
@@ -1355,7 +1358,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       } else {
         $('chat-list').innerHTML = `<div class="loading">${bicep()}<p>Carico la chat…</p></div>`;
       }
-      load(!data);
+      if (!onlyFb() || !data) load(!data);
       renderSync();
       timer = setInterval(tick, POLL_EVERY);
     },

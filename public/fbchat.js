@@ -15,7 +15,7 @@ const TZ = 'Europe/Rome';
 
 let ready = null; // { au, fs, auth, db } una volta caricato l'SDK
 
-function sdk() {
+export function sdk() {
   if (!ready) {
     ready = Promise.all([import(SDK + 'firebase-app.js'), import(SDK + 'firebase-auth.js'), import(SDK + 'firebase-firestore.js')])
       .then(([a, au, fs]) => {
@@ -46,6 +46,23 @@ function sdk() {
 /** Stesso calcolo del server (fbUid in Code.gs). */
 export const fbUid = (name) => String(name).replace(/[^A-Za-z0-9_-]/g, '_') || 'utente';
 
+/** Accesso a Firebase come `me` (permesso chiesto al server solo se non c'è già quello giusto sul telefono). */
+export async function fbSignIn(me, getToken) {
+  const x = await sdk();
+  const { au, auth } = x;
+  await auth.authStateReady();
+  let ok = auth.currentUser && auth.currentUser.uid === fbUid(me.name);
+  if (ok) {
+    const t = await auth.currentUser.getIdTokenResult();
+    ok = t.claims.pal === true && t.claims.name === me.name;
+  }
+  if (!ok) {
+    const r = await getToken();
+    await au.signInWithCustomToken(auth, r.token);
+  }
+  return x;
+}
+
 const fmt = (opts) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ, hourCycle: 'h23', ...opts });
 const dayFmt = fmt({ year: 'numeric', month: '2-digit', day: '2-digit' });
 const timeFmt = fmt({ hour: '2-digit', minute: '2-digit' });
@@ -72,17 +89,7 @@ export function createFbChat({ getToken, onChange, onState, onPlans, onError, on
   async function start(me, test) {
     stop();
     const my = ++gen;
-    const { au, fs, auth, db } = await sdk();
-    await auth.authStateReady();
-    let ok = auth.currentUser && auth.currentUser.uid === fbUid(me.name);
-    if (ok) {
-      const t = await auth.currentUser.getIdTokenResult();
-      ok = t.claims.pal === true && t.claims.name === me.name;
-    }
-    if (!ok) {
-      const r = await getToken();
-      await au.signInWithCustomToken(auth, r.token);
-    }
+    const { fs, db } = await fbSignIn(me, getToken);
     if (my !== gen) return; // nel frattempo si è chiusa o cambiata la chat
     coll = test ? 'prova_chat' : 'chat';
     asksColl = test ? 'prova_domande' : 'domande';

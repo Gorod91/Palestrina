@@ -96,6 +96,10 @@ Con la pianificazione dei 7 giorni il sondaggio sembra un calendario da compilar
 
 Consigliato: 1 + 2 + 3, il 4 solo se serve.
 
+## Tutto su Firebase (piano B, in prova dal 19/10)
+
+Il telefono parla solo con Firebase; Apps Script resta il motore dietro le quinte (coda delle azioni, punti, penalità, sfide, recap, notifiche, accesso col codice), con le tabelle su Firestore (`db/<tabella>`, adattatore con la stessa interfaccia dei fogli) e le foto in `foto/`. In prova già attivo (`prova_db`, `prova_stato`, `prova_azioni`); interruttori e passaggio nel README ("Tutto su Firebase"). Provato in locale con `tools/firebase-prova/test-tutto.js` (anche con `VERO=1`, la configurazione per tutti).
+
 ## Chat su Firebase (in corso)
 
 La chat oggi chiede al server ogni 5 secondi se ci sono novità (Apps Script + foglio: 1–6 s di ritardo). Con Firebase (Firestore) il telefono resta collegato e i messaggi arrivano in meno di mezzo secondo, con copia sul telefono e invio senza campo.

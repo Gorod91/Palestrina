@@ -60,9 +60,11 @@ const props = {
     return realProps.getProperty(k);
   },
   setProperty(k, v) {
+    STATE_DIRTY = true;
     return realProps.setProperty(TEST ? TEST_PREFIX + k : k, v);
   },
   deleteProperty(k) {
+    STATE_DIRTY = true;
     if (TEST) realProps.setProperty(TEST_PREFIX + k, TEST_DELETED);
     else realProps.deleteProperty(k);
   },
@@ -103,11 +105,21 @@ function testReset() {
   MEMO = {};
   try {
     // messaggi, domande e risposte di prova su Firebase: altrimenti tornerebbero nei fogli di prova
-    ['prova_chat', 'prova_domande', 'prova_piani'].forEach(firestoreClear);
+    ['prova_chat', 'prova_domande', 'prova_piani', 'prova_azioni'].forEach(firestoreClear);
   } catch (err) {
     console.error('Chat di prova su Firebase non cancellata', err);
   }
+  // tabelle di prova su Firestore: al prossimo uso si ricopiano da quelle vere
+  TEST_SHEETS.forEach((key) => {
+    delete TABLES[tablePath(key, true)];
+    try {
+      firestoreCall('delete', tablePath(key, true));
+    } catch (err) {
+      console.error('Tabella di prova non cancellata', err);
+    }
+  });
   CHAT_DIRTY = true; // a fine richiesta lo stato della prova su Firebase riparte dai dati veri
+  STATE_DIRTY = true;
   return { ok: true };
 }
 
@@ -160,7 +172,7 @@ function autorizzaDrive() {
   Logger.log('Cartella foto: ' + photosRoot().getUrl());
 }
 
-const TRIGGERS_VERSION = '7';
+const TRIGGERS_VERSION = '8';
 
 /**
  * Recap ogni domenica alle 19 e premiazioni del mese l'ultimo giorno del mese alle 21 (fuso orario dello script).
@@ -169,7 +181,7 @@ const TRIGGERS_VERSION = '7';
 function ensureTriggers(force) {
   if (!force && props.getProperty('TRIGGERS_VERSION') === TRIGGERS_VERSION) return;
   // Due richieste insieme dopo un aggiornamento creerebbero i trigger due volte (premiazioni doppie)
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   if (!lock.tryLock(10000)) return;
   try {
     if (!force && props.getProperty('TRIGGERS_VERSION') === TRIGGERS_VERSION) return;
@@ -180,7 +192,7 @@ function ensureTriggers(force) {
 }
 
 function createTriggers() {
-  const handlers = ['sendWeeklyRecap', 'sendMonthlyRecap', 'eveningCheck', 'sfideTick', 'releaseDueNews'];
+  const handlers = ['sendWeeklyRecap', 'sendMonthlyRecap', 'eveningCheck', 'sfideTick', 'releaseDueNews', 'codaTick'];
   ScriptApp.getProjectTriggers()
     .filter((t) => handlers.includes(t.getHandlerFunction()))
     .forEach((t) => ScriptApp.deleteTrigger(t));
@@ -189,6 +201,8 @@ function createTriggers() {
   ScriptApp.newTrigger('eveningCheck').timeBased().everyDays(1).atHour(21).nearMinute(5).create();
   // Sfide: promemoria delle conferme e chiusura di quelle di ieri
   ScriptApp.newTrigger('sfideTick').timeBased().everyHours(1).create();
+  // Tutto su Firebase: azioni rimaste in coda e stato del nuovo giorno
+  ScriptApp.newTrigger('codaTick').timeBased().everyMinutes(1).create();
   // Novità con un orario preciso (`at`): un trigger una tantum per ognuna ancora da rilasciare
   NEWS.forEach((n) => {
     const at = n.at && newsAt(n);
@@ -202,7 +216,7 @@ const RESET_ID = '2026-10-13';
 
 function ensureReset() {
   if (props.getProperty('RESET_ID') === RESET_ID) return;
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(30000);
   try {
     if (props.getProperty('RESET_ID') === RESET_ID) return;
@@ -414,6 +428,9 @@ function doPost(e) {
   TESTER = '';
   CHAT_DIRTY = false;
   LATER = [];
+  TABLES = {};
+  PRELOADED = {};
+  STATE_DIRTY = false;
   try {
     const req = JSON.parse(e.postData.contents);
     try {
@@ -440,6 +457,11 @@ function doPost(e) {
         if (!other) return json({ error: 'Utente non trovato' });
         user = { ...other, admin: true, debug: user.debug, actingAs: true };
       }
+    }
+    try {
+      preloadTables(['presenze', 'chat', 'piani', 'sudometro', 'sfide', 'cambi']);
+    } catch (err) {
+      console.error('Tabelle non precaricate', err);
     }
     try {
       closeOldSfide();
@@ -479,9 +501,20 @@ function fetchLater(request) {
 
 /** Fine richiesta: prima lo stato della chat su Firebase, insieme alle notifiche. */
 function finishRequest() {
+  try {
+    flushTables();
+  } catch (err) {
+    console.error('Tabelle non salvate', err);
+  }
   const list = [];
   const st = chatStateRequest();
   if (st) list.push(st);
+  try {
+    const pub = statesRequest();
+    if (pub) list.push(pub);
+  } catch (err) {
+    console.error('Stato non pubblicato su Firebase', err);
+  }
   if (LATER) list.push(...LATER);
   LATER = null;
   if (!list.length) return;
@@ -506,7 +539,7 @@ function handle(req, user) {
       case 'checkinUndo':
         return json(checkinUndo(user));
       case 'setReference':
-        return json(saveReference(user, req.features, req.photo));
+        return json(saveReference(user, req.features, req.photo, req.photoId));
       case 'photo':
         return json(getPhoto(req.id));
       case 'photos':
@@ -535,6 +568,16 @@ function handle(req, user) {
           return json(req.fb && r.error === 'Messaggio non trovato' ? { ok: true } : r);
         }
         return json(chatDelete(user, req.id));
+      case 'coda': {
+        // Il telefono ha messo qualcosa in coda su Firebase (o ha appena aperto l'app): si esegue subito
+        if (!fbAllOn()) return json({ error: 'Non disponibile' });
+        if (stateStale()) {
+          STATE_DIRTY = true;
+          CHAT_DIRTY = true;
+        }
+        const n = processQueue(TEST);
+        return json({ ok: true, done: n });
+      }
       case 'fbSync':
         // Domanda o risposta appena scritta su Firebase: la copia nei fogli (con cambi e notifiche) la fa il server
         if (!fbChatOn()) return json({ error: 'Non disponibile' });
@@ -679,7 +722,7 @@ function doGet(e) {
 // ---------- Logica ----------
 
 function checkin(user, source) {
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   try {
     const today = dayString(new Date());
@@ -704,7 +747,7 @@ function checkin(user, source) {
 /** Annulla il check-in di oggi: lo toglie dalle presenze e dalla chat, senza notifiche. */
 function checkinUndo(user) {
   const today = dayString(new Date());
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   try {
     const sh = sheet('presenze');
@@ -730,9 +773,9 @@ function checkinUndo(user) {
 }
 
 /** Foto di riferimento ("riposato"): solo i valori calcolati, mai la foto. Si fa una volta. */
-function saveReference(user, features, photo) {
+function saveReference(user, features, photo, photoId) {
   if (!features || typeof features.redness !== 'number') return { error: 'Foto di riferimento non valida' };
-  const saved = savePhoto(user, photo, 'riferimento');
+  const saved = savePhoto(user, photo, 'riferimento', photoId);
   props.setProperty('ref_' + user.name, JSON.stringify({ features, at: Date.now(), photoId: saved.id || '' }));
   forget('refs');
   bumpChat(); // la foto da fresco compare anche in chat
@@ -769,7 +812,7 @@ function saveSudometro(user, req) {
   if (done && user.debug && req.overwrite === true) return overwriteSudometro(user, req, today);
   if (done) return { error: 'Il Sudometro di oggi è già fatto' };
   const score = Math.max(0, Math.min(100, Math.round(Number(req.score) || 0)));
-  const saved = savePhoto(user, req.photo, `sudato ${score}${debug ? ' debug' : ''}`);
+  const saved = savePhoto(user, req.photo, `sudato ${score}${debug ? ' debug' : ''}`, req.photoId);
   const refId = getReference(user).photoId || ''; // il riferimento di oggi: domani se ne farà un altro
   const now = new Date();
   sheet('sudometro').appendRow([
@@ -797,8 +840,8 @@ function saveSudometro(user, req) {
 function overwriteSudometro(user, req, today) {
   const score = Math.max(0, Math.min(100, Math.round(Number(req.score) || 0)));
   const title = String(req.title || '').slice(0, 60);
-  const saved = savePhoto(user, req.photo, `sudato ${score}`);
-  const lock = LockService.getScriptLock();
+  const saved = savePhoto(user, req.photo, `sudato ${score}`, req.photoId);
+  const lock = scriptLock();
   lock.waitLock(10000);
   let oldPhoto = '';
   try {
@@ -902,7 +945,7 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
-    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
+    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn(), firebaseTutto: !TEST && fbAllOn(), provaTutto: TEST && fbAllOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
@@ -1087,6 +1130,7 @@ function readChatRows() {
 }
 
 function bumpChat() {
+  STATE_DIRTY = true;
   const v = Number(props.getProperty('CHAT_VERSION') || 0) + 1;
   props.setProperty('CHAT_VERSION', String(v));
   CHAT_DIRTY = true;
@@ -1233,7 +1277,7 @@ function withRef(data) {
 /** Evento automatico in chat (check-in, Sudometro, premiazioni). I dati restano strutturati: il testo lo fa l'app. */
 function addChatEvent(name, data) {
   try {
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock();
     lock.waitLock(10000);
     try {
       appendChat({ name }, 'event', JSON.stringify(data));
@@ -1258,7 +1302,7 @@ function chatSend(user, text, id) {
   const t = String(text || '').trim().slice(0, 500);
   if (!t) return { error: 'Messaggio vuoto' };
   const cid = /^[a-z0-9]{8,20}$/.test(String(id || '')) ? String(id) : '';
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   try {
     if (!cid || !chatRows().some((r) => r.id === cid)) {
@@ -1286,7 +1330,7 @@ function notifyChat(user) {
 function pollAsk(user, day) {
   const d = day ? String(day) : dayString(new Date());
   if (planDays().indexOf(d) < 0) return { error: 'Si può chiedere solo da oggi a 6 giorni' };
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   let created = '';
   try {
@@ -1327,7 +1371,7 @@ function planSet(user, day, choice, time) {
  * chiesto. `when` è il momento della risposta (per le risposte date su Firebase, quello di Firebase).
  */
 function planApply(user, d, c, at, when) {
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   let changed = false;
   let notify = true;
@@ -1399,7 +1443,7 @@ function chatDelete(user, id) {
   if (!user.debug) return { error: 'Solo per gli utenti debug' };
   const target = String(id || '');
   if (!target) return { error: 'Messaggio non indicato' };
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   try {
     const sh = sheet('chat');
@@ -1482,7 +1526,7 @@ function maybeOpenSfida(user) {
   if (today < featureFrom('sfide')) return;
   const now = nowHHmm();
   let event = null;
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   try {
     const list = sfide().filter((s) => s.day === today);
@@ -1525,7 +1569,7 @@ function maybeOpenSfida(user) {
 /** Azioni sulla card della sfida: join, value, winner, confirm, contest. */
 function sfidaAction(user, req) {
   if (!featureOn('sfide')) return { error: 'Sfide non ancora attive' };
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   let notify = null;
   let ended = null;
@@ -1672,7 +1716,7 @@ function closeOldSfide() {
   const today = dayString(new Date());
   const old = sfide().filter((s) => s.state === 'aperta' && s.day < today);
   if (!old.length) return;
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   try {
     old.forEach((s) => concludeSfida(s));
@@ -1835,7 +1879,7 @@ function findRows(key, match) {
 /** Annulla un'azione: le righe coinvolte passano nel foglio Annullati. Nessuna notifica. */
 function adminUndo(admin, kind, key) {
   const k = String(key || '');
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   try {
     const take = []; // { sheet, row, values }
@@ -1927,7 +1971,7 @@ function adminUndo(admin, kind, key) {
 
 /** Rimette al loro posto le righe di un'azione annullata. */
 function adminRestore(id) {
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   try {
     const found = findRows('annullati', (r) => r[0] === String(id || ''));
@@ -1976,7 +2020,7 @@ function adminAddCheckin(name, day, time) {
   if (!user) return { error: 'Utente non trovato' };
   if (!/^\d{4}-\d\d-\d\d$/.test(String(day)) || String(day) > dayString(new Date())) return { error: 'Giorno non valido' };
   if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(String(time))) return { error: 'Orario non valido' };
-  const lock = LockService.getScriptLock();
+  const lock = scriptLock();
   lock.waitLock(10000);
   try {
     if (rows('presenze').some((r) => r.day === day && r.name === name)) return { error: 'Quel giorno ha già un check-in' };
@@ -1992,9 +2036,20 @@ function adminAddCheckin(name, day, time) {
 // ---------- Foto su Drive ----------
 
 /** Salva un JPEG (base64) nella cartella dell'utente. Un errore non blocca il resto. */
-function savePhoto(user, base64, label) {
+function savePhoto(user, base64, label, photoId) {
+  if (photoId) return fotoOwned(user, String(photoId)); // foto già messa su Firebase dal telefono
   if (!base64) return {};
   if (base64.length > 3e6) return { error: 'Foto troppo grande' };
+  if (fbAllOn()) {
+    try {
+      const id = newId();
+      firestoreCall('patch', `foto/${id}`, fotoDoc(user.name, base64, label));
+      return { id };
+    } catch (err) {
+      console.error('Salvataggio foto fallito', err);
+      return { error: 'Foto non salvata: ' + (err.message || err) };
+    }
+  }
   try {
     const name = `${Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH.mm')} ${user.name} ${TEST ? 'prova ' : ''}${label}.jpg`;
     const blob = Utilities.newBlob(Utilities.base64Decode(base64), 'image/jpeg', name);
@@ -2014,8 +2069,7 @@ function getPhotos(ids) {
   list.forEach((id) => {
     if (!allowed.has(id)) return;
     try {
-      const blob = DriveApp.getFileById(id).getBlob();
-      photos[id] = { mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
+      photos[id] = readPhoto(id);
     } catch (err) {
       console.error('Foto non letta', id, err);
     }
@@ -2027,8 +2081,70 @@ function getPhoto(id) {
   // Solo file elencati nel foglio Sudometro: lo script non deve leggere altri file del Drive.
   const allowed = id && (rows('sudometro').some((r) => r.photoId === id || r.refId === id) || Object.values(refPhotoIds()).includes(id));
   if (!allowed) return { error: 'Foto non trovata' };
+  return readPhoto(id);
+}
+
+/** Foto da Firebase (nuove o già copiate) o, se non c'è, da Drive. */
+function readPhoto(id) {
+  if (!isDriveId(id) || fbAllOn()) {
+    const d = firestoreGet(`foto/${id}`);
+    if (d) return { mime: d.fields.mime.stringValue, data: d.fields.data.bytesValue };
+  }
   const blob = DriveApp.getFileById(id).getBlob();
   return { mime: blob.getContentType(), data: Utilities.base64Encode(blob.getBytes()) };
+}
+
+/** Gli id di Drive sono lunghi; quelli delle foto su Firebase (newId) no. */
+const isDriveId = (id) => String(id).length > 20;
+
+function fotoDoc(name, base64, label) {
+  return {
+    fields: {
+      name: { stringValue: name },
+      label: { stringValue: String(label || '') },
+      mime: { stringValue: 'image/jpeg' },
+      data: { bytesValue: base64 },
+      at: { timestampValue: new Date().toISOString() },
+    },
+  };
+}
+
+/** Foto caricata dal telefono su Firebase: valida solo se è sua. */
+function fotoOwned(user, id) {
+  if (!/^[A-Za-z0-9_-]{6,60}$/.test(id)) return { error: 'Foto non valida' };
+  const d = firestoreGet(`foto/${id}`);
+  if (!d || d.fields.name.stringValue !== user.name) return { error: 'Foto non trovata' };
+  return { id };
+}
+
+/**
+ * Da lanciare dall'editor (ripetibile): copia su Firebase le foto di Drive usate dall'app (Sudometro e riferimenti),
+ * con lo stesso id. Salta quelle già copiate; se finisce il tempo basta rilanciarla.
+ */
+function copiaFotoSuFirebase() {
+  TEST = false;
+  MEMO = {};
+  const ids = new Set(rows('sudometro').flatMap((r) => [r.photoId, r.refId]).concat(Object.values(readRefPhotoIds())).filter((x) => x && isDriveId(x)));
+  const t0 = Date.now();
+  let copied = 0;
+  let skipped = 0;
+  for (const id of ids) {
+    if (Date.now() - t0 > 5 * 60000) break; // Apps Script si ferma a 6 minuti
+    if (firestoreGet(`foto/${id}`)) {
+      skipped++;
+      continue;
+    }
+    try {
+      const f = DriveApp.getFileById(id);
+      const name = (allUsers().find((u) => f.getName().indexOf(` ${u.name} `) > 0) || {}).name || '';
+      firestoreCall('patch', `foto/${id}`, fotoDoc(name, Utilities.base64Encode(f.getBlob().getBytes()), 'da Drive'));
+      copied++;
+    } catch (err) {
+      console.error('Foto non copiata', id, err);
+    }
+  }
+  Logger.log(`Foto copiate: ${copied}, già presenti: ${skipped}, totali: ${ids.size}`);
+  return { copied, skipped, total: ids.size };
 }
 
 function photosRoot() {
@@ -2126,6 +2242,10 @@ function hhmmMinus(t, minutes) {
 
 /** Classifica a punti di un mese ("yyyy-MM"), con il dettaglio di ciascuno. */
 function computePoints(month) {
+  return memo('points:' + month, () => computePointsRaw(month));
+}
+
+function computePointsRaw(month) {
   const P = POINTS;
   const users = allUsers();
   const inMonth = (day) => day.slice(0, 7) === month;
@@ -2334,6 +2454,7 @@ function sheetRaw(key) {
 }
 
 function openSheet(key) {
+  if (tablesOn(key)) return openTable(key);
   const ss = SpreadsheetApp.getActive();
   let sh = ss.getSheetByName(sheetName(key));
   if (!sh && TEST && TEST_SHEETS.includes(key)) {
@@ -2372,6 +2493,283 @@ function openSheet(key) {
     props.setProperty('CHAT_TEXT_FORMAT', '1');
   }
   return sh;
+}
+
+// ---------- Tabelle su Firestore ----------
+// Con la proprietà TABELLE = "firebase" (e sempre in modalità prova) ogni "foglio" è un documento Firestore,
+// db/<chiave> (in prova prova_db/<chiave>), con tutte le righe (intestazione compresa) in JSON compresso.
+// La tabella ha gli stessi metodi dei fogli usati qui, quindi punti, penalità, sfide e registro admin non cambiano.
+// Le modifiche si scrivono su Firestore al rilascio del lock e a fine richiesta; se nel frattempo un'altra
+// richiesta ha scritto la stessa tabella, si rilegge e si rifanno sopra le stesse modifiche.
+
+/** Tabella su Firestore invece che nel foglio. In prova si può tornare ai fogli con PROVA_TABELLE = "fogli". */
+function tablesOn(key) {
+  if (TEST && TEST_SHEETS.includes(key)) return realProps.getProperty('PROVA_TABELLE') !== 'fogli';
+  return realProps.getProperty('TABELLE') === 'firebase';
+}
+
+let TABLES = {}; // tabelle caricate in questa esecuzione: percorso → VTable
+
+const tablePath = (key, test) => `${test ? 'prova_db' : 'db'}/${key}`;
+
+/** Righe → testo compresso (le date restano date). */
+function packRows(rows) {
+  const json = JSON.stringify(rows, function (k, v) {
+    return this[k] instanceof Date ? { $d: this[k].toISOString() } : v;
+  });
+  return Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(json, 'application/json')).getBytes());
+}
+
+function unpackRows(b64) {
+  const json = Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(b64), 'application/x-gzip')).getDataAsString();
+  return JSON.parse(json, (k, v) => (v && typeof v === 'object' && typeof v.$d === 'string' && Object.keys(v).length === 1 ? new Date(v.$d) : v));
+}
+
+/** Documento di una tabella: { rows, time } oppure null se non c'è. */
+function readTableDoc(path) {
+  const d = firestoreGet(path);
+  if (!d) return null;
+  return { rows: unpackRows(d.fields.rows.bytesValue), time: d.updateTime };
+}
+
+function openTable(key) {
+  const path = tablePath(key, TEST && TEST_SHEETS.includes(key));
+  const had = TABLES[path];
+  if (had && had.ops.length) return had; // modifiche non ancora scritte: si continua su quelle
+  let doc = PRELOADED[path] !== undefined ? PRELOADED[path] : readTableDoc(path);
+  delete PRELOADED[path];
+  let ops = [];
+  if (!doc) {
+    // Prima volta: in prova si copia la tabella vera, altrimenti si parte dalla sola intestazione
+    let rows = [SHEETS[key].header.slice()];
+    if (TEST && TEST_SHEETS.includes(key)) {
+      if (realProps.getProperty('TABELLE') === 'firebase') {
+        const real = readTableDoc(tablePath(key, false));
+        if (real) rows = real.rows;
+      } else {
+        const sh = SpreadsheetApp.getActive().getSheetByName(SHEETS[key].name);
+        if (sh) rows = sh.getDataRange().getDisplayValues();
+      }
+    }
+    doc = { rows: [], time: '' };
+    ops = rows.map((r) => ({ t: 'add', row: r }));
+  }
+  const t = new VTable(path, doc.rows, doc.time);
+  ops.forEach((o) => t.appendRow(o.row));
+  TABLES[path] = t;
+  return t;
+}
+
+// Tabelle lette tutte insieme all'inizio di una richiesta (una chiamata in parallelo invece di una per tabella)
+let PRELOADED = {};
+
+function preloadTables(keys) {
+  const paths = keys.filter(tablesOn).map((k) => tablePath(k, TEST && TEST_SHEETS.includes(k))).filter((p) => !TABLES[p] && PRELOADED[p] === undefined);
+  if (!paths.length) return;
+  const token = firestoreToken();
+  const res = UrlFetchApp.fetchAll(paths.map((p) => ({ url: `${firestoreBase()}/${p}`, headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true })));
+  res.forEach((r, i) => {
+    const code = r.getResponseCode();
+    if (code === 404) PRELOADED[paths[i]] = null;
+    else if (code < 300) {
+      const d = JSON.parse(r.getContentText());
+      PRELOADED[paths[i]] = { rows: unpackRows(d.fields.rows.bytesValue), time: d.updateTime };
+    }
+  });
+}
+
+/** Scrive su Firestore le tabelle modificate. */
+function flushTables() {
+  Object.keys(TABLES).forEach((path) => {
+    const t = TABLES[path];
+    if (!t.ops.length) return;
+    for (let attempt = 0; ; attempt++) {
+      const body = {
+        writes: [{
+          update: { name: `${fbDocRoot()}/${path}`, fields: { rows: { bytesValue: packRows(t.rows) }, at: { timestampValue: new Date().toISOString() } } },
+          currentDocument: t.time ? { updateTime: t.time } : { exists: false },
+        }],
+      };
+      const r = firestoreFetch('post', ':commit', body);
+      if (r.code < 300) {
+        t.time = (r.json.writeResults && r.json.writeResults[0] && r.json.writeResults[0].updateTime) || t.time;
+        t.ops = [];
+        STATE_DIRTY = true;
+        break;
+      }
+      // Un'altra richiesta ha scritto la tabella: si rilegge e si rifanno le modifiche
+      if (attempt >= 4 || !(r.code === 400 || r.code === 409 || r.code === 412)) throw new Error(`Tabella ${path} non salvata (${r.code}): ${r.text.slice(0, 200)}`);
+      const fresh = readTableDoc(path) || { rows: [], time: '' };
+      t.replay(fresh.rows, fresh.time);
+    }
+  });
+}
+
+/** Righe uguali (per ritrovarle dopo una rilettura). */
+const sameRow = (a, b) => JSON.stringify(a) === JSON.stringify(b);
+
+class VTable {
+  constructor(path, rows, time) {
+    this.path = path;
+    this.rows = rows;
+    this.time = time;
+    this.ops = [];
+  }
+  width() {
+    return this.rows.reduce((w, r) => Math.max(w, r.length), 0);
+  }
+  /** Come nei fogli: tutte le righe hanno la stessa larghezza e le righe vuote in fondo non contano. */
+  tidy() {
+    const w = this.width();
+    this.rows.forEach((r) => {
+      while (r.length < w) r.push('');
+    });
+    while (this.rows.length > 1 && this.rows[this.rows.length - 1].every((x) => x === '' || x === null)) this.rows.pop();
+  }
+  getDataRange() {
+    return new VRange(this, 1, 1, this.rows.length, this.width());
+  }
+  getLastRow() {
+    return this.rows.length;
+  }
+  getMaxColumns() {
+    return this.width();
+  }
+  appendRow(row) {
+    const r = row.slice();
+    this.rows.push(r);
+    this.ops.push({ t: 'add', row: r.slice() });
+    this.tidy();
+    return this;
+  }
+  deleteRow(n) {
+    const before = this.rows[n - 1];
+    this.rows.splice(n - 1, 1);
+    this.ops.push({ t: 'del', before: before.slice() });
+  }
+  getRange(a, c, nr, nc) {
+    if (typeof a === 'string') return new VRange(this, 1, 1, 0, 0); // colonne intere: solo per il formato, che qui non serve
+    return new VRange(this, a, c, nr || 1, nc || 1);
+  }
+  setFrozenRows() {}
+  /** Rifà le modifiche di questa esecuzione sopra la versione appena riletta. */
+  replay(rows, time) {
+    const ops = this.ops;
+    this.rows = rows;
+    this.time = time;
+    this.ops = [];
+    ops.forEach((o) => {
+      if (o.t === 'add') return this.appendRow(o.row);
+      if (o.t === 'sort') return new VRange(this, 2, 1, Math.max(this.rows.length - 1, 0), this.width()).sort(o.spec);
+      const i = this.rows.findIndex((r, k) => k > 0 && sameRow(r, o.before));
+      if (i < 0) return; // già tolta o cambiata da un'altra richiesta
+      if (o.t === 'del') this.deleteRow(i + 1);
+      else {
+        this.ops.push({ t: 'set', before: this.rows[i].slice(), after: o.after.slice() });
+        this.rows[i] = o.after.slice();
+      }
+    });
+  }
+}
+
+class VRange {
+  constructor(t, r, c, nr, nc) {
+    Object.assign(this, { t, r, c, nr, nc });
+  }
+  getValues() {
+    const out = [];
+    for (let i = 0; i < this.nr; i++) {
+      const row = this.t.rows[this.r - 1 + i] || [];
+      const o = [];
+      for (let j = 0; j < this.nc; j++) {
+        const v = row[this.c - 1 + j];
+        o.push(v === undefined || v === null ? '' : v instanceof Date ? new Date(v.getTime()) : v);
+      }
+      out.push(o);
+    }
+    return out;
+  }
+  getDisplayValues() {
+    return this.getValues().map((r) => r.map((v) => (v instanceof Date ? Utilities.formatDate(v, TZ, 'yyyy-MM-dd HH:mm:ss') : typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : String(v))));
+  }
+  setValues(values) {
+    values.forEach((vals, i) => {
+      const n = this.r - 1 + i;
+      while (this.t.rows.length <= n) this.t.rows.push([]);
+      const before = this.t.rows[n].slice();
+      const after = before.slice();
+      vals.forEach((v, j) => (after[this.c - 1 + j] = v));
+      this.t.rows[n] = after;
+      // una riga nuova (oltre la fine) si rifà come aggiunta, una esistente come modifica
+      if (before.every((x) => x === '' || x === null || x === undefined)) this.t.ops.push({ t: 'add', row: after.slice() });
+      else this.t.ops.push({ t: 'set', before, after: after.slice() });
+    });
+    this.t.tidy();
+    return this;
+  }
+  setValue(v) {
+    return this.setValues([[v]]);
+  }
+  clearContent() {
+    return this.setValues(this.getValues().map((r) => r.map(() => '')));
+  }
+  setNumberFormat() {
+    return this;
+  }
+  /** Ordina le righe del blocco (spec: [{ column, ascending }], colonne contate dall'inizio del foglio). */
+  sort(spec) {
+    const block = this.t.rows.splice(this.r - 1, this.nr);
+    const key = (v) => (v instanceof Date ? v.getTime() : v);
+    block.sort((a, b) => {
+      for (const s of spec) {
+        const x = key(a[s.column - 1]);
+        const y = key(b[s.column - 1]);
+        if (x < y) return s.ascending === false ? 1 : -1;
+        if (x > y) return s.ascending === false ? -1 : 1;
+      }
+      return 0;
+    });
+    this.t.rows.splice(this.r - 1, 0, ...block);
+    this.t.ops.push({ t: 'sort', spec });
+    return this;
+  }
+}
+
+/** Lock dello script che, prima di rilasciarsi, scrive su Firestore le tabelle modificate. */
+function scriptLock() {
+  const l = LockService.getScriptLock();
+  return {
+    waitLock: (ms) => l.waitLock(ms),
+    tryLock: (ms) => l.tryLock(ms),
+    hasLock: () => l.hasLock(),
+    releaseLock() {
+      try {
+        flushTables();
+      } finally {
+        l.releaseLock();
+      }
+    },
+  };
+}
+
+/**
+ * Da lanciare dall'editor, una volta, prima di mettere TABELLE = "firebase": copia tutti i fogli su Firestore.
+ * Si può rifare: sovrascrive le tabelle su Firestore con il contenuto dei fogli.
+ */
+function copiaFogliSuFirebase() {
+  TEST = false;
+  MEMO = {};
+  const ss = SpreadsheetApp.getActive();
+  const done = [];
+  Object.keys(SHEETS).forEach((key) => {
+    const sh = ss.getSheetByName(SHEETS[key].name);
+    if (!sh) return;
+    const rows = sh.getDataRange().getValues();
+    firestoreCall('patch', tablePath(key, false), { fields: { rows: { bytesValue: packRows(rows) }, at: { timestampValue: new Date().toISOString() } } });
+    done.push(`${key} (${rows.length - 1})`);
+  });
+  Logger.log('Tabelle copiate su Firebase: ' + done.join(', '));
+  return done;
 }
 
 function toTime(v) {
@@ -2493,6 +2891,25 @@ function firestoreToken() {
   return token;
 }
 
+/** Come firestoreCall, ma restituisce sempre { code, text, json } senza errori. */
+function firestoreFetch(method, path, body) {
+  const opts = { method, headers: { Authorization: 'Bearer ' + firestoreToken() }, muteHttpExceptions: true };
+  if (body) {
+    opts.contentType = 'application/json';
+    opts.payload = JSON.stringify(body);
+  }
+  const r = UrlFetchApp.fetch(`${firestoreBase()}${path[0] === ':' ? '' : '/'}${path}`, opts);
+  return { code: r.getResponseCode(), text: r.getContentText(), json: safeJson(r.getContentText()) };
+}
+
+/** Un documento, o null se non c'è. */
+function firestoreGet(path) {
+  const r = firestoreFetch('get', path);
+  if (r.code === 404) return null;
+  if (r.code >= 300) throw new Error(`Firestore ${r.code}: ${r.text.slice(0, 200)}`);
+  return r.json;
+}
+
 /** `path` è un documento (`chat/abc`) o un metodo della radice (`:commit`, `:runQuery`). */
 function firestoreCall(method, path, body) {
   const opts = { method, headers: { Authorization: 'Bearer ' + firestoreToken() }, muteHttpExceptions: true };
@@ -2556,7 +2973,7 @@ function fbSync() {
     });
     const docs = (Array.isArray(res) ? res : []).map((x) => x.document).filter(Boolean);
     if (!docs.length) return 0;
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock();
     lock.waitLock(10000);
     try {
       MEMO = {};
@@ -2577,6 +2994,149 @@ function fbSync() {
     console.error('Chat Firebase non copiata nel foglio', err);
     return 0;
   }
+}
+
+// ---------- Tutto su Firebase: stato pubblicato e azioni in coda ----------
+// Con FIREBASE_TUTTO = "si" (e sempre in prova) il telefono parla solo con Firebase:
+// - legge lo stato (lo stesso dell'azione "state") dal documento stato/<uid> (in prova prova_stato/<uid>), che il
+//   server riscrive quando qualcosa cambia;
+// - scrive le azioni in azioni/<id> (in prova prova_azioni), con stato "nuova", e avvisa il server con l'azione
+//   "coda" senza aspettare; il server le esegue come se arrivassero qui e scrive l'esito nello stesso documento.
+// Un trigger ogni minuto rifà il giro, se un avviso va perso.
+
+let STATE_DIRTY = false; // qualcosa è cambiato: lo stato su Firebase va riscritto
+
+function fbAllOn() {
+  if (TEST) return realProps.getProperty('PROVA_TABELLE') !== 'fogli';
+  return realProps.getProperty('FIREBASE_TUTTO') === 'si';
+}
+
+const fbPfx = () => (TEST ? 'prova_' : '');
+
+/** La scrittura su Firebase dello stato di chi è cambiato (null se non serve). */
+function statesRequest() {
+  if (!STATE_DIRTY || !fbAllOn()) return null;
+  STATE_DIRTY = false;
+  MEMO = {};
+  const cache = CacheService.getScriptCache();
+  const writes = [];
+  const marks = {};
+  allUsers().forEach((u) => {
+    const json = JSON.stringify(buildState(u));
+    const path = `${fbPfx()}stato/${fbUid(u.name)}`;
+    const hash = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, json));
+    if (cache.get('h_' + path) === hash) return; // uguale all'ultima volta
+    marks['h_' + path] = hash;
+    writes.push({
+      update: {
+        name: `${fbDocRoot()}/${path}`,
+        fields: { json: { stringValue: json }, day: { stringValue: dayString(new Date()) }, at: { timestampValue: new Date().toISOString() } },
+      },
+    });
+  });
+  realProps.setProperty(fbPfx() + 'STATO_GIORNO', dayString(new Date()));
+  if (!writes.length) return null;
+  cache.putAll(marks, 21600);
+  return {
+    url: `${firestoreBase()}:commit`,
+    method: 'post',
+    headers: { Authorization: 'Bearer ' + firestoreToken() },
+    contentType: 'application/json',
+    payload: JSON.stringify({ writes }),
+  };
+}
+
+/** Il giorno è cambiato dall'ultima pubblicazione: lo stato (check-in di oggi, settimana…) va riscritto. */
+function stateStale() {
+  return fbAllOn() && realProps.getProperty(fbPfx() + 'STATO_GIORNO') !== dayString(new Date());
+}
+
+// Azioni che il telefono può mettere in coda (le altre passano dalla richiesta diretta)
+const QUEUE_ACTIONS = ['checkin', 'checkinUndo', 'sudometro', 'setReference', 'setAlias', 'setTimer', 'chatMute', 'subscribe', 'sfida', 'state'];
+
+/** Esegue le azioni in coda (della prova se `test`). Restituisce quante. */
+function processQueue(test) {
+  const was = { TEST, TESTER };
+  TEST = !!test;
+  if (!fbAllOn()) {
+    TEST = was.TEST;
+    return 0;
+  }
+  const coll = `${fbPfx()}azioni`;
+  let done = 0;
+  try {
+    const res = firestoreCall('post', ':runQuery', {
+      structuredQuery: {
+        from: [{ collectionId: coll }],
+        where: { fieldFilter: { field: { fieldPath: 'stato' }, op: 'EQUAL', value: { stringValue: 'nuova' } } },
+        limit: 50,
+      },
+    });
+    const docs = (Array.isArray(res) ? res : []).map((x) => x.document).filter(Boolean);
+    docs.sort((a, b) => (a.fields.at.timestampValue < b.fields.at.timestampValue ? -1 : 1));
+    docs.forEach((d) => {
+      // Prenotata da questa esecuzione (se un'altra l'ha già presa, il documento è cambiato e si salta)
+      const claim = firestoreFetch('post', ':commit', {
+        writes: [{ update: { name: d.name, fields: { ...d.fields, stato: { stringValue: 'in corso' } } }, currentDocument: { updateTime: d.updateTime } }],
+      });
+      if (claim.code >= 300) return;
+      let out;
+      try {
+        out = runQueued(d.fields.name.stringValue, d.fields.action.stringValue, safeJson(d.fields.data.stringValue) || {});
+      } catch (err) {
+        out = { error: String(err.message || err) };
+      }
+      firestoreCall('patch', `${d.name.split('/documents/')[1]}?updateMask.fieldPaths=stato&updateMask.fieldPaths=esito&updateMask.fieldPaths=fatta`, {
+        fields: { stato: { stringValue: 'fatta' }, esito: { stringValue: JSON.stringify(out).slice(0, 200000) }, fatta: { timestampValue: new Date().toISOString() } },
+      });
+      done++;
+    });
+  } finally {
+    TEST = was.TEST;
+    TESTER = was.TESTER;
+  }
+  return done;
+}
+
+/** Un'azione della coda, come se fosse arrivata a doPost da `name`. */
+function runQueued(name, action, data) {
+  if (QUEUE_ACTIONS.indexOf(action) < 0) return { error: 'Azione non permessa' };
+  let user = allUsers().find((u) => u.name === name);
+  if (!user) return { error: 'Utente non trovato' };
+  if (TEST) {
+    if (!(user.admin || PROVA_USERS.includes(user.name))) return { error: 'Non in prova' };
+    TESTER = user.name;
+    if (data.actAs && data.actAs !== user.name && user.admin) {
+      const other = allUsers().find((u) => u.name === String(data.actAs));
+      if (!other) return { error: 'Utente non trovato' };
+      user = { ...other, admin: true, debug: user.debug, actingAs: true };
+    }
+  }
+  MEMO = {};
+  const out = handle({ ...data, action }, user);
+  flushTables();
+  return JSON.parse(out.getContent());
+}
+
+/** Ogni minuto: azioni rimaste in coda (avviso perso) e stato del nuovo giorno. */
+function codaTick() {
+  [false, true].forEach((test) => {
+    TEST = test;
+    try {
+      if (!fbAllOn()) return;
+      MEMO = {};
+      TABLES = {};
+      STATE_DIRTY = stateStale();
+      CHAT_DIRTY = STATE_DIRTY;
+      processQueue(test);
+      TEST = test;
+      pushChatIfChanged();
+    } catch (err) {
+      console.error('Coda non eseguita', err);
+    } finally {
+      TEST = false;
+    }
+  });
 }
 
 // ---------- Sondaggio su Firebase ----------
@@ -2652,7 +3212,7 @@ function fbSyncPlans() {
   asks.forEach((a) => {
     const user = users.find((u) => u.name === a.f.name);
     if (!user || !/^[a-z0-9]{8,20}$/.test(a.f.id || '')) return;
-    const lock = LockService.getScriptLock();
+    const lock = scriptLock();
     lock.waitLock(10000);
     let created = false;
     try {
@@ -2752,14 +3312,17 @@ function firestoreDelete(coll, id) {
 
 /** Stato della chat su Firestore (documento state/chat o prova_state/chat), se in questa richiesta è cambiato. */
 function pushChatIfChanged() {
-  const r = chatStateRequest();
-  if (!r) return;
-  try {
-    const res = UrlFetchApp.fetch(r.url, { ...r, muteHttpExceptions: true });
-    if (res.getResponseCode() >= 300) throw new Error(`Firestore ${res.getResponseCode()}`);
-  } catch (err) {
-    console.error('Chat non aggiornata su Firebase', err);
-  }
+  flushTables();
+  [chatStateRequest, statesRequest].forEach((make) => {
+    try {
+      const r = make();
+      if (!r) return;
+      const res = UrlFetchApp.fetch(r.url, { ...r, muteHttpExceptions: true });
+      if (res.getResponseCode() >= 300) throw new Error(`Firestore ${res.getResponseCode()}`);
+    } catch (err) {
+      console.error('Firebase non aggiornato', err);
+    }
+  });
 }
 
 /** La scrittura dello stato della chat su Firestore, da fare se in questa richiesta è cambiato (altrimenti null). */

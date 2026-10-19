@@ -11,7 +11,9 @@ node fake-gas.js ../../apps-script/Code.gs 8787 &
 curl -s localhost:8787/run/append -d '{"name":"Chat","row":["ID","Data","Ora","Nome","Tipo","Testo","Rif","Orario"]}'
 curl -s localhost:8787/run/append -d "{\"name\":\"Chat\",\"row\":[\"mgv00001abcd\",\"$(TZ=Europe/Rome date +%F)\",\"08:15\",\"Paolo\",\"msg\",\"Messaggio vecchio dal foglio\",\"\",\"\"]}"
 curl -s localhost:8787/run/copiaChatSuFirebase
-node test.js
+node test.js            # chat e sondaggio
+node test-tutto.js      # tutto su Firebase in prova (VERO=1 per la configurazione per tutti, con
+                        # il finto server avviato con TABELLE=firebase FIREBASE_TUTTO=si e copiaFogliSuFirebase)
 ```
 
 `FIREBASE_CHAT=spento node fake-gas.js …` avvia il finto server con Firebase spento.

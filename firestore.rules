@@ -14,6 +14,38 @@ service cloud.firestore {
         && t < request.time + duration.value(8, 'd');
     }
 
+    // Stato dell'app di ognuno (lo scrive il server): lo legge solo lui
+    match /{coll}/{uid} {
+      allow read: if pal() && coll in ['stato', 'prova_stato'] && request.auth.uid == uid;
+    }
+
+    // Azioni in coda per il server: solo a proprio nome, solo nuove; l'esito lo scrive il server
+    match /{coll}/{id} {
+      allow read: if pal() && coll in ['azioni', 'prova_azioni'] && resource.data.name == request.auth.token.name;
+      allow create: if pal()
+        && coll in ['azioni', 'prova_azioni']
+        && request.resource.data.keys().hasOnly(['name', 'action', 'data', 'stato', 'at'])
+        && request.resource.data.name == request.auth.token.name
+        && request.resource.data.stato == 'nuova'
+        && request.resource.data.action in ['checkin', 'checkinUndo', 'sudometro', 'setReference', 'setAlias', 'setTimer', 'chatMute', 'subscribe', 'sfida', 'state']
+        && request.resource.data.data is string
+        && request.resource.data.data.size() <= 20000
+        && request.resource.data.at == request.time;
+    }
+
+    // Foto del Sudometro: le vede chi ha fatto l'accesso; ognuno carica solo le proprie, che poi non cambiano
+    match /foto/{id} {
+      allow read: if pal();
+      allow create: if pal()
+        && request.resource.data.keys().hasOnly(['name', 'label', 'mime', 'data', 'at'])
+        && request.resource.data.name == request.auth.token.name
+        && request.resource.data.mime == 'image/jpeg'
+        && request.resource.data.label is string
+        && request.resource.data.data is bytes
+        && request.resource.data.data.size() < 900000
+        && request.resource.data.at == request.time;
+    }
+
     // Si legge tutto; si scrive solo a proprio nome. Eventi, cancellazioni e stato li fa il server.
     match /{coll}/{id} {
       allow read: if pal()

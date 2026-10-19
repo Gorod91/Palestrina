@@ -186,6 +186,17 @@ Chat e sondaggio usano Firestore (progetto `palestrina-cb43c`). Le regole stanno
 3. GitHub → *Settings → Secrets and variables → Actions → New repository secret*: nome `FIREBASE_DEPLOY_KEY`, valore = tutto il contenuto del file. Poi cancella il file scaricato.
 4. *Actions* → **Aggiorna regole Firebase** → *Run workflow*.
 
+## Tutto su Firebase
+
+Con il passaggio il telefono parla solo con Firebase: legge lo stato da `stato/<utente>` (lo riscrive il server quando cambia qualcosa), mette le azioni (check-in, Sudometro, sfide, impostazioni) in coda in `azioni/` e avvisa il server senza aspettare; le foto stanno in `foto/`. Apps Script resta il motore: esegue la coda, calcola punti e penalità, fa recap, premiazioni, sfide e notifiche, e tiene le sue tabelle su Firestore (`db/<tabella>`, con le stesse colonne dei fogli). In **modalità prova** è già così (raccolte `prova_…`).
+
+Interruttori (proprietà dello script):
+- `TABELLE` = `firebase`: le tabelle del server su Firestore invece che nei fogli.
+- `FIREBASE_TUTTO` = `si`: i telefoni usano Firebase per tutto. `FIREBASE_CHAT` = `tutti`: chat e sondaggio su Firebase.
+- `PROVA_TABELLE` = `fogli`: la modalità prova torna ai fogli (per tornare indietro se qualcosa non va).
+
+Passaggio per tutti, dall'editor di Apps Script: `copiaFogliSuFirebase()`, `copiaChatSuFirebase()`, `copiaFotoSuFirebase()` (rilanciarla finché non dice che le ha copiate tutte), poi le tre proprietà `TABELLE`, `FIREBASE_CHAT`, `FIREBASE_TUTTO`. Per tornare indietro si tolgono le proprietà (i fogli non vengono più aggiornati da quel momento).
+
 ## Timer addominali
 
 Tab **Timer**: durata in alto (30 secondi di default, si cambia con − e + di 5 secondi o toccando il numero), poi il pulsante gigante **Inizia**. L'ultimo tempo usato è salvato per ogni account (in Apps Script), quindi resta anche cambiando telefono.

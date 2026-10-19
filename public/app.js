@@ -2,6 +2,7 @@ import * as sudometro from './sudometro.js';
 import { initTimer, setTimerAccount } from './timer.js';
 import { createChat, answersList, bicep } from './chat.js';
 import { fakeState, fakeChat, fakePhoto } from './fake.js';
+import { createFbData } from './fbdata.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -89,7 +90,91 @@ function fakeOn() {
   return store.get('fakeData') === true && !!(state && state.me && state.me.debug);
 }
 
+// ---------- Tutto su Firebase ----------
+// Con la novità attiva (o in modalità prova, quando il server lo prevede) lo stato arriva da Firestore e le azioni
+// vanno in coda su Firestore: il telefono non aspetta Apps Script. Se Firebase non va, tutto torna come prima.
+const QUEUE_ACTIONS = new Set(['checkin', 'checkinUndo', 'sudometro', 'setReference', 'setAlias', 'setTimer', 'chatMute', 'subscribe', 'sfida']);
+let fbStarted = ''; // '', 'prova' o 'tutti': per chi è collegato
+let fbLiveState = false; // stato arrivato da Firebase (dal server, non solo dalla copia sul telefono)
+let fbRetryAt = 0;
+let pendingState = null; // stato arrivato mentre un'azione era ancora in corso sullo schermo
+const fbdata = createFbData({
+  getToken: () => realApi('fbToken'),
+  ping: () => realApi('coda').catch(() => {}),
+  onState(st, meta) {
+    if (!meta.fromCache) fbLiveState = true;
+    trace.log('firebase', `stato${meta.fromCache ? ' (dal telefono)' : ''}`);
+    if (optimistic) {
+      pendingState = st;
+      return;
+    }
+    applyState(st);
+  },
+  onError(err) {
+    trace.log('firebase', `ERRORE ${err.code || ''} ${err.message}`);
+    fbDataStop();
+    fbRetryAt = Date.now() + 5 * 60000;
+    if (debugOn()) toast(`Firebase non disponibile: ${err.message}`);
+  },
+});
+/** Chi deve usare Firebase per tutto: '', 'prova' o 'tutti' (deciso dal server nello stato). */
+function fbMode() {
+  const f = (state && state.features) || {};
+  if (testOn()) return f.provaTutto ? 'prova' : '';
+  return f.firebaseTutto ? 'tutti' : '';
+}
+const fbOk = () => !!fbStarted && fbdata.ready() && fbLiveState;
+function fbDataCheck() {
+  const want = session && state && state.me ? fbMode() : '';
+  if (want === fbStarted) return;
+  fbDataStop();
+  if (!want || Date.now() < fbRetryAt) return;
+  fbStarted = want;
+  fbdata.start({ name: state.me.name }, want === 'prova').catch(fbdataFail);
+  realApi('coda').catch(() => {}); // stato del nuovo giorno e azioni rimaste in coda
+}
+function fbdataFail(err) {
+  trace.log('firebase', `non disponibile: ${err.message}`);
+  fbDataStop();
+  fbRetryAt = Date.now() + 5 * 60000;
+}
+function fbDataStop() {
+  if (!fbStarted) return;
+  fbdata.stop();
+  fbStarted = '';
+  fbLiveState = false;
+}
+function applyState(st) {
+  state = st;
+  store.set('state', { day: new Date().toDateString(), test: testOn(), data: state });
+  if (!state.me.admin && !state.me.tester && testOn()) store.set('testMode', null);
+  setTimerAccount(state.me.name, state.me.timerSeconds, (s) => api('setTimer', { seconds: s }).catch(() => {}));
+  render();
+}
+/** Azione in coda su Firebase; le foto si caricano prima direttamente su Firebase. */
+function fbCall(action, data) {
+  const d = { ...data, ...(testOn() && store.get('actAs') ? { actAs: store.get('actAs') } : {}) };
+  if (d.photo && (action === 'sudometro' || action === 'setReference')) {
+    d.photoId = fbdata.putPhoto(d.photo, action === 'setReference' ? 'riferimento' : 'sudato');
+    delete d.photo;
+  }
+  return fbdata.call(action, d);
+}
+/** Foto da Firebase; quelle non ancora copiate da Drive le dà Apps Script. */
+async function fbPhotos(ids) {
+  const photos = {};
+  const missing = [];
+  await Promise.all(ids.map((id) => fbdata.photo(id).then((p) => (photos[id] = p)).catch(() => missing.push(id))));
+  if (missing.length) Object.assign(photos, (await realApi('photos', { ids: missing })).photos || {});
+  return { photos };
+}
+
 async function api(action, data = {}) {
+  if (!fakeOn() && fbOk()) {
+    if (action === 'state') return state;
+    if (action === 'photos') return fbPhotos(data.ids || []);
+    if (QUEUE_ACTIONS.has(action)) return fbCall(action, data);
+  }
   if (store.get('fakeData') === true && action !== 'login') {
     if (action === 'state') {
       const real = await realApi('state');
@@ -293,6 +378,7 @@ function render() {
   $('chat-notify').checked = !me.chatMuted;
   chat.setUser({ name: me.name, display: me.display });
   chat.checkFirebase();
+  fbDataCheck();
   chat.updateBadge(state.chatMeta);
   chat.updatePending(state.plans);
 }
@@ -601,6 +687,15 @@ async function login(code) {
 let optimistic = 0;
 
 async function refresh() {
+  if (fbOk()) {
+    // Lo stato arriva da Firebase da solo: qui si applica solo quello arrivato durante un'azione
+    if (pendingState && !optimistic) {
+      const st = pendingState;
+      pendingState = null;
+      applyState(st);
+    }
+    return;
+  }
   try {
     const fresh = await api('state');
     trace.set(fresh.trace);
@@ -829,7 +924,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
-const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => (testOn() ? 'prova' : state && state.features && state.features.firebase ? 'tutti' : '') });
+const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => (testOn() ? 'prova' : state && state.features && state.features.firebase ? 'tutti' : ''), fbOnly: () => fbOk() });
 
 // ---------- Tab ----------
 
@@ -871,6 +966,7 @@ async function saveAlias(value) {
 }
 
 function logout() {
+  fbDataStop();
   setTimerAccount('', null, null);
   chat.reset();
   session = null;
@@ -1040,6 +1136,8 @@ $('test-mode').addEventListener('change', async (e) => {
   if (!e.target.checked) store.set('actAs', null); // fuori dalla prova si è sempre se stessi
   store.set('state', null);
   toast(e.target.checked ? 'Modalità prova attiva: niente arriva agli altri' : 'Modalità prova spenta: dati veri');
+  fbDataStop(); // lo stato della modalità nuova lo si chiede al server, poi Firebase si ricollega a quella giusta
+  fbRetryAt = 0;
   render();
   await refresh();
   chat.reload();

@@ -4,6 +4,7 @@ const fs = require('fs');
 const vm = require('vm');
 const http = require('http');
 const crypto = require('crypto');
+const zlib = require('zlib');
 const { execFileSync } = require('child_process');
 
 const [file, port = '8787'] = process.argv.slice(2);
@@ -44,7 +45,9 @@ sheets.Utenti = users;
 const { privateKey } = crypto.generateKeyPairSync('rsa', { modulusLength: 2048 });
 const P = {
   RESET_ID: '2026-10-13',
-  TRIGGERS_VERSION: '7',
+  TRIGGERS_VERSION: '8',
+  ...(process.env.TABELLE ? { TABELLE: process.env.TABELLE } : {}),
+  ...(process.env.FIREBASE_TUTTO ? { FIREBASE_TUTTO: process.env.FIREBASE_TUTTO } : {}),
   FIRESTORE_EMULATOR: 'localhost:8080',
   FIREBASE_CLIENT_EMAIL: 'prova@palestrina-cb43c.iam.gserviceaccount.com',
   FIREBASE_PRIVATE_KEY: privateKey.export({ type: 'pkcs8', format: 'pem' }),
@@ -59,6 +62,7 @@ const props = {
 };
 const cacheData = {};
 const cache = {
+  putAll: (o, sec) => Object.entries(o).forEach(([k, v]) => cache.put(k, v, sec)),
   get: (k) => (cacheData[k] && cacheData[k].exp > Date.now() ? cacheData[k].v : null),
   put: (k, v, s = 600) => { cacheData[k] = { v, exp: Date.now() + s * 1000 }; },
   remove: (k) => delete cacheData[k],
@@ -83,10 +87,18 @@ const Utilities = {
   },
   base64EncodeWebSafe: (x) => Buffer.from(typeof x === 'string' ? Buffer.from(x, 'utf8') : Buffer.from(x.map((b) => b & 255))).toString('base64url'),
   base64Encode: (x) => Buffer.from(typeof x === 'string' ? Buffer.from(x, 'utf8') : Buffer.from(x.map((b) => b & 255))).toString('base64'),
+  computeDigest: (alg, s) => [...crypto.createHash('md5').update(s).digest()].map((b) => (b > 127 ? b - 256 : b)),
+  DigestAlgorithm: { MD5: 'md5' },
   computeRsaSha256Signature: (s, key) => [...crypto.sign('sha256', Buffer.from(s), key)].map((b) => (b > 127 ? b - 256 : b)),
   getUuid: () => crypto.randomUUID(),
-  newBlob: () => ({}),
+  newBlob: (data, type) => blob(typeof data === 'string' ? Buffer.from(data, 'utf8') : Buffer.from(data.map((b) => b & 255)), type),
+  base64Decode: (s) => [...Buffer.from(s, 'base64')].map((b) => (b > 127 ? b - 256 : b)),
+  gzip: (b) => blob(zlib.gzipSync(b.buf), 'application/x-gzip'),
+  ungzip: (b) => blob(zlib.gunzipSync(b.buf)),
 };
+function blob(buf, type) {
+  return { buf, type, getBytes: () => [...buf].map((b) => (b > 127 ? b - 256 : b)), getDataAsString: () => buf.toString('utf8') };
+}
 const UrlFetchApp = {
   fetch(url, o = {}) {
     const args = ['-sS', '-X', (o.method || 'get').toUpperCase(), '-w', '\n%{http_code}', url];
@@ -103,7 +115,7 @@ const UrlFetchApp = {
   },
 };
 UrlFetchApp.fetchAll = (list) => list.map((r) => UrlFetchApp.fetch(r.url, r));
-const lock = { waitLock() {}, tryLock: () => true, releaseLock() {} };
+const lock = { waitLock() {}, tryLock: () => true, hasLock: () => true, releaseLock() {} };
 const ctx = {
   console,
   SpreadsheetApp: { getActive: () => ss },
@@ -111,7 +123,7 @@ const ctx = {
   CacheService: { getScriptCache: () => cache },
   LockService: { getScriptLock: () => lock },
   Session: { getScriptTimeZone: () => TZ },
-  ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (t) => ({ text: t, setMimeType() { return this; } }) },
+  ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (t) => ({ text: t, getContent() { return t; }, setMimeType() { return this; } }) },
   ScriptApp: { getProjectTriggers: () => [], deleteTrigger() {}, newTrigger: () => { const t = new Proxy({}, { get: (_, k) => (k === 'create' ? () => ({}) : () => t) }); return t; }, WeekDay: {} },
   DriveApp: {},
   Logger: { log: (...a) => console.log('[Logger]', ...a) },
@@ -130,10 +142,26 @@ http
     req.on('end', () => {
       let out;
       try {
-        if (req.url.startsWith('/run/')) {
+        if (req.url === '/eval') out = JSON.stringify({ result: ctx.__run(body) }); // solo per le prove: una funzione da eseguire dentro Code.gs
+        else if (req.url.startsWith('/run/')) {
           // Funzioni dell'editor (es. copiaChatSuFirebase) e accesso ai fogli per le prove
           const name = req.url.slice(5);
-          if (name === 'sheet') out = JSON.stringify((sheets[JSON.parse(body).name] || { data: null }).data);
+          // Fogli per nome ("Chat", "Prova · Chat"): se quella tabella sta su Firestore si legge da lì
+          const tableOf = (n) => {
+            const test = n.startsWith('Prova · ');
+            const key = ctx.__run('(function (n) { return Object.keys(SHEETS).find((k) => SHEETS[k].name === n); })', test ? n.slice(8) : n);
+            return key && (test || process.env.TABELLE === 'firebase') ? { key, test } : null;
+          };
+          if (name === 'sheet') {
+            const t = tableOf(JSON.parse(body).name);
+            out = t ? JSON.stringify((ctx.__run('readTableDoc', `${t.test ? 'prova_db' : 'db'}/${t.key}`) || { rows: null }).rows) : JSON.stringify((sheets[JSON.parse(body).name] || { data: null }).data);
+          } else if (name === 'append' && tableOf(JSON.parse(body).name)) {
+            const b = JSON.parse(body);
+            const t = tableOf(b.name);
+            ctx.__run('(function (key, row) { TEST = false; MEMO = {}; TABLES = {}; const sh = sheet(key); if (row[0] !== SHEETS[key].header[0]) sh.appendRow(row); flushTables(); })', t.key, b.row);
+            out = '{"ok":true}';
+          }
+          else if (name === 'table') { const b = JSON.parse(body); out = JSON.stringify((ctx.__run('readTableDoc', `${b.test ? 'prova_db' : 'db'}/${b.name}`) || { rows: null }).rows); }
           else if (name === 'append') { const b = JSON.parse(body); (sheets[b.name] || ss.insertSheet(b.name)).appendRow(b.row); out = '{"ok":true}'; }
           else if (name === 'prop') { const b = JSON.parse(body); if (b.value === null) delete P[b.key]; else P[b.key] = b.value; out = '{"ok":true}'; }
           else out = JSON.stringify({ result: ctx.__run(name) });
