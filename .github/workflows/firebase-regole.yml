@@ -1,0 +1,73 @@
+name: Aggiorna regole Firebase
+
+# A ogni modifica di firestore.rules su main: pubblica le regole di Firestore (API Firebase Rules).
+# Serve il secret FIREBASE_DEPLOY_KEY: chiave JSON di un account di servizio con il solo ruolo
+# "Amministratore regole Firebase" (vedi README, sezione Regole di Firebase).
+on:
+  push:
+    branches: [main]
+    paths: ['firestore.rules']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firebase-regole
+  cancel-in-progress: false
+
+env:
+  PROJECT: palestrina-cb43c
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Accesso a Firebase
+        env:
+          KEY: ${{ secrets.FIREBASE_DEPLOY_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::Manca il secret FIREBASE_DEPLOY_KEY (vedi README, sezione Regole di Firebase)"
+            exit 1
+          fi
+          # JWT firmato con la chiave dell'account di servizio, scambiato con un token di accesso (vale un'ora)
+          TOKEN=$(node -e '
+            const k = JSON.parse(process.env.KEY);
+            const crypto = require("crypto");
+            const b = (o) => Buffer.from(JSON.stringify(o)).toString("base64url");
+            const now = Math.floor(Date.now() / 1000);
+            const head = b({ alg: "RS256", typ: "JWT" });
+            const body = b({ iss: k.client_email, scope: "https://www.googleapis.com/auth/cloud-platform", aud: "https://oauth2.googleapis.com/token", iat: now, exp: now + 3600 });
+            const sig = crypto.sign("sha256", Buffer.from(head + "." + body), k.private_key).toString("base64url");
+            fetch("https://oauth2.googleapis.com/token", {
+              method: "POST",
+              headers: { "Content-Type": "application/x-www-form-urlencoded" },
+              body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion: head + "." + body + "." + sig }),
+            }).then((r) => r.json()).then((j) => {
+              if (!j.access_token) { console.error(JSON.stringify(j)); process.exit(1); }
+              process.stdout.write(j.access_token);
+            });
+          ')
+          echo "::add-mask::$TOKEN"
+          echo "TOKEN=$TOKEN" >> "$GITHUB_ENV"
+
+      - name: Pubblica le regole
+        run: |
+          API="https://firebaserules.googleapis.com/v1/projects/$PROJECT"
+          # Nuovo insieme di regole (Firebase lo controlla: se c'è un errore si ferma qui e le regole attive restano)
+          BODY=$(jq -n --rawfile c firestore.rules '{source: {files: [{name: "firestore.rules", content: $c}]}}')
+          R=$(curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" "$API/rulesets" -d "$BODY")
+          NAME=$(echo "$R" | jq -r '.name // empty')
+          if [ -z "$NAME" ]; then
+            echo "::error::Regole rifiutate da Firebase"
+            echo "$R" | jq .
+            exit 1
+          fi
+          # Le regole nuove diventano quelle attive di Firestore
+          curl -sS --fail-with-body -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+            "$API/releases/cloud.firestore" \
+            -d "{\"release\": {\"name\": \"projects/$PROJECT/releases/cloud.firestore\", \"rulesetName\": \"$NAME\"}}" | jq '{name, rulesetName, updateTime}'
+          echo "Regole pubblicate: $NAME"

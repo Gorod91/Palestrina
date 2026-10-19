@@ -176,6 +176,16 @@ Tab **Chat**: messaggi del gruppo (ultimi 7 giorni) e, in cima, la domanda **"Ch
 - Notifiche: la domanda arriva a tutti; ogni risposta solo a chi l'ha fatta; i messaggi agli altri, al massimo una notifica ogni 5 minuti per persona. Si possono silenziare in **Impostazioni → Notifiche** (la domanda arriva comunque). Toccando la notifica si apre la chat.
 - Dati nel foglio **Chat**, creato da solo al primo messaggio. L'app controlla i nuovi messaggi ogni 5 secondi solo mentre la chat è aperta.
 
+## Regole di Firebase
+
+Chat e sondaggio usano Firestore (progetto `palestrina-cb43c`). Le regole stanno in `firestore.rules` e a ogni modifica su `main` le pubblica la Action **Aggiorna regole Firebase** (si può anche lanciare a mano da *Actions*). Se le regole hanno un errore Firebase le rifiuta e restano attive quelle di prima.
+
+**Una volta sola** (chiave usata solo per le regole, separata da quella dell'app in Apps Script):
+1. [Google Cloud console](https://console.cloud.google.com/iam-admin/serviceaccounts?project=palestrina-cb43c) → *Account di servizio* → **Crea account di servizio**: nome `github-regole`, ruolo **Amministratore regole Firebase** (*Firebase Rules Admin*), nient'altro.
+2. Sull'account creato: *Chiavi* → *Aggiungi chiave* → *Crea nuova chiave* → **JSON** (si scarica un file).
+3. GitHub → *Settings → Secrets and variables → Actions → New repository secret*: nome `FIREBASE_DEPLOY_KEY`, valore = tutto il contenuto del file. Poi cancella il file scaricato.
+4. *Actions* → **Aggiorna regole Firebase** → *Run workflow*.
+
 ## Timer addominali
 
 Tab **Timer**: durata in alto (30 secondi di default, si cambia con − e + di 5 secondi o toccando il numero), poi il pulsante gigante **Inizia**. L'ultimo tempo usato è salvato per ogni account (in Apps Script), quindi resta anche cambiando telefono.
