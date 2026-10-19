@@ -110,4 +110,3 @@ La chat oggi chiede al server ogni 5 secondi se ci sono novità (Apps Script + f
   - Storico: `copiaChatSuFirebase()` dall'editor, ripetibile.
   - Provata in locale: `tools/firebase-prova` (emulatore, finto Apps Script, tre telefoni).
 - **Sondaggio su Firebase (18/10, in prova)**: domande in `domande/<giorno>` e risposte in `piani/<giorno>_<uid>` (in prova `prova_domande`, `prova_piani`), scritte dal telefono: gli altri le vedono in ~0,2 s. Il server le copia dopo nei fogli Chat e Piani (con Cambi e notifiche, azione `fbSync`) e copia su Firebase quelle arrivate da lui. Le regole controllano nome, risposta, orario, giorno e che per quel giorno ci sia la domanda; senza regole nuove il sondaggio torna da solo al server.
-- Da verificare: se il Wi-Fi aziendale di Michy blocca anche Firebase.

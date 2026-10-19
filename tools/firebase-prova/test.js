@@ -1,5 +1,5 @@
 // Prova della fase 4: tre telefoni (Chromium), emulatore Firestore/Auth e finto Apps Script.
-// A = Francesco e B = Paolo con Firebase; C = Michy con Firestore bloccato (Wi-Fi aziendale).
+// A = Francesco e B = Paolo con Firebase; C con Firestore bloccato (rete che non lo raggiunge).
 const http = require('http');
 const fs = require('fs');
 const path = require('path');

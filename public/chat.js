@@ -228,7 +228,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     load(true);
   }
   /**
-   * Firestore non risponde ma la rete c'è (per esempio un Wi-Fi che blocca Firebase): i miei messaggi rimasti
+   * Firestore non risponde ma la rete c'è (rete che non lo raggiunge): i miei messaggi rimasti
    * in attesa partono da Apps Script con lo stesso id. Se poi Firebase si sblocca, lo stesso id non si doppia.
    */
   function rescuePending() {
