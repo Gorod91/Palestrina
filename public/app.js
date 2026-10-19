@@ -98,6 +98,7 @@ let fbStarted = ''; // '', 'prova' o 'tutti': per chi è collegato
 let fbLiveState = false; // stato arrivato da Firebase (dal server, non solo dalla copia sul telefono)
 let fbRetryAt = 0;
 let pendingState = null; // stato arrivato mentre un'azione era ancora in corso sullo schermo
+let queued = []; // mie azioni in coda non ancora eseguite dal server (anche da prima di chiudere l'app)
 const fbdata = createFbData({
   getToken: () => realApi('fbToken'),
   ping: () => realApi('coda').catch(() => {}),
@@ -109,6 +110,10 @@ const fbdata = createFbData({
       return;
     }
     applyState(st);
+  },
+  onPending(list) {
+    queued = list;
+    if (state && !optimistic) applyState(state);
   },
   onError(err) {
     trace.log('firebase', `ERRORE ${err.code || ''} ${err.message}`);
@@ -144,8 +149,17 @@ function fbDataStop() {
   fbStarted = '';
   fbLiveState = false;
 }
+/** Check-in ancora in coda (per esempio fatto senza rete): si vede già, come appena fatto. */
+function withQueued(st) {
+  if (!st || !st.me || st.me.checkedInToday || !queued.some((q) => q.action === 'checkin')) return st;
+  return {
+    ...st,
+    me: { ...st.me, checkedInToday: true },
+    week: { ...st.week, ranking: st.week.ranking.map((r) => (r.name === st.me.name ? { ...r, count: r.count + 1 } : r)) },
+  };
+}
 function applyState(st) {
-  state = st;
+  state = withQueued(st);
   store.set('state', { day: new Date().toDateString(), test: testOn(), data: state });
   if (!state.me.admin && !state.me.tester && testOn()) store.set('testMode', null);
   setTimerAccount(state.me.name, state.me.timerSeconds, (s) => api('setTimer', { seconds: s }).catch(() => {}));
@@ -153,7 +167,8 @@ function applyState(st) {
 }
 /** Azione in coda su Firebase; le foto si caricano prima direttamente su Firebase. */
 function fbCall(action, data) {
-  const d = { ...data, ...(testOn() && store.get('actAs') ? { actAs: store.get('actAs') } : {}) };
+  // tapAt: momento del tocco, se l'azione arriva al server in ritardo (telefono senza rete)
+  const d = { ...data, tapAt: Date.now(), ...(testOn() && store.get('actAs') ? { actAs: store.get('actAs') } : {}) };
   if (d.photo && (action === 'sudometro' || action === 'setReference')) {
     d.photoId = fbdata.putPhoto(d.photo, action === 'setReference' ? 'riferimento' : 'sudato');
     delete d.photo;

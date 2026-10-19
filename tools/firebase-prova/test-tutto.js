@@ -111,14 +111,27 @@ async function waitCount(P, name, n, ms = 15000) {
   const pres = await post('/run/sheet', { name: SH('Presenze') });
   ok((pres || []).some((r) => r[2] === 'Francesco' && r[0] === today), 'nella tabella di prova (su Firestore)');
 
-  console.log('3. Check-in di Michy senza rete: parte quando torna');
+  console.log('3. Check-in di Michy senza rete, app chiusa e riaperta più tardi con la rete');
   await M.ctx.setOffline(true);
+  const tap = new Date();
   await M.page.$eval('#btn-checkin', (b) => b.click());
   ok((await waitCount(M, 'Michy', 1, 1500)) >= 0, 'M: si vede subito anche offline');
-  await sleep(2000);
+  await sleep(1000);
+  await M.page.close(); // app chiusa senza rete
+  await sleep(65000); // più di un minuto: l'ora di arrivo sarà diversa da quella del tocco
   await M.ctx.setOffline(false);
-  const dO = await waitCount(F, 'Michy', 1, 30000);
-  ok(dO >= 0, `F vede il check-in di Michy ${dO} ms dopo il ritorno della rete`);
+  const tR = Date.now();
+  M.page = await M.ctx.newPage();
+  M.page.on('console', (m) => M.logs.push(m.text()));
+  M.page.on('pageerror', (e) => M.logs.push('ERRORE ' + e.message));
+  M.page.on('dialog', (d) => d.accept());
+  await M.page.goto('http://localhost:8000/');
+  const dO = await waitCount(F, 'Michy', 1, 90000);
+  ok(dO >= 0, `F vede il check-in di Michy ${Date.now() - tR} ms dopo la riapertura`);
+  const hhmm = (d) => d.toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit' });
+  const presM = ((await post('/run/sheet', { name: SH('Presenze') })) || []).find((r) => r[2] === 'Michy' && r[0] === today);
+  ok(presM && presM[1] === hhmm(tap), `registrato all'ora del tocco (${presM && presM[1]}, tocco ${hhmm(tap)}, arrivo ${hhmm(new Date(tR))})`);
+  ok((await waitCount(M, 'Michy', 1, 5000)) >= 0, 'M: dopo la riapertura il check-in c\'è');
 
   console.log('4. Sudometro con foto su Firebase (azione in coda, come il telefono)');
   const jpeg = fs.readFileSync(path.join(PUB, 'icons/icon-192.png')).toString('base64'); // contenuto qualsiasi: si controlla il giro

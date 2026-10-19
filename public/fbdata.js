@@ -8,11 +8,12 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
 
 const ESITO_MS = 60000; // oltre questo tempo un'azione in coda si considera persa
 
-export function createFbData({ getToken, ping, onState, onError }) {
+export function createFbData({ getToken, ping, onState, onPending, onError }) {
   let x = null; // { fs, db } dopo l'accesso
   let pfx = '';
   let me = null;
   let unsubState = null;
+  let unsubPending = null;
   let gen = 0;
   const waiting = new Map(); // id azione → { resolve, reject, timer, unsub }
 
@@ -33,12 +34,30 @@ export function createFbData({ getToken, ping, onState, onError }) {
       },
       (err) => onError(err),
     );
+    // Mie azioni non ancora eseguite (anche quelle salvate sul telefono senza rete, prima di chiudere l'app)
+    let pinged = 0;
+    unsubPending = fs.onSnapshot(
+      fs.query(fs.collection(db, `${pfx}azioni`), fs.where('name', '==', user.name), fs.where('stato', '==', 'nuova')),
+      { includeMetadataChanges: true },
+      (snap) => {
+        onPending(snap.docs.map((d) => ({ id: d.id, action: d.data().action, data: JSON.parse(d.data().data || '{}') })));
+        // Azioni arrivate su Firebase e non ancora eseguite (per esempio salvate senza rete prima di chiudere
+        // l'app): si avvisa il server, al massimo ogni 15 secondi
+        if (snap.docs.some((d) => !d.metadata.hasPendingWrites) && Date.now() - pinged > 15000) {
+          pinged = Date.now();
+          ping();
+        }
+      },
+      () => onPending([]),
+    );
   }
 
   function stop() {
     gen++;
     if (unsubState) unsubState();
+    if (unsubPending) unsubPending();
     unsubState = null;
+    unsubPending = null;
     waiting.forEach((w) => {
       clearTimeout(w.timer);
       if (w.unsub) w.unsub();
