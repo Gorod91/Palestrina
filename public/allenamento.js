@@ -235,6 +235,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       pager.addEventListener('scroll', onPagerScroll, { passive: true });
     }
     glide = null;
+    setupAll();
     tickRest();
   }
 
@@ -299,9 +300,51 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const sch = (schede || []).find((s) => s.id === ui.scheda);
     const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : todayDoc(id) ? 'ok' : ''}" data-a="j:${k}" aria-label="${esc((EX[id] || {}).n || id)}"></button>`).join('');
     const title = sch ? `${esc(sch.name)} · <span id="wo-num">${ui.i + 1}</span>/${ui.list.length}` : 'Allenamento libero';
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button>${sch ? '<button class="wo-chip" data-a="scheda">Cambia esercizio</button>' : ''}</div>
-      ${ui.list.length > 1 ? `<div class="wo-dots" id="wo-dots">${dots}</div>` : ''}
-      <div class="wo-pager${ui.list.length > 1 ? ' multi' : ''}" id="wo-pager">${ui.list.map((_, k) => pageHtml(k, sch)).join('')}</div>`;
+    const many = ui.list.length > 1;
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button></div>
+      ${many ? `<div class="wo-dots" id="wo-dots">${dots}</div>` : ''}
+      <div class="wo-pager${many ? ' multi' : ''}" id="wo-pager">${ui.list.map((_, k) => pageHtml(k, sch)).join('')}</div>
+      ${many ? `<div class="wo-bar"><button class="wo-all" id="wo-all">▦ Tutti</button></div>
+      <div class="wo-sheet" id="wo-sheet" hidden><div class="wo-sheet-box"><div class="wo-grab"></div><p class="wo-sheet-hint">Tieni premuto "Tutti" e trascina il dito su un esercizio, poi lascia</p>
+        <div class="wo-grid">${ui.list.map((id, k) => {
+          const e = EX[id] || { n: id }, d = todayDoc(id), pi = sch && sch.piano ? sch.piano[id] : null;
+          return `<button class="wo-tile${k === ui.i ? ' cur' : ''}${d ? ' ok' : ''}" data-a="j:${k}" data-k="${k}"><span>${d ? '✓' : k + 1}</span><b>${esc(e.n)}</b><small>${esc(pi ? pi.s : e.g || '')}</small></button>`;
+        }).join('')}</div></div></div>` : ''}`;
+  }
+
+  /** "▦ Tutti": tenendo premuto si apre la griglia, il dito scorre sulle tessere e lasciando si apre quella; con un tocco resta aperta. */
+  function setupAll() {
+    const btn = root.querySelector('#wo-all'), sheet = root.querySelector('#wo-sheet');
+    if (!btn || !sheet) return;
+    let t0 = 0, over = -1;
+    const under = (x, y) => {
+      const t = document.elementFromPoint(x, y)?.closest('.wo-tile');
+      return t && sheet.contains(t) ? Number(t.dataset.k) : -1;
+    };
+    btn.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      t0 = Date.now();
+      over = -1;
+      btn.setPointerCapture(e.pointerId);
+      sheet.hidden = false;
+    });
+    btn.addEventListener('pointermove', (e) => {
+      if (!btn.hasPointerCapture(e.pointerId)) return;
+      const k = under(e.clientX, e.clientY);
+      if (k === over) return;
+      over = k;
+      sheet.querySelectorAll('.wo-tile').forEach((t) => t.classList.toggle('hl', Number(t.dataset.k) === over));
+      if (over >= 0 && navigator.vibrate) navigator.vibrate(8);
+    });
+    btn.addEventListener('pointerup', () => {
+      if (over >= 0) {
+        openEx(over, ui.i);
+        draw();
+      } else if (Date.now() - t0 > 400) sheet.hidden = true; // tenuto premuto ma lasciato fuori dalle tessere
+    });
+    btn.addEventListener('contextmenu', (e) => e.preventDefault());
+    btn.addEventListener('click', (e) => e.stopPropagation()); // l'apertura la fa già pointerdown
+    sheet.addEventListener('click', (e) => { if (e.target === sheet) sheet.hidden = true; });
   }
 
   function pageHtml(k, sch) {
@@ -331,7 +374,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }).join('');
     const nx = nextTodo(k);
     const btn = saved
-      ? `${nx >= 0 ? `<button class="primary" data-a="j:${nx}">Prossimo: ${esc((EX[ui.list[nx]] || {}).n || '')} ›</button>` : `<button class="primary" data-a="end">${ui.list.length > 1 ? 'Fine scheda' : 'Fine'}</button>`}
+      ? `${nx < 0 ? `<button class="primary" data-a="end">${ui.list.length > 1 ? 'Fine scheda' : 'Fine'}</button>` : ''}
          <button class="link-button" data-a="edit">Modifica</button>${done.pending ? '<p class="wo-sub wo-center">Salvato sul telefono: parte appena c\'è rete</p>' : ''}`
       : `<div class="wo-btns"><button class="secondary" data-a="add">+ Serie</button><button class="secondary" data-a="del">− Serie</button></div><button class="primary" data-a="ok">✓ Fatto</button>`;
     return `<section class="wo-page" data-k="${k}">
@@ -458,6 +501,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'ok') {
       save(ui.list[ui.i], P().sets);
       Object.assign(P(), { editing: false, open: -1, sets: null });
+      const nx = nextTodo(ui.i); // un solo tocco: si passa subito al prossimo esercizio da fare
+      if (nx >= 0) openEx(nx, ui.i);
     } else if (cmd === 'edit') {
       Object.assign(P(), { editing: true, sets: copy(todayDoc(ui.list[ui.i]).sets) });
     } else if (cmd === 'add') {

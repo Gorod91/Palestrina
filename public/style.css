@@ -695,9 +695,28 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 /* Link per reinstallare l'app: si può selezionare e copiare */
 .icon-link { word-break: break-all; user-select: text; -webkit-user-select: text; }
 
-/* Allenamento: esercizi come pagine da trascinare col dito; la pagina dopo si intravede al bordo */
+/* Allenamento: esercizi come pagine larghe quanto lo schermo, da trascinare col dito */
 .wo-pager { display: flex; gap: 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch;
-  margin-right: -16px; padding-right: 16px; scroll-padding-left: 0; align-items: flex-start; }
+  align-items: flex-start; }
 .wo-pager::-webkit-scrollbar { display: none; }
 .wo-page { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
-.wo-pager.multi .wo-page { flex-basis: calc(100% - 22px); }
+
+/* Allenamento: barra in basso con "Tutti" e griglia degli esercizi (si tiene premuto e si trascina) */
+.wo-bar { position: sticky; bottom: 10px; z-index: 6; display: flex; justify-content: flex-end; margin-top: 14px; pointer-events: none; }
+.wo-all { pointer-events: auto; flex: none; padding: 12px 18px; border: 1px solid #3a3a3c; border-radius: 99px; background: rgba(44, 44, 46, .92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 8px 24px rgba(0, 0, 0, .5); color: var(--stand); font-size: 16px; font-weight: 700; touch-action: none;
+  user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+.wo-sheet { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; justify-content: flex-end; background: rgba(0, 0, 0, .55); }
+.wo-sheet[hidden] { display: none; }
+.wo-sheet-box { padding: 8px 14px calc(96px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: #161618; }
+.wo-grab { width: 40px; height: 5px; border-radius: 3px; background: #48484a; margin: 2px auto 10px; }
+.wo-sheet-hint { margin: 0 0 10px; color: var(--muted); font-size: 13px; text-align: center; }
+.wo-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.wo-tile { display: grid; gap: 3px; justify-items: start; align-content: start; min-height: 84px; padding: 10px; border: 0; border-radius: 14px; background: var(--card-2); color: var(--fg); text-align: left;
+  transition: transform .1s, background .1s; user-select: none; -webkit-user-select: none; }
+.wo-tile span { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; background: #48484a; font-size: 12px; font-weight: 700; }
+.wo-tile b { font-size: 14px; line-height: 1.2; }
+.wo-tile small { font-size: 12px; color: var(--muted); }
+.wo-tile.ok span { background: var(--exercise); color: #000; }
+.wo-tile.cur { outline: 2px solid var(--stand); outline-offset: -2px; }
+.wo-tile.hl { background: var(--stand); color: #000; transform: scale(1.05); }
+.wo-tile.hl small { color: #033; }
