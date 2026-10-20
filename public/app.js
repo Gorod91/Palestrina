@@ -396,7 +396,7 @@ function render() {
   renderGallery();
   renderRefCard(me.reference);
   $('debug-mode-card').hidden = !me.debug;
-  $('icon-card').hidden = !me.admin || testOn(); // per ora solo l'admin, con i dati veri
+  $('icon-card').hidden = testOn(); // per tutti, con i dati veri
   // Admin: tutto. Chi è solo tester (PROVA_USERS nel server): solo l'interruttore della modalità prova.
   $('admin-card').hidden = !(me.admin || me.tester);
   $('admin-card-title').textContent = me.admin ? 'Admin' : 'Prova';
