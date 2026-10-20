@@ -396,12 +396,16 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return -1;
   }
 
+  /** Anello del recupero: lo stesso del timer grande in miniatura (fermo pieno di verde; poi il tratto verde cresce col tempo). */
+  function restRing(frac) {
+    return `<svg class="wo-ring" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="19" fill="none" stroke="rgba(166,255,0,.18)" stroke-width="7"/><circle cx="24" cy="24" r="19" fill="none" stroke="#b8ff3d" stroke-width="7" stroke-dasharray="119.4" stroke-dashoffset="${(119.4 * (1 - frac)).toFixed(1)}" transform="rotate(-90 24 24)"/></svg>`;
+  }
+
   function restHtml() {
-    const left = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000));
-    if (!restEnd) return `<svg class="wo-rest-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="rgba(166,255,0,.22)" stroke-width="4"/><path d="M12 3a9 9 0 0 1 2.8.45" fill="none" stroke="#b8ff3d" stroke-width="4"/></svg><b>Recupero</b><button class="wo-chip" data-a="rest">1:30 ▸</button>`;
-    if (!left) return `<span class="wo-rest-ic">✓</span><b>Recupero finito</b><button class="wo-chip" data-a="stop">OK</button>`;
-    const off = 126 * (1 - left / REST);
-    return `<svg class="wo-ring" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="none" stroke="var(--card-2)" stroke-width="6"/><circle cx="24" cy="24" r="20" fill="none" stroke="var(--stand)" stroke-width="6" stroke-linecap="round" stroke-dasharray="126" stroke-dashoffset="${off}" transform="rotate(-90 24 24)"/></svg>
+    const ms = restEnd - Date.now(), left = Math.max(0, Math.ceil(ms / 1000));
+    if (!restEnd) return `${restRing(1)}<b>Recupero</b><button class="wo-chip" data-a="rest">1:30 ▸</button>`;
+    if (!left) return `${restRing(1)}<b>Recupero finito</b><button class="wo-chip" data-a="stop">OK</button>`;
+    return `${restRing(1 - Math.max(0, ms) / (REST * 1000))}
       <span><small>Recupero</small><b>${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}</b></span><button class="wo-chip" data-a="stop">Stop</button>`;
   }
 

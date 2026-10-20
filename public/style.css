@@ -676,12 +676,10 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .wo-in em { font-style: normal; color: var(--muted); font-size: 12px; font-weight: 600; }
 .wo-hint { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }
 .wo-rest { cursor: pointer; display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 14px; border-radius: 16px; background: var(--card); }
-.wo-rest.on { outline: 1.5px solid var(--stand); outline-offset: -1.5px; }
+.wo-rest.on { outline: 1.5px solid rgba(184, 255, 61, .6); outline-offset: -1.5px; }
 .wo-rest.end { outline: 1.5px solid var(--exercise); outline-offset: -1.5px; }
 .wo-rest small { display: block; color: var(--muted); font-size: 12px; }
 .wo-rest b { font-size: 17px; font-variant-numeric: tabular-nums; }
-.wo-rest-ic { font-size: 18px; }
-svg.wo-rest-ic { width: 24px; height: 24px; flex: none; } /* l'anello del nostro timer, in piccolo */
 .wo-ring { width: 40px; height: 40px; flex: none; }
 .wo-chip { margin-left: auto; padding: 8px 14px; border: 0; border-radius: 99px; background: var(--card-2); color: var(--fg); font-size: 15px; font-weight: 700; white-space: nowrap; }
 .wo-search { margin: 0 0 10px; }
