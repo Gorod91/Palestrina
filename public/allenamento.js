@@ -223,7 +223,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       root.innerHTML = '<p class="wo-empty">Carico l\'allenamento…</p>';
       return;
     }
-    root.innerHTML = ui.view === 'ex' ? exView() : ui.view === 'pick' ? pickView() : ui.view === 'scheda' ? schedaView() : listView();
+    root.innerHTML = ui.view === 'ex' ? exView() : ui.view === 'pick' ? pickView() : listView();
     const pager = root.querySelector('#wo-pager');
     if (pager) {
       pager.scrollLeft = ui.i * pageStep(pager);
@@ -398,21 +398,6 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return -1;
   }
 
-  /** La scheda intera: si sceglie l'esercizio, in qualsiasi ordine (le macchine non sono sempre libere). */
-  function schedaView() {
-    const sch = (schede || []).find((s) => s.id === ui.scheda);
-    if (!sch) return listView();
-    const n = doneToday(sch);
-    return `<button class="wo-back" data-a="home">‹ Allenamento</button>
-      <div class="wo-ex"><div class="wo-ex-name">${esc(sch.name)}</div><span class="wo-pill">${n} di ${sch.ex.length} fatti</span></div>
-      <p class="wo-sub wo-intro">Scegli da quale esercizio partire: l'ordine è libero.</p>
-      <section class="card wo-list">${sch.ex.map((id, k) => {
-        const e = EX[id] || { n: id }, d = todayDoc(id), l = lastTime(id), pi = sch.piano ? sch.piano[id] : null;
-        const info = d ? `Fatto oggi · ${summary(d.sets, unit(e))}` : [pi && pi.s, l && `ultima volta ${summary(l.sets, unit(e))}`].filter(Boolean).join(' · ');
-        return `<button class="wo-row${d ? ' fatto' : ''}" data-a="j:${k}"><span class="wo-mark">${d ? '✓' : k + 1}</span><span><b>${esc(e.n)}</b><small>${esc(info)}</small></span><span class="wo-chev">›</span></button>`;
-      }).join('')}</section>`;
-  }
-
   function restHtml() {
     const left = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000));
     if (!restEnd) return `<span class="wo-rest-ic">⏱</span><b>Recupero</b><button class="wo-chip" data-a="rest">1:30 ▸</button>`;
@@ -494,11 +479,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'g') {
       ui.g = arg;
     } else if (cmd === 'back') {
-      ui.view = ui.view === 'ex' ? (ui.scheda ? 'scheda' : 'pick') : 'list';
+      ui.view = ui.view === 'ex' && !ui.scheda ? 'pick' : 'list';
     } else if (cmd === 'end' || cmd === 'home') {
       ui.view = 'list';
-    } else if (cmd === 'scheda') {
-      ui.view = 'scheda';
     } else if (cmd === 'j') {
       openEx(Number(arg), ui.view === 'ex' ? ui.i : null);
     } else if (cmd === 'ok') {
