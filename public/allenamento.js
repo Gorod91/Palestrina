@@ -397,7 +397,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   function restHtml() {
     const left = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000));
-    if (!restEnd) return `<span class="wo-rest-ic">⏱</span><b>Recupero</b><button class="wo-chip" data-a="rest">1:30 ▸</button>`;
+    if (!restEnd) return `<svg class="wo-rest-ic" aria-hidden="true"><use href="#i-timer"/></svg><b>Recupero</b><button class="wo-chip" data-a="rest">1:30 ▸</button>`;
     if (!left) return `<span class="wo-rest-ic">✓</span><b>Recupero finito</b><button class="wo-chip" data-a="stop">OK</button>`;
     const off = 126 * (1 - left / REST);
     return `<svg class="wo-ring" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="none" stroke="var(--card-2)" stroke-width="6"/><circle cx="24" cy="24" r="20" fill="none" stroke="var(--stand)" stroke-width="6" stroke-linecap="round" stroke-dasharray="126" stroke-dashoffset="${off}" transform="rotate(-90 24 24)"/></svg>
@@ -447,7 +447,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   }
 
   root.addEventListener('click', (ev) => {
-    const a = ev.target.closest('[data-a]')?.dataset.a;
+    let a = ev.target.closest('[data-a]')?.dataset.a;
+    // il recupero parte toccando la barra in qualsiasi punto (fermo; mentre conta c'è il tasto Stop)
+    if (!a && ev.target.closest('.wo-rest') && !restEnd) a = 'rest';
     if (!a) return;
     const page = ev.target.closest('.wo-page');
     if (page) ui.i = Number(page.dataset.k); // i tasti valgono per la pagina in cui sono

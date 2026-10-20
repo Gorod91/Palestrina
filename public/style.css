@@ -675,12 +675,13 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .wo-in:focus-within { box-shadow: 0 0 0 3px rgba(0, 217, 255, .25); }
 .wo-in em { font-style: normal; color: var(--muted); font-size: 12px; font-weight: 600; }
 .wo-hint { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }
-.wo-rest { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 14px; border-radius: 16px; background: var(--card); }
+.wo-rest { cursor: pointer; display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 14px; border-radius: 16px; background: var(--card); }
 .wo-rest.on { outline: 1.5px solid var(--stand); outline-offset: -1.5px; }
 .wo-rest.end { outline: 1.5px solid var(--exercise); outline-offset: -1.5px; }
 .wo-rest small { display: block; color: var(--muted); font-size: 12px; }
 .wo-rest b { font-size: 17px; font-variant-numeric: tabular-nums; }
 .wo-rest-ic { font-size: 18px; }
+svg.wo-rest-ic { width: 24px; height: 24px; flex: none; color: var(--stand); } /* lo stesso disegno del tab Timer */
 .wo-ring { width: 40px; height: 40px; flex: none; }
 .wo-chip { margin-left: auto; padding: 8px 14px; border: 0; border-radius: 99px; background: var(--card-2); color: var(--fg); font-size: 15px; font-weight: 700; white-space: nowrap; }
 .wo-search { margin: 0 0 10px; }
@@ -700,8 +701,11 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 /* icona della griglia nel pulsante "Tutti" */
 .wo-all svg { width: 20px; height: 20px; fill: currentColor; flex: none; }
 /* Allenamento: barra in basso con "Tutti" e griglia degli esercizi (si tiene premuto e si trascina) */
-.wo-bar { position: sticky; bottom: 10px; z-index: 6; display: flex; justify-content: flex-end; margin-top: 14px; pointer-events: none; }
-.wo-all { pointer-events: auto; flex: none; padding: 16px 26px; border: 1px solid #48484a; border-radius: 99px; background: rgba(44, 44, 46, .94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+/* fisso in basso a destra, appena sopra la barra dei tab (alta circa 62 pt più il margine di iPhone) */
+.wo-bar { position: fixed; z-index: 6; right: max(16px, calc((100% - 480px) / 2)); bottom: calc(68px + max(4px, env(safe-area-inset-bottom) - 8px)); pointer-events: none; }
+body.keyboard .wo-bar { display: none; }
+.wo-pager.multi { padding-bottom: 64px; } /* l'ultimo pulsante della pagina non finisce sotto "Tutti" */
+.wo-all { pointer-events: auto; flex: none; padding: 11px 18px; border: 1px solid #48484a; border-radius: 99px; background: rgba(44, 44, 46, .94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   box-shadow: 0 10px 28px rgba(0, 0, 0, .55); display: flex; align-items: center; gap: 9px; color: var(--stand); font-size: 19px; font-weight: 800; touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .wo-sheet { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; justify-content: flex-end; background: rgba(0, 0, 0, .55); }
 .wo-sheet[hidden] { display: none; }
