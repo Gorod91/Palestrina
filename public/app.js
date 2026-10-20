@@ -396,6 +396,7 @@ function render() {
   renderGallery();
   renderRefCard(me.reference);
   $('debug-mode-card').hidden = !me.debug;
+  $('icon-card').hidden = !me.admin || testOn(); // per ora solo l'admin, con i dati veri
   // Admin: tutto. Chi è solo tester (PROVA_USERS nel server): solo l'interruttore della modalità prova.
   $('admin-card').hidden = !(me.admin || me.tester);
   $('admin-card-title').textContent = me.admin ? 'Admin' : 'Prova';
@@ -1571,6 +1572,18 @@ $('btn-checkin').addEventListener('click', checkin);
 $('btn-checkin-undo').addEventListener('click', checkinUndo);
 $('btn-notify').addEventListener('click', () => withBusy($('btn-notify'), 'Attivo…', enableNotifications));
 $('btn-logout').addEventListener('click', logout);
+// "Aggiorna l'icona": codice d'accesso di 15 minuti e Safari aperto sul link (x-safari-https apre proprio Safari, iOS 17+)
+$('btn-icon').addEventListener('click', () => withBusy($('btn-icon'), 'Preparo…', async () => {
+  try {
+    const { token } = await api('linkToken');
+    const url = new URL(`${location.pathname}?accesso=${token}`, location.origin).href;
+    $('icon-link').hidden = false;
+    $('icon-link').textContent = `Se Safari non si apre, copia questo link in Safari entro 15 minuti: ${url}`;
+    location.href = 'x-safari-' + url;
+  } catch (err) {
+    toast(`Errore: ${err.message}`);
+  }
+}));
 $('form-name').addEventListener('submit', (e) => {
   e.preventDefault();
   saveAlias($('in-name').value);
@@ -1681,8 +1694,31 @@ $('chat-input').addEventListener('focus', () => {
   setTimeout(() => ($('scroller').scrollTop = $('scroller').scrollHeight), 350);
 });
 
+/**
+ * Link "Aggiorna l'icona" (?accesso=…): entra con il codice d'accesso di 15 minuti. In Safari si toglie il manifest,
+ * così l'icona aggiunta alla Home si apre su questo indirizzo e la nuova app entra da sola, senza codice.
+ */
+async function accessFromLink() {
+  const token = new URLSearchParams(location.search).get('accesso');
+  if (!token) return;
+  if (!isStandalone) {
+    const m = document.querySelector('link[rel="manifest"]');
+    if (m) m.remove();
+    $('install-reinstall').hidden = false;
+  }
+  if (session) return;
+  try {
+    const r = await realApi('tokenLogin', { token });
+    session = { code: r.code, name: r.name, display: r.display };
+    store.set('session', session);
+  } catch (err) {
+    toast(err.message);
+  }
+}
+
 async function start() {
   window.__palestrinaStarted = true;
+  await accessFromLink();
   if (!isStandalone && !sessionStorage.getItem('palestrina.browser')) return show('install');
   if (!configured) return show('config');
   if (!session) return show('login');

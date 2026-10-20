@@ -97,6 +97,7 @@
         <li>Scegli <b>Aggiungi alla schermata Home</b>, poi <b>Aggiungi</b></li>
         <li>Chiudi Safari e apri <b>Palestrina</b> dalla Home</li>
       </ol>
+      <p id="install-reinstall" class="muted" hidden>Sei già collegato: la nuova icona si apre senza chiedere il codice. Poi cancella dalla Home l'icona vecchia e, nella nuova, tocca di nuovo <b>Attiva notifiche</b>.</p>
       <button id="btn-browser" class="link">Continua nel browser</button>
     </section>
 
@@ -300,6 +301,16 @@
         <div id="viewport-card" hidden>
           <h2 class="section">Schermo (debug)</h2>
           <section class="card"><pre id="viewport-debug" class="viewport-debug"></pre></section>
+        </div>
+
+        <!-- Reinstallare l'app senza rifare l'accesso (per esempio per avere la nuova icona). Per ora solo admin. -->
+        <div id="icon-card" hidden>
+          <h2 class="section">Icona dell'app</h2>
+          <section class="card">
+          <p class="muted">Apre Safari già collegato: lì scegli Condividi → Aggiungi alla schermata Home. La nuova icona si apre senza codice; poi cancella quella vecchia e riattiva le notifiche.</p>
+          <button id="btn-icon" class="secondary">Apri in Safari</button>
+          <p id="icon-link" class="muted small-text icon-link" hidden></p>
+          </section>
         </div>
 
         <section class="card list" style="margin-top:20px">

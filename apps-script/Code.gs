@@ -446,6 +446,13 @@ function doPost(e) {
     } catch (err) {
       console.error('Novità non rilasciate', err);
     }
+    // Link per reinstallare l'app (nuova icona): un codice d'accesso valido 15 minuti al posto del codice personale
+    if (req.action === 'tokenLogin') {
+      const code = CacheService.getScriptCache().get('accesso_' + String(req.token || '').slice(0, 64));
+      const u = code && findUserByCode(code);
+      if (!u) return json({ error: 'Link scaduto: chiedine uno nuovo dalle Impostazioni' });
+      return json({ code: String(code), name: u.name, display: u.display });
+    }
     let user = findUserByCode(req.code);
     if (!user) return json({ error: 'Codice non valido' });
     if (req.test === true && (user.admin || PROVA_USERS.includes(user.name))) {
@@ -530,6 +537,11 @@ function finishRequest() {
 function handle(req, user) {
   {
     switch (req.action) {
+      case 'linkToken': {
+        const token = Utilities.getUuid().replace(/-/g, '');
+        CacheService.getScriptCache().put('accesso_' + token, String(req.code).trim().toUpperCase(), 900);
+        return json({ token });
+      }
       case 'login':
         return json({ name: user.name, display: user.display, goal: user.goal, debug: user.debug, trace: isTraced(user) });
       case 'state':

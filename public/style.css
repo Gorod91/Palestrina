@@ -690,3 +690,6 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .wo-groups { display: flex; gap: 6px; overflow-x: auto; margin: 0 0 12px; padding-bottom: 2px; scrollbar-width: none; }
 .wo-groups button { flex: none; padding: 7px 13px; border: 0; border-radius: 99px; background: var(--card-2); color: var(--muted); font-size: 14px; font-weight: 600; }
 .wo-groups button.on { background: var(--fg); color: #000; }
+
+/* Link per reinstallare l'app: si può selezionare e copiare */
+.icon-link { word-break: break-all; user-select: text; -webkit-user-select: text; }
