@@ -102,11 +102,11 @@ async function waitCount(P, name, n, ms = 15000) {
 
   console.log('2. Check-in di Francesco: va in coda, Michy lo vede da Firebase');
   const before = await countOf(M, 'Francesco');
-  F.slow.ms = 4000; // Apps Script lento: il bicipite resta finché il server non risponde
+  F.slow.ms = 4000; // Apps Script lento: il bicipite si toglie quando Firebase conferma, senza aspettarlo
   const tC = Date.now();
   await F.page.$eval('#btn-checkin', (b) => b.click());
-  const tDone = await F.page.waitForFunction(() => /Check-in/.test(document.getElementById('toast').textContent) && !document.getElementById('toast').hidden, null, { timeout: 20000 }).then(() => Date.now() - tC).catch(() => -1);
-  ok(tDone >= 4000, `F: "Check-in fatto" solo dopo la risposta del server (${tDone} ms)`);
+  const tDone = await F.page.waitForFunction(() => /Check-in/.test(document.getElementById('toast').textContent) && !document.getElementById('toast').hidden, null, { timeout: 10000 }).then(() => Date.now() - tC).catch(() => -1);
+  ok(tDone >= 0 && tDone < 2000, `F: "Check-in fatto" dopo ${tDone} ms (conferma di Firebase), senza aspettare Apps Script`);
   ok((await waitCount(F, 'Francesco', before + 1, 1000)) >= 0, 'F: il suo check-in si vede subito');
   const dM = await waitCount(M, 'Francesco', before + 1);
   ok(dM >= 0, `M vede il check-in di Francesco dopo ${Date.now() - tC} ms`);
@@ -118,6 +118,20 @@ async function waitCount(P, name, n, ms = 15000) {
   ok(q.some((x) => x.document && x.document.fields.action.stringValue === 'checkin' && x.document.fields.stato.stringValue === 'fatta'), 'in coda su Firebase, eseguito dal server');
   const pres = await post('/run/sheet', { name: SH('Presenze') });
   ok((pres || []).some((r) => r[2] === 'Francesco' && r[0] === today), 'nella tabella di prova (su Firestore)');
+
+  console.log('2b. Server che non risponde: errore dopo 75 s e il check-in non viene più eseguito');
+  M.slow.ms = 0;
+  await M.ctx.route('https://finto.apps/**', (r) => r.abort()); // Apps Script irraggiungibile per Michy
+  const tS = Date.now();
+  await M.page.$eval('#btn-checkin', (b) => b.click());
+  ok((await waitCount(M, 'Michy', 1, 3000)) >= 0, 'M: check-in fatto appena Firebase lo conferma');
+  const err = await M.page.waitForFunction(() => /server non ha risposto/.test(document.getElementById('toast').textContent) && !document.getElementById('toast').hidden, null, { timeout: 90000 }).then(() => Date.now() - tS).catch(() => -1);
+  ok(err >= 70000, `M: errore "il server non ha risposto" dopo ${err} ms`);
+  ok((await waitCount(M, 'Michy', 0, 2000)) >= 0, 'M: il check-in sparisce');
+  await M.ctx.unroute('https://finto.apps/**');
+  await post('', { action: 'coda', code: 'MIC-1', test: !VERO }); // il server torna: non deve eseguirlo più
+  await sleep(3000);
+  ok((await countOf(F, 'Michy')) === 0, 'F: nessun check-in di Michy eseguito dopo l\'errore');
 
   console.log('3. Check-in di Michy senza rete: errore subito, non parte niente');
   await M.ctx.setOffline(true);

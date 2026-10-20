@@ -101,6 +101,8 @@ let fbRetryAt = 0;
 // Stato arrivato da Firebase mentre un'azione era in corso: è più vecchio dell'azione, quindi si scarta
 // (quello che la contiene arriva subito dopo l'esito)
 let pendingState = null;
+// Check-in o annullamento salvati su Firebase ma non ancora nello stato: si vedono già, finché lo stato non li ha
+const localDone = { checkin: false, undo: false };
 const fbdata = createFbData({
   getToken: () => realApi('fbToken'),
   ping: () => realApi('coda').catch(() => {}),
@@ -142,13 +144,30 @@ function fbdataFail(err) {
   fbRetryAt = Date.now() + 5 * 60000;
 }
 function fbDataStop() {
+  localDone.checkin = false;
+  localDone.undo = false;
   if (!fbStarted) return;
   fbdata.stop();
   fbStarted = '';
   fbLiveState = false;
 }
+/** Lo stato con sopra il check-in (o l'annullamento) appena fatto e non ancora arrivato dal server. */
+function withLocal(st) {
+  if (!st || !st.me) return st;
+  if (localDone.checkin && st.me.checkedInToday) localDone.checkin = false;
+  if (localDone.undo && !st.me.checkedInToday) localDone.undo = false;
+  const delta = localDone.checkin ? 1 : localDone.undo ? -1 : 0;
+  if (!delta) return st;
+  return {
+    ...st,
+    me: { ...st.me, checkedInToday: delta > 0 },
+    week: { ...st.week, ranking: st.week.ranking.map((r) => (r.name === st.me.name ? { ...r, count: Math.max(0, r.count + delta) } : r)) },
+  };
+}
+let serverState = null; // ultimo stato arrivato dal server, senza le azioni appena fatte sul telefono
 function applyState(st) {
-  state = st;
+  serverState = st;
+  state = withLocal(st);
   store.set('state', { day: new Date().toDateString(), test: testOn(), data: state });
   if (!state.me.admin && !state.me.tester && testOn()) store.set('testMode', null);
   setTimerAccount(state.me.name, state.me.timerSeconds, (s) => api('setTimer', { seconds: s }).catch(() => {}));
@@ -165,8 +184,27 @@ function fbCall(action, data) {
     d.photoId = fbdata.putPhoto(d.photo, action === 'setReference' ? 'riferimento' : 'sudato');
     delete d.photo;
   }
-  return fbdata.call(action, d); // il bicipite resta finché il server non ha eseguito l'azione
+  if (!FAST_ACTIONS.has(action)) return fbdata.call(action, d);
+  // Fatta quando Firebase conferma di averla salvata; se poi il server la rifiuta o non risponde, errore e si torna
+  // all'ultimo stato del server
+  const key = action === 'checkin' ? 'checkin' : action === 'checkinUndo' ? 'undo' : '';
+  if (key) {
+    localDone.checkin = key === 'checkin';
+    localDone.undo = key === 'undo';
+  }
+  return fbdata.call(action, d, {
+    onResult(r) {
+      if (action === 'checkin' && r.alreadyToday) toast('Avevi già fatto check-in oggi');
+    },
+    onError(err) {
+      if (key) localDone[key] = false;
+      toast(`Errore: ${err.message}`);
+      if (serverState) applyState(serverState);
+    },
+  });
 }
+// Azioni date per fatte appena salvate su Firebase (le altre aspettano la risposta del server: punteggio, sfide…)
+const FAST_ACTIONS = new Set(['checkin', 'checkinUndo', 'setTimer', 'chatMute', 'setAlias', 'subscribe']);
 /** Foto da Firebase; quelle non ancora copiate da Drive le dà Apps Script. */
 async function fbPhotos(ids) {
   const photos = {};

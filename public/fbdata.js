@@ -6,7 +6,10 @@ import { fbSignIn, fbUid } from './fbchat.js';
 /** Id ordinabile nel tempo, come newId() del server. */
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
-const ESITO_MS = 30000; // oltre questo tempo l'app smette di aspettare (il server scarta le azioni arrivate dopo 5 minuti)
+const ESITO_MS = 30000; // senza conferma di Firebase entro questo tempo l'azione non è partita
+// Azione salvata su Firebase ma non eseguita dal server entro questo tempo: errore. Il server non esegue più
+// un'azione arrivata da oltre 60 secondi (SERVER_WAIT_MS in Code.gs), quindi dopo l'errore non succede niente.
+const SERVER_MS = 75000;
 
 export function createFbData({ getToken, ping, onState, onError }) {
   let x = null; // { fs, db } dopo l'accesso
@@ -42,7 +45,7 @@ export function createFbData({ getToken, ping, onState, onError }) {
     waiting.forEach((w) => {
       clearTimeout(w.timer);
       if (w.unsub) w.unsub();
-      w.reject(new Error('Firebase scollegato'));
+      if (!w.fast) w.reject(new Error('Firebase scollegato')); // quelle già salvate le esegue comunque il server
     });
     waiting.clear();
     x = null;
@@ -52,8 +55,10 @@ export function createFbData({ getToken, ping, onState, onError }) {
 
   /**
    * Mette un'azione in coda e aspetta l'esito scritto dal server (stessa risposta della richiesta diretta).
+   * Con `fast` la promessa finisce appena Firebase conferma di averla salvata (sui suoi server, non solo sul
+   * telefono); l'esito del server arriva dopo a `fast.onResult` / `fast.onError`, anche se non risponde.
    */
-  function call(action, data = {}) {
+  function call(action, data = {}, fast = null) {
     if (!x) return Promise.reject(new Error('Firebase non collegato'));
     const { fs, db } = x;
     const id = newId();
@@ -71,6 +76,15 @@ export function createFbData({ getToken, ping, onState, onError }) {
       fs.setDoc(ref, { name: me.name, action, data: JSON.stringify(data), stato: 'nuova', at: fs.serverTimestamp() })
         .then(() => {
           ping();
+          if (fast) {
+            // Salvata: per chi aspetta è fatta; l'esito del server arriva dopo
+            clearTimeout(w.timer);
+            resolve({ ok: true, queued: true });
+            w.fast = true;
+            w.resolve = fast.onResult || (() => {});
+            w.reject = fast.onError || (() => {});
+            w.timer = setTimeout(() => done(w.reject, new Error('il server non ha risposto: riprova')), SERVER_MS);
+          }
           w.unsub = fs.onSnapshot(
             ref,
             (snap) => {

@@ -3095,6 +3095,8 @@ function stateStale() {
 
 // Un'azione arrivata su Firebase più di 5 minuti dopo il tocco si scarta (margine anche per l'orologio del telefono)
 const STALE_ACTION_MS = 5 * 60000;
+// Il telefono aspetta l'esito 75 secondi: un'azione in coda da più di 60 secondi non si esegue più
+const SERVER_WAIT_MS = 60000;
 
 // Azioni che il telefono può mettere in coda (le altre passano dalla richiesta diretta)
 const QUEUE_ACTIONS = ['checkin', 'checkinUndo', 'sudometro', 'setReference', 'setAlias', 'setTimer', 'chatMute', 'subscribe', 'sfida', 'state'];
@@ -3128,8 +3130,10 @@ function processQueue(test) {
       let out;
       try {
         const data = safeJson(d.fields.data.stringValue) || {};
-        const late = Number(data.tapAt) > 0 && new Date(d.fields.at.timestampValue).getTime() - Number(data.tapAt) > STALE_ACTION_MS;
-        // Arrivata molto dopo il tocco (rete instabile): non si esegue, il telefono ha già detto che non è partita
+        const arrived = new Date(d.fields.at.timestampValue).getTime();
+        // Arrivata molto dopo il tocco (rete instabile) o rimasta in coda troppo (server che non rispondeva):
+        // il telefono ha già dato errore, quindi non si esegue
+        const late = (Number(data.tapAt) > 0 && arrived - Number(data.tapAt) > STALE_ACTION_MS) || Date.now() - arrived > SERVER_WAIT_MS;
         out = late ? { error: 'Arrivata troppo tardi (connessione assente): rifalla' } : runQueued(d.fields.name.stringValue, d.fields.action.stringValue, data);
       } catch (err) {
         out = { error: String(err.message || err) };
