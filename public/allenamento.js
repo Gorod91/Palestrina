@@ -63,6 +63,8 @@ function primaVolta(piano) {
   return Array.from({ length: n }, () => ({ kg: 0, reps }));
 }
 const unit = (e) => (e && e.t) || 'kg';
+/** Di quanto cambia il peso con − e +: le macchine e i cavi vanno a 1 kg, bilancieri e manubri a 2,5 (si può sempre scrivere). */
+const kgStep = (e) => (e && /^(Macchina|Cavo|Cavi)/.test(e.m || '') ? 1 : 2.5);
 
 const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' });
 const today = () => dayFmt.format(new Date());
@@ -215,7 +217,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const kgCell = t === 'kg' ? `<span class="v${ck ? ' ch' : ''}">${kgf(s.kg)}<small>kg</small></span>` : '<span></span>';
       const row = `<button class="wo-set${saved ? ' done' : ''}${ui.open === k ? ' open' : ''}" data-a="o:${k}"><span class="n">${k + 1}</span>${kgCell}<span class="v${cr ? ' ch' : ''}">${s.reps}<small>${t === 'sec' ? 's' : 'rip'}</small></span><span class="n">${saved ? (done.pending ? '…' : '✓') : '›'}</span></button>`;
       if (ui.open !== k || saved) return row;
-      const kgEdit = t === 'kg' ? `<span class="wo-pm"><button data-a="k-:${k}" aria-label="Meno peso">−</button><input id="wo-kg" inputmode="decimal" value="${kgf(s.kg)}" aria-label="Chili"><button data-a="k+:${k}" aria-label="Più peso">+</button></span>` : '';
+      const kgEdit = t === 'kg' ? `<span class="wo-pm"><button data-a="k-:${k}" aria-label="Meno peso">−</button><input id="wo-kg" inputmode="decimal" value="${kgf(s.kg)}" aria-label="Chili" onfocus="this.select()"><button data-a="k+:${k}" aria-label="Più peso">+</button></span>` : '';
       return `${row}<div class="wo-edit">${kgEdit}
         <span class="wo-pm"><button data-a="r-:${k}" aria-label="${t === 'sec' ? 'Meno secondi' : 'Meno ripetizioni'}">−</button><b>${s.reps}${t === 'sec' ? '"' : ''}</b><button data-a="r+:${k}" aria-label="${t === 'sec' ? 'Più secondi' : 'Più ripetizioni'}">+</button></span></div>`;
     }).join('');
@@ -330,7 +332,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       ui.open = ui.open === k ? -1 : k;
     } else if (/^[kr][+-]$/.test(cmd)) {
       const k = Number(arg), d = cmd[1] === '+' ? 1 : -1;
-      if (cmd[0] === 'k') setKg(k, Math.max(0, ui.sets[k].kg + 2.5 * d));
+      if (cmd[0] === 'k') setKg(k, Math.max(0, ui.sets[k].kg + kgStep(EX[ui.list[ui.i]]) * d));
       else {
         const step = unit(EX[ui.list[ui.i]]) === 'sec' ? 5 : 1;
         ui.sets[k].reps = Math.max(step, Math.min(600, ui.sets[k].reps + step * d));
