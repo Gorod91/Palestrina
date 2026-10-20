@@ -162,6 +162,19 @@ function withLocal(st) {
     ...st,
     me: { ...st.me, checkedInToday: delta > 0 },
     week: { ...st.week, ranking: st.week.ranking.map((r) => (r.name === st.me.name ? { ...r, count: Math.max(0, r.count + delta) } : r)) },
+    presenzeMese: withMyDay(st.presenzeMese, st.me.name, delta),
+  };
+}
+/** Presenze del mese con il check-in di oggi aggiunto (delta 1) o tolto (delta -1). */
+function withMyDay(pm, name, delta) {
+  if (!pm) return pm;
+  return {
+    ...pm,
+    people: pm.people.map((p) => {
+      if (p.name !== name) return p;
+      const days = p.days.filter((d) => d !== pm.today);
+      return { ...p, days: delta > 0 ? days.concat(pm.today) : days };
+    }),
   };
 }
 let serverState = null; // ultimo stato arrivato dal server, senza le azioni appena fatte sul telefono
@@ -364,19 +377,7 @@ function render() {
   $('week-goal').textContent = `/${mine.goal}`;
   $('week-streak').textContent = mine.streak;
 
-  $('ranking').innerHTML = '';
-  week.ranking.forEach((r, i) => {
-    const li = document.createElement('li');
-    if (r.name === me.name) li.className = 'me';
-    li.innerHTML = `
-      <span class="pos">${i + 1}</span>
-      <span class="ring">${ring(r.count / r.goal, ...COLORS.move, { size: 44, width: 7 })}</span>
-      <div><div class="name"></div><div class="sub">${r.streak ? `${r.streak} ${r.streak === 1 ? 'settimana' : 'settimane'} di fila` : 'Obiettivo ' + r.goal}</div></div>
-      <span class="count">${r.count}<small>/${r.goal}</small></span>`;
-    li.querySelector('.name').textContent = r.display || r.name;
-    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', CROWN);
-    $('ranking').append(li);
-  });
+  renderPresence();
   renderPoints();
   renderAlbo();
   if (document.activeElement !== $('in-name')) $('in-name').value = me.alias || '';
@@ -562,6 +563,91 @@ async function fetchPhotos() {
       group.forEach(([, w]) => w.reject(err));
     }
   }
+}
+
+// Presenze: "Settimana" con gli anelli, "Mese" con i giorni in palestra di tutto il mese (si riparte sempre dalla settimana)
+let presenceMode = 'week';
+$('presence-mode').querySelectorAll('button').forEach((b) => {
+  b.onclick = () => {
+    presenceMode = b.dataset.mode;
+    renderPresence();
+  };
+});
+
+function renderPresence() {
+  const { me, week } = state;
+  const pm = state.presenzeMese;
+  const month = presenceMode === 'month' && !!pm;
+  $('presence-mode').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.mode === (month ? 'month' : 'week')));
+  $('presence-head').hidden = !month;
+  $('presence-key').hidden = !month;
+  $('pomodoro').hidden = month;
+  $('ranking').innerHTML = '';
+  if (month) return renderPresenceMonth(pm, me);
+  week.ranking.forEach((r, i) => {
+    const li = document.createElement('li');
+    if (r.name === me.name) li.className = 'me';
+    li.innerHTML = `
+      <span class="pos">${i + 1}</span>
+      <span class="ring">${ring(r.count / r.goal, ...COLORS.move, { size: 44, width: 7 })}</span>
+      <div><div class="name"></div><div class="sub">${r.streak ? `${r.streak} ${r.streak === 1 ? 'settimana' : 'settimane'} di fila` : 'Obiettivo ' + r.goal}</div></div>
+      <span class="count">${r.count}<small>/${r.goal}</small></span>`;
+    li.querySelector('.name').textContent = r.display || r.name;
+    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', CROWN);
+    $('ranking').append(li);
+  });
+}
+
+/** Settimane (da lunedì) dei giorni del mese: [[primo giorno, ultimo giorno], …] come 'AAAA-MM-GG'. */
+function monthWeeks(month) {
+  const pad = (n) => String(n).padStart(2, '0');
+  const [y, m] = month.split('-').map(Number);
+  const last = new Date(y, m, 0).getDate();
+  const weeks = [];
+  for (let d = 1; d <= last; ) {
+    const dow = (new Date(y, m - 1, d).getDay() + 6) % 7; // 0 = lunedì
+    const end = Math.min(last, d + 6 - dow);
+    weeks.push([`${month}-${pad(d)}`, `${month}-${pad(end)}`]);
+    d = end + 1;
+  }
+  return weeks;
+}
+
+function renderPresenceMonth(pm, me) {
+  const weeks = monthWeeks(pm.month);
+  const inMonth = (d) => d.slice(0, 7) === pm.month;
+  $('presence-head').innerHTML = `<span></span><div class="strip">${weeks
+    .map(([a, b]) => `<div class="wk${pm.today >= a && pm.today <= b ? ' now' : ''}" style="--n:${Number(b.slice(8)) - Number(a.slice(8)) + 1}"><span>${a.endsWith('-01') ? `1 ${MONTH_SHORT[Number(pm.month.slice(5)) - 1]}` : Number(a.slice(8))}</span></div>`)
+    .join('')}</div>`;
+  const people = pm.people
+    .map((p) => ({ ...p, total: p.days.filter(inMonth).length }))
+    .sort((a, b) => b.total - a.total || (a.display || a.name).localeCompare(b.display || b.name));
+  people.forEach((p, i) => {
+    const days = new Set(p.days);
+    const strip = weeks
+      .map(([a, b], w) => {
+        let cells = '';
+        for (let d = a; d <= b; d = nextDay(d)) cells += `<span class="d${days.has(d) ? ' in' : ''}${d > pm.today ? ' fut' : ''}${d === pm.today ? ' today' : ''}"></span>`;
+        // obiettivo della settimana intera: per la prima contano anche i giorni del mese prima
+        const n = p.days.filter((d) => d <= b && (w === 0 ? !inMonth(d) || d >= a : d >= a)).length;
+        const bar = a > pm.today ? ' fut' : n >= p.goal ? ' ok' : '';
+        return `<div class="wk" style="--n:${Number(b.slice(8)) - Number(a.slice(8)) + 1}"><div class="days">${cells}</div><div class="bar${bar}"></div></div>`;
+      })
+      .join('');
+    const li = document.createElement('li');
+    li.className = 'month' + (p.name === me.name ? ' me' : '');
+    li.innerHTML = `<span class="pos">${i + 1}</span><div class="name"></div><span class="count">${p.total}</span><div class="strip">${strip}</div>`;
+    li.querySelector('.name').textContent = p.display || p.name;
+    if (isKing(p.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', CROWN);
+    $('ranking').append(li);
+  });
+}
+
+const MONTH_SHORT = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+function nextDay(d) {
+  const t = new Date(d + 'T12:00:00Z');
+  t.setUTCDate(t.getUTCDate() + 1);
+  return t.toISOString().slice(0, 10);
 }
 
 // Galleria del Sudometro: parte sempre dalla settimana in corso; "Mese" mostra tutto il mese finché si resta lì
@@ -775,6 +861,7 @@ async function checkin() {
     ...state,
     me: { ...state.me, checkedInToday: true },
     week: { ...state.week, ranking: state.week.ranking.map((r) => (r.name === state.me.name ? { ...r, count: r.count + 1 } : r)) },
+    presenzeMese: withMyDay(state.presenzeMese, state.me.name, 1),
   };
   savingCheckin = true;
   optimistic++;
@@ -996,6 +1083,10 @@ function selectTab(name) {
   if (name === 'classifica' && galleryMode !== 'week' && state) {
     galleryMode = 'week'; // ogni volta che si apre la Classifica si riparte dalla settimana
     renderGallery();
+  }
+  if (name === 'classifica' && presenceMode !== 'week' && state) {
+    presenceMode = 'week';
+    renderPresence();
   }
 }
 

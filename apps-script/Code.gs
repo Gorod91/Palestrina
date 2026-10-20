@@ -966,11 +966,31 @@ function buildState(user) {
         .sort((a, b) => b.score - a.score)
         .map((r) => ({ name: r.name, display: dn(r.name), day: r.day, score: r.score, title: r.title, photoId: r.photoId, refId: r.refId })),
     },
+    // Presenze del mese (Classifica → Mese): i giorni in palestra di ognuno. Si parte dal lunedì della settimana del 1°,
+    // così l'obiettivo della prima settimana conta anche i giorni del mese prima (come per i punti).
+    presenzeMese: presenzeMese(users, presenze, today),
     // Lo stesso per tutto il mese (interruttore "Mese" sopra la galleria)
     sudometroMonth: rows('sudometro')
       .filter((r) => r.day.slice(0, 7) === today.slice(0, 7))
       .sort((a, b) => b.score - a.score)
       .map((r) => ({ name: r.name, display: dn(r.name), day: r.day, score: r.score, title: r.title, photoId: r.photoId, refId: r.refId })),
+  };
+}
+
+function presenzeMese(users, presenze, today) {
+  const m = today.slice(0, 7);
+  const from = weekKey(m + '-01');
+  let to = today;
+  while (addDays(to, 1).slice(0, 7) === m) to = addDays(to, 1);
+  return {
+    month: m,
+    today,
+    people: users.map((u) => ({
+      name: u.name,
+      display: u.display,
+      goal: u.goal,
+      days: [...new Set(presenze.filter((r) => r.name === u.name && r.day >= from && r.day <= to).map((r) => r.day))].sort(),
+    })),
   };
 }
 

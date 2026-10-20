@@ -148,10 +148,18 @@
         </section>
         <p class="footnote">Tocca un nome per vedere da dove arrivano i punti.</p>
 
-        <h2 class="section">Questa settimana</h2>
+        <div class="section section-row">
+          <h2>Presenze</h2>
+          <div id="presence-mode" class="seg" role="group" aria-label="Periodo">
+            <button type="button" data-mode="week">Settimana</button>
+            <button type="button" data-mode="month">Mese</button>
+          </div>
+        </div>
         <section class="card list">
+          <div id="presence-head" class="month-head" aria-hidden="true" hidden></div>
           <ol id="ranking" class="ranking"></ol>
         </section>
+        <div id="presence-key" class="month-key" hidden><span><i class="k-in"></i>In palestra</span><span><i class="k-ok"></i>Obiettivo della settimana centrato</span><span><i class="k-today"></i>Oggi</span></div>
         <p id="pomodoro" class="footnote"></p>
 
         <div id="card-gallery" hidden>
