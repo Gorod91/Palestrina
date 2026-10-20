@@ -3,6 +3,7 @@ import { initTimer, setTimerAccount } from './timer.js';
 import { createChat, answersList, bicep } from './chat.js';
 import { fakeState, fakeChat, fakePhoto } from './fake.js';
 import { createFbData } from './fbdata.js';
+import { makeZip } from './zip.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -356,6 +357,7 @@ function render() {
   $('admin-card').hidden = !(me.admin || me.tester);
   $('admin-card-title').textContent = me.admin ? 'Admin' : 'Prova';
   $('btn-admin').hidden = !me.admin;
+  $('btn-photos-zip').hidden = !me.admin;
   $('admin-foot').innerHTML = me.admin ? ADMIN_FOOT : 'Modalità prova: tutto funziona davvero ma su una copia dei dati, e la chat usa Firebase (i messaggi li vede solo chi è in prova). Le notifiche arrivano solo a te.';
   $('debug-mode').checked = debugOn();
   $('fake-mode').checked = fakeOn();
@@ -1106,6 +1108,77 @@ function renderAdmin() {
 }
 
 $('btn-admin').addEventListener('click', openAdmin);
+$('btn-photos-zip').addEventListener('click', photosZip);
+
+// ---------- Admin: tutte le foto del Sudometro in uno zip ----------
+// Primo tocco: prepara lo zip (foto da sudato, riferimenti e dati.json con punteggi e misure).
+// Secondo tocco: lo condivide o lo salva (iPhone vuole un tocco "fresco" per aprire la condivisione).
+let zipReady = null; // { blob, name, count }
+const ZIP_LABEL = $('btn-photos-zip').textContent;
+
+async function photosZip() {
+  const btn = $('btn-photos-zip');
+  if (zipReady) return shareZip();
+  btn.disabled = true;
+  const label = (t) => (btn.innerHTML = `${bicep()}${t}`);
+  try {
+    label('Preparo l\'elenco…');
+    const { rows, refs } = await realApi('adminPhotos');
+    const safe = (t) => String(t).normalize('NFD').replace(/[^A-Za-z0-9 _-]/g, '').trim().replace(/\s+/g, '_') || 'x';
+    const names = new Map(); // id foto → nome nel file zip
+    rows.forEach((r) => {
+      if (r.photoId) names.set(r.photoId, `sudato/${r.day}_${String(r.time).replace(':', '')}_${safe(r.name)}_${r.score}${r.debug ? '_debug' : ''}.jpg`);
+    });
+    rows.forEach((r) => {
+      if (r.refId && !names.has(r.refId)) names.set(r.refId, `riferimenti/${safe(r.name)}_${r.day}_${r.refId.slice(-6)}.jpg`);
+    });
+    refs.forEach((r) => {
+      if (!names.has(r.photoId)) names.set(r.photoId, `riferimenti/${safe(r.name)}_attuale.jpg`);
+    });
+    const ids = [...names.keys()];
+    const files = [];
+    for (let i = 0; i < ids.length; i += 8) {
+      label(`Scarico le foto… ${i}/${ids.length}`);
+      const { photos } = await realApi('adminPhotos', { ids: ids.slice(i, i + 8) });
+      Object.entries(photos || {}).forEach(([id, p]) => files.push({ name: names.get(id), data: Uint8Array.from(atob(p.data), (c) => c.charCodeAt(0)) }));
+    }
+    const data = {
+      esportato: new Date().toISOString(),
+      sudometro: rows.map((r) => ({ ...r, file: names.get(r.photoId) || '', fileRiferimento: names.get(r.refId) || '' })),
+      riferimentiAttuali: refs.map((r) => ({ name: r.name, features: r.features, file: names.get(r.photoId) || '' })),
+    };
+    files.push({ name: 'dati.json', data: new TextEncoder().encode(JSON.stringify(data, null, 2)) });
+    const day = new Date().toLocaleDateString('en-CA');
+    zipReady = { blob: makeZip(files), name: `sudometro-${day}${testOn() ? '-prova' : ''}.zip`, count: files.length - 1 };
+    const missing = ids.length - zipReady.count;
+    btn.textContent = `Zip pronto (${zipReady.count} foto): tocca per salvarlo o inviarlo`;
+    if (missing) toast(`${missing} foto non trovate: sono nello zip le altre`);
+  } catch (err) {
+    btn.textContent = ZIP_LABEL;
+    toast(`Errore: ${err.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function shareZip() {
+  const { blob, name } = zipReady;
+  zipReady = null;
+  $('btn-photos-zip').textContent = ZIP_LABEL;
+  const file = new File([blob], name, { type: 'application/zip' });
+  try {
+    if (navigator.canShare && navigator.canShare({ files: [file] })) return await navigator.share({ files: [file], title: name });
+  } catch (err) {
+    if (err.name === 'AbortError') return; // condivisione chiusa
+  }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60000);
+}
 
 // Margini in alto su iPhone (debug): per trovare dove iOS smette di sfocare. Salvati solo su questo telefono.
 const IOS_MARGINS = { 'ios-top': 0, 'ios-chat': 22 };

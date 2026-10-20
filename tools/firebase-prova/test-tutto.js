@@ -178,6 +178,20 @@ async function waitCount(P, name, n, ms = 15000) {
     ok((await waitCount(F, 'Michy', 1)) >= 0, 'F rivede il check-in di Michy');
   }
 
+  console.log('5b. Admin: zip con tutte le foto del Sudometro');
+  await F.page.$eval('#btn-photos-zip', (b) => b.click());
+  const ready = await F.page.waitForFunction(() => /Zip pronto/.test(document.getElementById('btn-photos-zip').textContent), null, { timeout: 30000 }).then(() => true).catch(() => false);
+  ok(ready, `zip preparato (${await F.page.$eval('#btn-photos-zip', (b) => b.textContent)})`);
+  const [dl] = await Promise.all([F.page.waitForEvent('download', { timeout: 15000 }), F.page.$eval('#btn-photos-zip', (b) => b.click())]);
+  const zipPath = path.join(require('os').tmpdir(), 'sudometro-prova.zip');
+  await dl.saveAs(zipPath);
+  const list = require('child_process').execFileSync('python3', ['-c', 'import sys,zipfile,json; z=zipfile.ZipFile(sys.argv[1]); print(json.dumps({"files": z.namelist(), "bad": z.testzip(), "dati": json.loads(z.read("dati.json"))}))', zipPath], { encoding: 'utf8' });
+  const z = JSON.parse(list);
+  ok(z.bad === null, 'zip valido');
+  ok(z.files.some((f) => /^sudato\/.*_Michy_77\.jpg$/.test(f)), `foto da sudato di Michy nello zip (${z.files.join(', ')})`);
+  ok(z.files.some((f) => /^riferimenti\/Michy/.test(f)), 'riferimento di Michy nello zip');
+  ok(z.dati.sudometro.some((r) => r.name === 'Michy' && r.score === 77 && r.file), 'dati.json con punteggio e file');
+
   console.log('6. Regole');
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
   const tok = (name) => `${b64({ alg: 'none', typ: 'JWT' })}.${b64({ sub: name, user_id: name, pal: true, name, iat: Math.floor(Date.now() / 1000), exp: Math.floor(Date.now() / 1000) + 3600, aud: 'palestrina-cb43c', iss: 'https://securetoken.google.com/palestrina-cb43c', firebase: { sign_in_provider: 'custom' } })}.`;

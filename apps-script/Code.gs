@@ -625,6 +625,9 @@ function handle(req, user) {
         return json(saveSudometro(user, req));
       case 'subscribe':
         return json(saveSubscription(user, req.subscription));
+      case 'adminPhotos':
+        if (!user.admin) return json({ error: 'Solo per l\'admin' });
+        return json(adminPhotos(req.ids));
       case 'adminLog':
       case 'adminUndo':
       case 'adminRestore':
@@ -2082,6 +2085,40 @@ function getPhoto(id) {
   const allowed = id && (rows('sudometro').some((r) => r.photoId === id || r.refId === id) || Object.values(refPhotoIds()).includes(id));
   if (!allowed) return { error: 'Foto non trovata' };
   return readPhoto(id);
+}
+
+/**
+ * Admin: senza `ids` l'elenco di tutti i Sudometro (anche le prove di debug) e dei riferimenti attuali, con
+ * punteggi e misure; con `ids` (al massimo 8) quelle foto, purché siano del Sudometro o di un riferimento.
+ */
+function adminPhotos(ids) {
+  const all = sheetRaw('sudometro').getDataRange().getValues().slice(1).map((r) => ({
+    day: toDay(r[0]),
+    time: toTime(r[1]),
+    name: String(r[2]),
+    score: Number(r[3]),
+    title: String(r[4] || ''),
+    details: safeJson(r[5]) || {},
+    debug: !!r[6],
+    photoId: String(r[7] || ''),
+    refId: String(r[8] || ''),
+  }));
+  const refs = Object.keys(props.getProperties())
+    .filter((k) => k.indexOf('ref_') === 0)
+    .map((k) => ({ name: k.slice(4), ...(safeJson(props.getProperty(k)) || {}) }))
+    .filter((r) => r.photoId);
+  if (!ids) return { rows: all, refs };
+  const allowed = new Set(all.flatMap((r) => [r.photoId, r.refId]).concat(refs.map((r) => r.photoId)).filter(Boolean));
+  const photos = {};
+  (Array.isArray(ids) ? ids : []).slice(0, 8).map(String).forEach((id) => {
+    if (!allowed.has(id)) return;
+    try {
+      photos[id] = readPhoto(id);
+    } catch (err) {
+      console.error('Foto non letta', id, err);
+    }
+  });
+  return { photos };
 }
 
 /** Foto da Firebase (nuove o già copiate) o, se non c'è, da Drive. */
