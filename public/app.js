@@ -524,12 +524,11 @@ async function fetchPhotos() {
   }
 }
 
-// Galleria del Sudometro: settimana in corso o mese (scelta ricordata sul telefono)
-let galleryMode = store.get('galleryMode') === 'month' ? 'month' : 'week';
+// Galleria del Sudometro: parte sempre dalla settimana in corso; "Mese" mostra tutto il mese finché si resta lì
+let galleryMode = 'week';
 $('gallery-mode').querySelectorAll('button').forEach((b) => {
   b.onclick = () => {
     galleryMode = b.dataset.mode;
-    store.set('galleryMode', galleryMode);
     renderGallery();
   };
 });
@@ -958,6 +957,10 @@ function selectTab(name) {
   $('scroller').scrollTop = 0;
   document.body.classList.toggle('chat-mode', name === 'chat');
   chat.setActive(name === 'chat' && !!session);
+  if (name === 'classifica' && galleryMode !== 'week' && state) {
+    galleryMode = 'week'; // ogni volta che si apre la Classifica si riparte dalla settimana
+    renderGallery();
+  }
 }
 
 async function saveAlias(value) {
