@@ -39,7 +39,9 @@ const SCHEDE_ESEMPIO = [
   {
     id: 'a',
     name: 'Scheda A',
-    ex: ['squat', 'lat', 'spinte-manubri', 'pulley-medio', 'chest-press-sdraiato', 'curl', 'situps', 'plank', 'barchetta'],
+    // "@addome" è un circuito: sit-up, plank e barchetta di fila, ripetuti per più giri (ogni giro salvato come una serie)
+    ex: ['squat', 'lat', 'spinte-manubri', 'pulley-medio', 'chest-press-sdraiato', 'curl', '@addome'],
+    circuiti: { addome: { n: 'Circuito addome', ex: ['situps', 'plank', 'barchetta'], giri: 3, rec: 60 } },
     piano: {
       squat: { s: '4 × 6-8' },
       lat: { s: '3 × 8-10' },
@@ -176,8 +178,17 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function lastTime(ex) {
     return serie.filter((s) => s.ex === ex && s.day < today()).sort((a, b) => (a.day < b.day ? 1 : -1))[0] || null;
   }
+  /** Circuito di una scheda ("@nome"), oppure null per un esercizio normale. */
+  const circIn = (sch, id) => (id[0] === '@' && sch && sch.circuiti ? sch.circuiti[id.slice(1)] || null : null);
+  const curSch = () => (schede || []).find((s) => s.id === ui.scheda);
+  /** Fatto oggi: per un circuito, tutti i suoi esercizi salvati. */
+  function isDone(id, sch = curSch()) {
+    const c = circIn(sch, id);
+    return c ? c.ex.every((e) => todayDoc(e)) : !!todayDoc(id);
+  }
+  const nameOf = (id, sch = curSch()) => (circIn(sch, id) || EX[id] || { n: id }).n;
   const lastDone = (sch) => serie.filter((s) => s.scheda === sch.id).reduce((m, s) => (s.day > m ? s.day : m), '');
-  const doneToday = (sch) => sch.ex.filter((e) => serie.some((s) => s.ex === e && s.day === today() && s.scheda === sch.id)).length;
+  const doneToday = (sch) => sch.ex.filter((e) => (circIn(sch, e) ? isDone(e, sch) : serie.some((s) => s.ex === e && s.day === today() && s.scheda === sch.id))).length;
 
   /** La scheda da fare: quella iniziata oggi, se non finita; altrimenti quella non fatta da più tempo. */
   function proposta() {
@@ -298,7 +309,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function exView() {
     const sch = (schede || []).find((s) => s.id === ui.scheda);
     // "ok" anche su quello aperto: scorrendo via, la barretta resta verde se l'esercizio è fatto ("cur" ha la precedenza)
-    const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : ''}${todayDoc(id) ? ' ok' : ''}" data-a="j:${k}" aria-label="${esc((EX[id] || {}).n || id)}"></button>`).join('');
+    const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : ''}${isDone(id) ? ' ok' : ''}" data-a="j:${k}" aria-label="${esc(nameOf(id))}"></button>`).join('');
     const title = sch ? `${esc(sch.name)} · <span id="wo-num">${ui.i + 1}</span>/${ui.list.length}` : 'Allenamento libero';
     const many = ui.list.length > 1;
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button></div>
@@ -307,10 +318,159 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       ${many ? `<div class="wo-bar"><button class="wo-all" id="wo-all"><svg viewBox="0 0 24 24" aria-hidden="true">${[3, 10, 17].map((y) => [3, 10, 17].map((x) => `<rect x="${x}" y="${y}" width="5.5" height="5.5" rx="1.6"/>`).join('')).join('')}</svg>Tutti</button></div>
       <div class="wo-sheet" id="wo-sheet" hidden><div class="wo-sheet-box"><div class="wo-grab"></div><p class="wo-sheet-hint">Tieni premuto "Tutti" e trascina il dito su un esercizio, poi lascia</p>
         <div class="wo-grid">${ui.list.map((id, k) => {
-          const e = EX[id] || { n: id }, d = todayDoc(id), pi = sch && sch.piano ? sch.piano[id] : null;
-          return `<button class="wo-tile${k === ui.i ? ' cur' : ''}${d ? ' ok' : ''}" data-a="j:${k}" data-k="${k}"><span>${d ? '✓' : k + 1}</span><b>${esc(e.n)}</b><small>${esc(pi ? pi.s : e.g || '')}</small></button>`;
+          const c = circIn(sch, id), e = EX[id] || { n: id }, d = isDone(id), pi = sch && sch.piano ? sch.piano[id] : null;
+          const sub = c ? `${c.giri} giri · ${c.ex.length} esercizi` : pi ? pi.s : e.g || '';
+          return `<button class="wo-tile${k === ui.i ? ' cur' : ''}${d ? ' ok' : ''}" data-a="j:${k}" data-k="${k}"><span>${d ? '✓' : k + 1}</span><b>${esc(nameOf(id))}</b><small>${esc(sub)}</small></button>`;
         }).join('')}</div></div></div>` : ''}`;
   }
+
+  // ---------- Circuito (es. sit-up, plank e barchetta di fila, per più giri) ----------
+
+  /** Stato del circuito di una pagina: giro in corso, numero di giri, valori di ogni esercizio, giri già fatti. */
+  function circState(id, c, sch) {
+    const pg = pageOf(id);
+    if (!pg.circ) {
+      const vals = {}, done = {};
+      c.ex.forEach((e) => {
+        const l = lastTime(e);
+        vals[e] = l ? l.sets[0].reps : primaVolta(sch && sch.piano ? sch.piano[e] : null)[0].reps;
+        done[e] = [];
+      });
+      pg.circ = { cur: 0, giri: c.giri, vals, done };
+    }
+    return pg.circ;
+  }
+
+  function circHtml(k, sch) {
+    const id = ui.list[k], c = circIn(sch, id), st = circState(id, c, sch);
+    const head = `<div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${st.giri} giri</span><span class="wo-pill">recupero ${mmss(c.rec)}</span></div>`;
+    if (isDone(id, sch) && !pageOf(id).rifai) {
+      const nx = nextTodo(k);
+      return `<section class="wo-page" data-k="${k}">${head}
+        <section class="card wo-list">${c.ex.map((e) => `<div class="wo-row"><span><b>${esc(nameOf(e))}</b><small>Fatto oggi · ${summary(todayDoc(e).sets, unit(EX[e]))}</small></span><span class="wo-chev">✓</span></div>`).join('')}</section>
+        ${nx < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : ''}<button class="link-button" data-a="crifai">Rifai il circuito</button></section>`;
+    }
+    const rounds = Array.from({ length: st.giri }, (_, g) => `<i class="${g < st.cur ? 'ok' : g === st.cur ? 'cur' : ''}">${g < st.cur ? '✓' : `Giro ${g + 1}`}</i>`).join('');
+    const rows = c.ex.map((e, j) => {
+      const t = unit(EX[e]), l = lastTime(e), pi = sch && sch.piano ? sch.piano[e] : null;
+      const info = [pi && pi.s, l && `ultima volta ${summary(l.sets, t)}`].filter(Boolean).join(' · ');
+      return `<div class="wo-cex"><span class="wo-cn">${j + 1}</span><div class="wo-cname"><b>${esc(nameOf(e))}</b><small>${esc(info)}</small></div>
+        <span class="wo-pm"><button data-a="cv-:${e}" aria-label="Meno">−</button><label class="wo-in"><input data-f="c:${e}" inputmode="numeric" value="${st.vals[e]}" aria-label="${esc(nameOf(e))}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${t === 'sec' ? 's' : 'rip'}</em></label><button data-a="cv+:${e}" aria-label="Più">+</button></span></div>`;
+    }).join('');
+    return `<section class="wo-page" data-k="${k}">${head}
+      <div class="wo-rounds"><button data-a="cg-" aria-label="Un giro in meno">−</button>${rounds}<button data-a="cg+" aria-label="Un giro in più">+</button></div>
+      <div class="wo-cexs">${rows}</div>
+      <button class="primary" data-a="cgiro">✓ Giro ${st.cur + 1} fatto</button>
+      <button class="secondary wo-crun" data-a="crun">▶ Avvia circuito guidato</button>
+      ${st.cur ? `<button class="link-button" data-a="csave">Salva con ${st.cur} ${st.cur === 1 ? 'giro' : 'giri'}</button>` : ''}
+      <p class="wo-sub wo-center">Ogni esercizio salva un giro come una serie</p>
+    </section>`;
+  }
+
+  /** Un giro finito: i valori attuali di ogni esercizio diventano la sua serie di quel giro. */
+  function circRound(id) {
+    const c = circIn(curSch(), id), st = pageOf(id).circ;
+    if (!c || !st) return;
+    c.ex.forEach((e) => st.done[e].push(st.vals[e]));
+    st.cur++;
+  }
+
+  /** Salva i giri fatti (una serie per giro) e passa al prossimo esercizio della scheda. */
+  function circSave(id) {
+    const c = circIn(curSch(), id), st = pageOf(id).circ;
+    if (!c || !st || !st.cur) return;
+    c.ex.forEach((e) => save(e, st.done[e].map((v) => ({ kg: 0, reps: v }))));
+    pageOf(id).circ = null;
+    pageOf(id).rifai = false;
+    const k = ui.list.indexOf(id), nx = nextTodo(k);
+    if (nx >= 0 && nx !== k) openEx(nx, k);
+  }
+
+  // Circuito guidato a tutto schermo: sit-up (li conti tu e tocchi), plank e barchetta col 3-2-1 e il timer grande,
+  // recupero azzurro tra un giro e l'altro; alla fine salva tutto.
+  const run = document.createElement('div');
+  run.className = 'wo-run';
+  run.hidden = true;
+  document.body.append(run);
+  let runId = '', runPlan = [], runAt = 0, runRaf = 0;
+
+  function circRun(id) {
+    const c = circIn(curSch(), id), st = pageOf(id).circ;
+    if (!c || !st) return;
+    runId = id;
+    runPlan = [];
+    for (let g = st.cur; g < st.giri; g++) {
+      c.ex.forEach((e, j) => runPlan.push({ e, g, last: j === c.ex.length - 1 }));
+      if (g < st.giri - 1) runPlan.push({ rest: true, g });
+    }
+    runAt = 0;
+    run.hidden = false;
+    runStep();
+  }
+
+  function runStep() {
+    cancelAnimationFrame(runRaf);
+    const c = circIn(curSch(), runId), st = pageOf(runId).circ;
+    if (runAt >= runPlan.length) return runFinish(c);
+    const s = runPlan[runAt];
+    const bar = `<div class="wo-run-steps">${runPlan.map((x, j) => `<i class="${x.rest ? 'rest ' : ''}${j < runAt ? 'ok' : j === runAt ? 'cur' : ''}"></i>`).join('')}</div>
+      <div class="wo-run-giro">Giro ${s.g + 1} di ${st.giri}</div>`;
+    const stop = '<button class="wo-run-stop" data-r="stop">Interrompi circuito</button>';
+    if (!s.rest && unit(EX[s.e]) !== 'sec') {
+      run.innerHTML = `${bar}<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>
+        <button class="wo-run-reps" data-r="next">${st.vals[s.e]}<small>ripetizioni · fatto ✓</small></button>${stop}`;
+      return;
+    }
+    const total = s.rest ? c.rec : st.vals[s.e];
+    run.classList.toggle('rest', !!s.rest);
+    run.innerHTML = `${bar}<div class="wo-big-head"><b>${s.rest ? 'Recupero' : esc(nameOf(s.e))}</b><small>${s.rest ? `poi giro ${s.g + 2}` : ''}</small></div>
+      <button class="timer-running" data-r="next"><span></span><small>tocca per saltare</small></button>${stop}`;
+    const d = run.querySelector('.timer-running'), n = d.querySelector('span');
+    const go = Date.now() + (s.rest ? 0 : COUNTDOWN), end = go + total * 1000;
+    const tick = () => {
+      const now = Date.now(), counting = now < go;
+      d.classList.toggle('counting', counting);
+      if (counting) {
+        n.textContent = String(Math.ceil((go - now) / 1000));
+        d.style.setProperty('--p', '0');
+      } else {
+        if (now >= end) {
+          if (navigator.vibrate) navigator.vibrate(200);
+          return runNext();
+        }
+        n.textContent = mmss(Math.ceil((end - now) / 1000));
+        d.style.setProperty('--p', String(1 - (end - now) / (total * 1000)));
+      }
+      runRaf = requestAnimationFrame(tick);
+    };
+    runRaf = requestAnimationFrame(tick);
+  }
+
+  function runNext() {
+    const s = runPlan[runAt];
+    if (s && s.last) circRound(runId);
+    runAt++;
+    runStep();
+  }
+
+  function runFinish(c) {
+    const st = pageOf(runId).circ;
+    run.classList.remove('rest');
+    run.innerHTML = `<div class="wo-run-done">✓</div><div class="wo-big-head"><b>Circuito fatto</b></div>
+      <div class="wo-run-sum">${c.ex.map((e) => `<div>${esc(nameOf(e))}<span>${summary(st.done[e].map((v) => ({ kg: 0, reps: v })), unit(EX[e]))}</span></div>`).join('')}</div>
+      <button class="primary" data-r="close">Fine · salvato</button>`;
+    circSave(runId);
+  }
+
+  run.addEventListener('click', (ev) => {
+    const r = ev.target.closest('[data-r]')?.dataset.r;
+    if (r === 'next') runNext();
+    if (r === 'stop' || r === 'close') {
+      cancelAnimationFrame(runRaf);
+      run.hidden = true;
+      draw();
+    }
+  });
 
   /** "▦ Tutti": tenendo premuto si apre la griglia, il dito scorre sulle tessere e lasciando si apre quella; con un tocco resta aperta. */
   function setupAll() {
@@ -348,6 +508,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   }
 
   function pageHtml(k, sch) {
+    if (circIn(sch, ui.list[k])) return circHtml(k, sch);
     const ex = ui.list[k], e = EX[ex] || { n: ex, m: '' };
     const pg = pageOf(ex);
     const piano = sch && sch.piano ? sch.piano[ex] : null;
@@ -391,7 +552,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function nextTodo(from = ui.i) {
     for (let d = 1; d < ui.list.length; d++) {
       const k = (from + d) % ui.list.length;
-      if (!todayDoc(ui.list[k])) return k;
+      if (!isDone(ui.list[k])) return k;
     }
     return -1;
   }
@@ -557,7 +718,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       ui.scheda = s.id;
       ui.list = s.ex.slice();
       pages = {};
-      const k = s.ex.findIndex((e) => !todayDoc(e));
+      const k = s.ex.findIndex((e) => !isDone(e, s));
       openEx(cmd === 'go' && k >= 0 ? k : 0);
     } else if (cmd === 'libero') {
       ui.view = 'pick';
@@ -598,6 +759,24 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         const step = unit(EX[ui.list[ui.i]]) === 'sec' ? 5 : 1;
         sets[k].reps = Math.max(step, Math.min(600, sets[k].reps + step * d));
       }
+    } else if (cmd === 'cg-' || cmd === 'cg+') {
+      const st = P().circ;
+      if (st) st.giri = Math.max(Math.max(1, st.cur), Math.min(8, st.giri + (cmd === 'cg+' ? 1 : -1)));
+    } else if (cmd === 'cv-' || cmd === 'cv+') {
+      const st = P().circ, step = unit(EX[arg]) === 'sec' ? 5 : 1;
+      if (st) st.vals[arg] = Math.max(step, Math.min(600, st.vals[arg] + (cmd === 'cv+' ? step : -step)));
+    } else if (cmd === 'cgiro') {
+      const id = ui.list[ui.i];
+      circRound(id);
+      const st = P().circ;
+      if (st && st.cur >= st.giri) circSave(id);
+    } else if (cmd === 'csave') {
+      circSave(ui.list[ui.i]);
+    } else if (cmd === 'crun') {
+      circRun(ui.list[ui.i]);
+      return;
+    } else if (cmd === 'crifai') {
+      Object.assign(P(), { circ: null, rifai: true }); // si rifà da capo; i giri salvati restano finché non si salvano i nuovi
     } else if (cmd === 'tgo') {
       const ex = ui.list[ui.i], sets = P().sets || [];
       const j = Math.max(0, Math.min(Number(arg) || 0, sets.length - 1));
@@ -619,6 +798,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (!f || !page) return;
     ui.i = Number(page.dataset.k);
     const pg = P();
+    if (f.startsWith('c:')) { // valore di un esercizio del circuito
+      const v = Math.round(Number(ev.target.value.replace(',', '.')));
+      if (pg.circ && v >= 1 && v <= 600) pg.circ.vals[f.slice(2)] = v;
+      return draw();
+    }
     if (pg.open < 0 || !pg.sets) return;
     const v = Number(ev.target.value.replace(',', '.'));
     if (f === 'k') setKg(pg.open, v);

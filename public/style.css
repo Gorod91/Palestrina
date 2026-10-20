@@ -750,3 +750,40 @@ body.keyboard .wo-bar { display: none; }
 .wo-big.rest .timer-running { background: radial-gradient(closest-side, var(--bg) 87%, transparent 88%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0); }
 .wo-big.rest .wo-big-head b { color: var(--stand); }
 .wo-rest .wo-dial { background: radial-gradient(closest-side, var(--card) 80%, transparent 81%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0); }
+
+/* Allenamento: circuito (pagina) */
+.wo-rounds { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
+.wo-rounds i { flex: 1; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--card); color: var(--muted); font-style: normal; font-size: 14px; font-weight: 700; }
+.wo-rounds i.ok { background: rgba(166, 255, 0, .16); color: var(--exercise); }
+.wo-rounds i.cur { background: var(--fg); color: #000; }
+.wo-rounds button { flex: none; width: 38px; height: 38px; border: 0; border-radius: 12px; background: var(--card-2); color: var(--exercise); font-size: 20px; font-weight: 800; }
+.wo-cexs { display: grid; gap: 8px; }
+.wo-cex { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; align-items: center; gap: 10px; padding: 12px; border-radius: 16px; background: var(--card); }
+.wo-cn { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--card-2); color: var(--muted); font-size: 12px; font-weight: 800; }
+.wo-cname b { display: block; font-size: 16px; }
+.wo-cname small { display: block; color: var(--muted); font-size: 12px; }
+.wo-crun { color: var(--stand); margin-top: 8px; }
+
+/* Allenamento: circuito guidato a tutto schermo */
+.wo-run { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: var(--bg);
+  padding: calc(env(safe-area-inset-top) + 70px) 16px calc(env(safe-area-inset-bottom) + 24px); text-align: center; }
+.wo-run[hidden] { display: none; }
+.wo-run .timer-running { margin: 0; }
+.wo-run.rest .timer-running { background: radial-gradient(closest-side, var(--bg) 87%, transparent 88%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0); }
+.wo-run.rest .wo-big-head b { color: var(--stand); }
+.wo-run-steps { position: absolute; top: calc(env(safe-area-inset-top) + 18px); left: 16px; right: 16px; display: flex; gap: 4px; }
+.wo-run-steps i { flex: 1; height: 5px; border-radius: 3px; background: var(--card-2); }
+.wo-run-steps i.ok { background: var(--exercise); }
+.wo-run-steps i.cur { background: var(--fg); }
+.wo-run-steps i.rest { background: rgba(0, 217, 255, .3); }
+.wo-run-steps i.rest.ok { background: var(--stand); }
+.wo-run-giro { position: absolute; top: calc(env(safe-area-inset-top) + 34px); left: 0; right: 0; color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.wo-run-reps { width: min(76vw, 330px); aspect-ratio: 1; border: 0; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: var(--exercise); color: #000; font-size: 110px; font-weight: 800; line-height: 1; box-shadow: 0 0 0 12px rgba(166, 255, 0, .14); }
+.wo-run-reps small { font-size: 17px; font-weight: 700; margin-top: 10px; }
+.wo-run-stop { border: 0; background: none; color: var(--muted); font-size: 15px; padding: 8px; }
+.wo-run-done { width: 150px; height: 150px; border-radius: 50%; display: grid; place-items: center; background: var(--exercise); color: #000; font-size: 72px; font-weight: 900; }
+.wo-run-sum { display: grid; gap: 6px; width: min(100%, 360px); }
+.wo-run-sum div { display: flex; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--card); font-size: 16px; }
+.wo-run-sum span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.wo-run .primary { width: min(100%, 360px); }
