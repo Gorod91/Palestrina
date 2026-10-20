@@ -423,6 +423,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }
     const total = s.rest ? c.rec : st.vals[s.e];
     run.classList.toggle('rest', !!s.rest);
+    if (!s.rest && !s.started) { // esercizio a tempo: parte solo con il grande "Inizia" (poi 3-2-1)
+      run.innerHTML = `${bar}<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>${mmss(total)}${total < 60 ? '"' : ''}</small></div>
+        <button class="timer-start" data-r="start">Inizia</button>${stop}`;
+      return;
+    }
     run.innerHTML = `${bar}<div class="wo-big-head"><b>${s.rest ? 'Recupero' : esc(nameOf(s.e))}</b><small>${s.rest ? `poi giro ${s.g + 2}` : ''}</small></div>
       <button class="timer-running" data-r="next"><span></span><small>tocca per saltare</small></button>${stop}`;
     const d = run.querySelector('.timer-running'), n = d.querySelector('span');
@@ -465,6 +470,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   run.addEventListener('click', (ev) => {
     const r = ev.target.closest('[data-r]')?.dataset.r;
     if (r === 'next') runNext();
+    if (r === 'start') {
+      runPlan[runAt].started = true;
+      runStep();
+    }
     if (r === 'stop' || r === 'close') {
       cancelAnimationFrame(runRaf);
       run.hidden = true;

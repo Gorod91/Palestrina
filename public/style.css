@@ -787,3 +787,4 @@ body.keyboard .wo-bar { display: none; }
 .wo-run-sum div { display: flex; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--card); font-size: 16px; }
 .wo-run-sum span { color: var(--muted); font-variant-numeric: tabular-nums; }
 .wo-run .primary { width: min(100%, 360px); }
+.wo-run .timer-start { margin: 0; }
