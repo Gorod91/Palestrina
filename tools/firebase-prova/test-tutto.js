@@ -102,11 +102,11 @@ async function waitCount(P, name, n, ms = 15000) {
 
   console.log('2. Check-in di Francesco: va in coda, Michy lo vede da Firebase');
   const before = await countOf(M, 'Francesco');
-  F.slow.ms = 4000; // Apps Script lento: il check-in deve risultare fatto lo stesso appena salvato su Firebase
+  F.slow.ms = 4000; // Apps Script lento: il bicipite resta finché il server non risponde
   const tC = Date.now();
   await F.page.$eval('#btn-checkin', (b) => b.click());
-  const tDone = await F.page.waitForFunction(() => /Check-in/.test(document.getElementById('toast').textContent) && !document.getElementById('toast').hidden, null, { timeout: 10000 }).then(() => Date.now() - tC).catch(() => -1);
-  ok(tDone >= 0 && tDone < 2000, `F: "Check-in fatto" dopo ${tDone} ms, senza aspettare Apps Script`);
+  const tDone = await F.page.waitForFunction(() => /Check-in/.test(document.getElementById('toast').textContent) && !document.getElementById('toast').hidden, null, { timeout: 20000 }).then(() => Date.now() - tC).catch(() => -1);
+  ok(tDone >= 4000, `F: "Check-in fatto" solo dopo la risposta del server (${tDone} ms)`);
   ok((await waitCount(F, 'Francesco', before + 1, 1000)) >= 0, 'F: il suo check-in si vede subito');
   const dM = await waitCount(M, 'Francesco', before + 1);
   ok(dM >= 0, `M vede il check-in di Francesco dopo ${Date.now() - tC} ms`);

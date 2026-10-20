@@ -42,7 +42,7 @@ export function createFbData({ getToken, ping, onState, onError }) {
     waiting.forEach((w) => {
       clearTimeout(w.timer);
       if (w.unsub) w.unsub();
-      if (!w.fast) w.reject(new Error('Firebase scollegato')); // quelle già salvate le esegue comunque il server
+      w.reject(new Error('Firebase scollegato'));
     });
     waiting.clear();
     x = null;
@@ -52,10 +52,8 @@ export function createFbData({ getToken, ping, onState, onError }) {
 
   /**
    * Mette un'azione in coda e aspetta l'esito scritto dal server (stessa risposta della richiesta diretta).
-   * Con `fast` la promessa finisce appena l'azione è salvata su Firebase (il server la esegue comunque):
-   * l'esito arriva dopo a `fast.onResult` / `fast.onError`.
    */
-  function call(action, data = {}, fast = null) {
+  function call(action, data = {}) {
     if (!x) return Promise.reject(new Error('Firebase non collegato'));
     const { fs, db } = x;
     const id = newId();
@@ -73,15 +71,6 @@ export function createFbData({ getToken, ping, onState, onError }) {
       fs.setDoc(ref, { name: me.name, action, data: JSON.stringify(data), stato: 'nuova', at: fs.serverTimestamp() })
         .then(() => {
           ping();
-          if (fast) {
-            // Salvata: per chi aspetta è fatta; l'esito del server arriva dopo
-            clearTimeout(w.timer);
-            resolve({ ok: true, queued: true });
-            w.fast = true;
-            w.resolve = fast.onResult || (() => {});
-            w.reject = fast.onError || (() => {});
-            w.timer = setTimeout(() => done(w.reject, new Error('il server non ha confermato, controlla tra poco')), ESITO_MS * 4);
-          }
           w.unsub = fs.onSnapshot(
             ref,
             (snap) => {
