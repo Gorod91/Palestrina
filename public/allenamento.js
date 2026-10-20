@@ -297,7 +297,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   /** Esercizi della scheda come pagine affiancate: si trascinano col dito, come le schermate della Home di iPhone. */
   function exView() {
     const sch = (schede || []).find((s) => s.id === ui.scheda);
-    const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : todayDoc(id) ? 'ok' : ''}" data-a="j:${k}" aria-label="${esc((EX[id] || {}).n || id)}"></button>`).join('');
+    // "ok" anche su quello aperto: scorrendo via, la barretta resta verde se l'esercizio è fatto ("cur" ha la precedenza)
+    const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : ''}${todayDoc(id) ? ' ok' : ''}" data-a="j:${k}" aria-label="${esc((EX[id] || {}).n || id)}"></button>`).join('');
     const title = sch ? `${esc(sch.name)} · <span id="wo-num">${ui.i + 1}</span>/${ui.list.length}` : 'Allenamento libero';
     const many = ui.list.length > 1;
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button></div>
