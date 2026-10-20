@@ -35,6 +35,7 @@ async function phone(browser, code) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 800 } });
   const logs = [];
   const calls = []; // azioni chieste ad Apps Script
+  const slow = { ms: 0 }; // ritardo di Apps Script (per vedere cosa non lo aspetta)
   await ctx.addInitScript(([code, vero]) => {
     sessionStorage.setItem('palestrina.browser', '1');
     if (!sessionStorage.getItem('prova-impostata')) {
@@ -55,6 +56,7 @@ async function phone(browser, code) {
     }
     if (u.host === 'finto.apps') {
       calls.push({ t: Date.now(), action: JSON.parse(route.request().postData() || '{}').action });
+      if (slow.ms) await sleep(slow.ms);
       const r = await fetch(GAS, { method: 'POST', body: route.request().postData() });
       return route.fulfill({ status: 200, contentType: 'application/json', headers: { 'Access-Control-Allow-Origin': '*' }, body: await r.text() });
     }
@@ -66,7 +68,7 @@ async function phone(browser, code) {
   page.on('dialog', (d) => d.accept());
   await page.goto('http://localhost:8000/');
   await page.waitForSelector('#btn-checkin', { state: 'attached', timeout: 20000 });
-  return { page, ctx, logs, calls };
+  return { page, ctx, logs, calls, slow };
 }
 
 /** Conteggio della settimana di `name` nella classifica di Home di quel telefono. */
@@ -100,11 +102,17 @@ async function waitCount(P, name, n, ms = 15000) {
 
   console.log('2. Check-in di Francesco: va in coda, Michy lo vede da Firebase');
   const before = await countOf(M, 'Francesco');
+  F.slow.ms = 4000; // Apps Script lento: il check-in deve risultare fatto lo stesso appena salvato su Firebase
   const tC = Date.now();
   await F.page.$eval('#btn-checkin', (b) => b.click());
+  const tDone = await F.page.waitForFunction(() => /Check-in/.test(document.getElementById('toast').textContent) && !document.getElementById('toast').hidden, null, { timeout: 10000 }).then(() => Date.now() - tC).catch(() => -1);
+  ok(tDone >= 0 && tDone < 2000, `F: "Check-in fatto" dopo ${tDone} ms, senza aspettare Apps Script`);
   ok((await waitCount(F, 'Francesco', before + 1, 1000)) >= 0, 'F: il suo check-in si vede subito');
   const dM = await waitCount(M, 'Francesco', before + 1);
   ok(dM >= 0, `M vede il check-in di Francesco dopo ${Date.now() - tC} ms`);
+  F.slow.ms = 0;
+  await sleep(1500);
+  ok((await countOf(F, 'Francesco')) === before + 1, 'F: il check-in resta (nessuno stato vecchio lo cancella)');
   ok(F.calls.filter((c) => c.t >= tC).every((c) => c.action !== 'checkin'), 'F: il check-in non è passato dalla richiesta diretta');
   const q = await fetch(`${FS}:runQuery`, { method: 'POST', headers: { Authorization: 'Bearer owner' }, body: JSON.stringify({ structuredQuery: { from: [{ collectionId: PFX + 'azioni' }] } }) }).then((r) => r.json());
   ok(q.some((x) => x.document && x.document.fields.action.stringValue === 'checkin' && x.document.fields.stato.stringValue === 'fatta'), 'in coda su Firebase, eseguito dal server');

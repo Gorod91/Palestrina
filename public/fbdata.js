@@ -42,7 +42,7 @@ export function createFbData({ getToken, ping, onState, onError }) {
     waiting.forEach((w) => {
       clearTimeout(w.timer);
       if (w.unsub) w.unsub();
-      w.reject(new Error('Firebase scollegato'));
+      if (!w.fast) w.reject(new Error('Firebase scollegato')); // quelle già salvate le esegue comunque il server
     });
     waiting.clear();
     x = null;
@@ -52,9 +52,10 @@ export function createFbData({ getToken, ping, onState, onError }) {
 
   /**
    * Mette un'azione in coda e aspetta l'esito scritto dal server (stessa risposta della richiesta diretta).
-   * Senza rete l'azione parte appena torna.
+   * Con `fast` la promessa finisce appena l'azione è salvata su Firebase (il server la esegue comunque):
+   * l'esito arriva dopo a `fast.onResult` / `fast.onError`.
    */
-  function call(action, data = {}) {
+  function call(action, data = {}, fast = null) {
     if (!x) return Promise.reject(new Error('Firebase non collegato'));
     const { fs, db } = x;
     const id = newId();
@@ -72,16 +73,25 @@ export function createFbData({ getToken, ping, onState, onError }) {
       fs.setDoc(ref, { name: me.name, action, data: JSON.stringify(data), stato: 'nuova', at: fs.serverTimestamp() })
         .then(() => {
           ping();
+          if (fast) {
+            // Salvata: per chi aspetta è fatta; l'esito del server arriva dopo
+            clearTimeout(w.timer);
+            resolve({ ok: true, queued: true });
+            w.fast = true;
+            w.resolve = fast.onResult || (() => {});
+            w.reject = fast.onError || (() => {});
+            w.timer = setTimeout(() => done(w.reject, new Error('il server non ha confermato, controlla tra poco')), ESITO_MS * 4);
+          }
           w.unsub = fs.onSnapshot(
             ref,
             (snap) => {
               const d = snap.exists() ? snap.data() : null;
               if (!d || d.stato !== 'fatta') return;
               const out = JSON.parse(d.esito || '{}');
-              if (out.error) done(reject, new Error(out.error));
-              else done(resolve, out);
+              if (out.error) done(w.reject, new Error(out.error));
+              else done(w.resolve, out);
             },
-            (err) => done(reject, err),
+            (err) => done(w.reject, err),
           );
         })
         .catch((err) => done(reject, err));
