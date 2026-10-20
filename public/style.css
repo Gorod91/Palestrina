@@ -676,7 +676,7 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .wo-in em { font-style: normal; color: var(--muted); font-size: 12px; font-weight: 600; }
 .wo-hint { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }
 .wo-rest { cursor: pointer; display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 14px; border-radius: 16px; background: var(--card); }
-.wo-rest.on { outline: 1.5px solid rgba(166, 255, 0, .6); outline-offset: -1.5px; }
+.wo-rest.on { outline: 1.5px solid rgba(0, 217, 255, .6); outline-offset: -1.5px; }
 .wo-rest.end { outline: 1.5px solid var(--exercise); outline-offset: -1.5px; }
 .wo-rest small { display: block; color: var(--muted); font-size: 12px; }
 .wo-rest b { font-size: 17px; font-variant-numeric: tabular-nums; }
@@ -742,4 +742,11 @@ body.keyboard .wo-bar { display: none; }
   padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
 .wo-big[hidden] { display: none; }
 .wo-big .timer-running { margin: 0; }
-.wo-big-title { margin: 0; color: var(--muted); font-size: 17px; font-weight: 600; text-align: center; }
+.wo-big-head { display: grid; gap: 4px; text-align: center; }
+.wo-big-head b { font-size: 34px; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
+.wo-big-head small { color: var(--muted); font-size: 17px; font-weight: 600; }
+.wo-big-head small:empty { display: none; }
+/* recupero in azzurro (gli esercizi restano verdi come il timer addominali) */
+.wo-big.rest .timer-running { background: radial-gradient(closest-side, var(--bg) 87%, transparent 88%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0); }
+.wo-big.rest .wo-big-head b { color: var(--stand); }
+.wo-rest .wo-dial { background: radial-gradient(closest-side, var(--card) 80%, transparent 81%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0); }

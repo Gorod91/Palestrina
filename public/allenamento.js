@@ -423,7 +423,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   const big = document.createElement('div');
   big.className = 'wo-big';
   big.hidden = true;
-  big.innerHTML = '<p class="wo-big-title"></p><button class="timer-running" type="button"><span>0</span><small>tocca per annullare</small></button>';
+  big.innerHTML = '<div class="wo-big-head"><b></b><small></small></div><button class="timer-running" type="button"><span>0</span><small>tocca per annullare</small></button>';
   document.body.append(big);
   big.querySelector('button').addEventListener('click', () => {
     restEnd = 0;
@@ -436,7 +436,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     big.hidden = !(restEnd || tmr.end);
     if (!big.hidden) {
       const e = EX[tmr.ex] || {};
-      big.querySelector('.wo-big-title').textContent = tmr.end ? `${e.n || ''} · serie ${tmr.j + 1} di ${tmrSets(tmr.ex).length}` : 'Recupero';
+      big.querySelector('.wo-big-head b').textContent = tmr.end ? e.n || '' : 'Recupero';
+      big.querySelector('.wo-big-head small').textContent = tmr.end ? `Serie ${tmr.j + 1} di ${tmrSets(tmr.ex).length}` : '';
+      big.classList.toggle('rest', !tmr.end); // il recupero è azzurro
     }
     root.querySelectorAll('.wo-rest').forEach((el) => {
       el.innerHTML = restHtml();
