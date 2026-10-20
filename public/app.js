@@ -4,6 +4,7 @@ import { createChat, answersList, bicep } from './chat.js';
 import { fakeState, fakeChat, fakePhoto } from './fake.js';
 import { createFbData } from './fbdata.js';
 import { makeZip } from './zip.js';
+import { createWorkout } from './allenamento.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -318,7 +319,7 @@ function toast(msg, ms = 3500) {
   toastTimer = setTimeout(() => ($('toast').hidden = true), ms);
 }
 
-const TAB_TITLES = { oggi: 'Home', classifica: 'Classifica', chat: 'Chat', timer: 'Timer', altro: 'Impostazioni' };
+const TAB_TITLES = { oggi: 'Home', classifica: 'Classifica', chat: 'Chat', timer: 'Timer', allenamento: 'Allenamento', altro: 'Impostazioni' };
 
 function show(screen) {
   ['install', 'config', 'login', 'home'].forEach((s) => ($(`screen-${s}`).hidden = s !== screen));
@@ -379,6 +380,7 @@ function render() {
 
   renderPresence();
   renderPoints();
+  workoutTab();
   renderAlbo();
   if (document.activeElement !== $('in-name')) $('in-name').value = me.alias || '';
   $('in-name').placeholder = me.name;
@@ -1067,14 +1069,46 @@ function cameraError(err) {
 
 const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => (testOn() ? 'prova' : state && state.features && state.features.firebase ? 'tutti' : ''), fbOnly: () => fbOk() });
 
+// ---------- Allenamento (fase 1, solo in prova) ----------
+
+const workout = createWorkout({
+  root: $('workout'),
+  getToken: () => realApi('fbToken'),
+  toast,
+  openTimer: () => selectTab('timer'),
+  timerSeconds: () => (state && state.me && state.me.timerSeconds) || 30,
+});
+$('timer-back').addEventListener('click', () => selectTab('allenamento'));
+
+/** In prova il tab Timer diventa Allenamento (con il timer dentro); fuori dalla prova resta com'era. */
+let workoutProva = null;
+function workoutTab() {
+  const prova = testOn() && !!(state && state.me);
+  if (prova) workout.start({ name: state.me.name }, true);
+  if (prova === workoutProva) return;
+  workoutProva = prova;
+  const btn = $('tab-timer');
+  btn.dataset.tab = prova ? 'allenamento' : 'timer';
+  btn.querySelector('use').setAttribute('href', prova ? '#i-dumbbell' : '#i-timer');
+  btn.querySelector('span').textContent = prova ? 'Allenamento' : 'Timer';
+  $('timer-back').hidden = !prova;
+  if (!prova) workout.stop();
+  const cur = store.get('tab');
+  if (!prova && cur === 'allenamento') selectTab('timer');
+  else if (cur === 'allenamento' || cur === 'timer') selectTab(cur);
+}
+
 // ---------- Tab ----------
 
-const TABS = ['oggi', 'classifica', 'chat', 'timer', 'altro'];
+const TABS = ['oggi', 'classifica', 'chat', 'timer', 'allenamento', 'altro'];
 
 function selectTab(name) {
   if (!TABS.includes(name)) name = 'oggi';
+  if (name === 'allenamento' && !testOn()) name = 'timer';
   document.querySelectorAll('.tab-panel').forEach((p) => (p.hidden = p.dataset.tab !== name));
-  document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === name));
+  // in prova il timer sta dentro Allenamento: resta acceso il tasto di Allenamento
+  const on = name === 'timer' && testOn() ? 'allenamento' : name;
+  document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === on));
   store.set('tab', name);
   $('page-title').textContent = TAB_TITLES[name];
   $('scroller').scrollTop = 0;
