@@ -57,6 +57,11 @@ h1 { margin: 0; font-size: 34px; font-weight: 800; letter-spacing: -.03em; line-
 
 /* ---------- Card e testi ---------- */
 .section { margin: 26px 0 10px; }
+.section-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.section-row h2 { margin: 0; }
+.seg { display: inline-flex; padding: 2px; border-radius: 9px; background: var(--card-2); }
+.seg button { border: 0; padding: 4px 12px; border-radius: 7px; background: none; color: var(--muted); font-size: 13px; font-weight: 600; }
+.seg button.on { background: var(--card); color: var(--fg); }
 .card { background: var(--card); border-radius: 18px; padding: 16px; margin-bottom: 12px; }
 .card.list { padding: 4px 16px; }
 .label { margin: 0; color: var(--muted); font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
@@ -120,6 +125,7 @@ input::placeholder { color: #636366; }
 .ranking .count { font-size: 20px; font-weight: 700; color: var(--move); font-variant-numeric: tabular-nums; }
 .ranking .count small { font-size: 14px; color: var(--muted); font-weight: 600; }
 .gallery li { display: grid; grid-template-columns: 22px auto 1fr auto; gap: 12px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.gallery li.empty { display: block; color: var(--muted); font-size: 15px; }
 .gallery .photo { width: 60px; height: 60px; border-radius: 14px; background: var(--card-2); display: grid; place-items: center; overflow: hidden; color: var(--muted); }
 .gallery .photo svg { width: 24px; height: 24px; }
 .gallery .photo img { width: 100%; height: 100%; object-fit: cover; cursor: pointer; }

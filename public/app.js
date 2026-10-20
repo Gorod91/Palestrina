@@ -524,14 +524,27 @@ async function fetchPhotos() {
   }
 }
 
+// Galleria del Sudometro: settimana in corso o mese (scelta ricordata sul telefono)
+let galleryMode = store.get('galleryMode') === 'month' ? 'month' : 'week';
+$('gallery-mode').querySelectorAll('button').forEach((b) => {
+  b.onclick = () => {
+    galleryMode = b.dataset.mode;
+    store.set('galleryMode', galleryMode);
+    renderGallery();
+  };
+});
+
 function renderGallery() {
-  const list = state.week.sudometro || [];
-  $('card-gallery').hidden = !list.length;
+  const month = galleryMode === 'month';
+  const list = (month ? state.sudometroMonth || state.week.sudometro : state.week.sudometro) || [];
+  // la sezione c'è se c'è almeno un Sudometro nel mese (la settimana può essere vuota)
+  $('card-gallery').hidden = !((state.sudometroMonth || state.week.sudometro || []).length);
+  $('gallery-mode').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.mode === galleryMode));
   const el = $('gallery');
-  el.innerHTML = '';
+  el.innerHTML = list.length ? '' : `<li class="empty">Nessun Sudometro ${month ? 'questo mese' : 'questa settimana'}</li>`;
   list.forEach((r, i) => {
     const li = document.createElement('li');
-    const day = new Date(r.day + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long' });
+    const day = new Date(r.day + 'T12:00:00').toLocaleDateString('it-IT', month ? { weekday: 'short', day: 'numeric' } : { weekday: 'long' });
     const title = clean(r.title);
     li.innerHTML = `
       <span class="pos">${i + 1}</span>

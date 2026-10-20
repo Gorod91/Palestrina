@@ -155,7 +155,13 @@
         <p id="pomodoro" class="footnote"></p>
 
         <div id="card-gallery" hidden>
-          <h2 class="section">Sudometro</h2>
+          <div class="section section-row">
+            <h2>Sudometro</h2>
+            <div id="gallery-mode" class="seg" role="group" aria-label="Periodo">
+              <button type="button" data-mode="week">Settimana</button>
+              <button type="button" data-mode="month">Mese</button>
+            </div>
+          </div>
           <section class="card list">
             <ol id="gallery" class="gallery"></ol>
           </section>

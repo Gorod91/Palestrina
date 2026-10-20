@@ -966,6 +966,11 @@ function buildState(user) {
         .sort((a, b) => b.score - a.score)
         .map((r) => ({ name: r.name, display: dn(r.name), day: r.day, score: r.score, title: r.title, photoId: r.photoId, refId: r.refId })),
     },
+    // Lo stesso per tutto il mese (interruttore "Mese" sopra la galleria)
+    sudometroMonth: rows('sudometro')
+      .filter((r) => r.day.slice(0, 7) === today.slice(0, 7))
+      .sort((a, b) => b.score - a.score)
+      .map((r) => ({ name: r.name, display: dn(r.name), day: r.day, score: r.score, title: r.title, photoId: r.photoId, refId: r.refId })),
   };
 }
 
