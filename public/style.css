@@ -695,16 +695,9 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 /* Link per reinstallare l'app: si può selezionare e copiare */
 .icon-link { word-break: break-all; user-select: text; -webkit-user-select: text; }
 
-/* Allenamento: esercizio precedente e successivo, scorrimento */
-.wo-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -2px 0 10px; }
-.wo-nav button { display: flex; align-items: center; gap: 4px; max-width: 42%; min-width: 0; padding: 4px 0; border: 0; background: none; color: var(--muted); font-size: 13px; font-weight: 600; }
-.wo-nav button b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
-.wo-nav button span { flex: none; }
-.wo-nav button span { color: var(--stand); font-size: 20px; line-height: 1; }
-.wo-nav em { font-style: normal; color: var(--muted); font-size: 11px; opacity: .7; letter-spacing: .04em; text-transform: uppercase; }
-.wo-nav i { width: 42%; }
-#workout.wo-in-right { animation: wo-from-right .22s ease-out; }
-#workout.wo-in-left { animation: wo-from-left .22s ease-out; }
-@keyframes wo-from-right { from { transform: translateX(40px); opacity: .3; } }
-@keyframes wo-from-left { from { transform: translateX(-40px); opacity: .3; } }
-@media (prefers-reduced-motion: reduce) { #workout.wo-in-right, #workout.wo-in-left { animation: none; } }
+/* Allenamento: esercizi come pagine da trascinare col dito; la pagina dopo si intravede al bordo */
+.wo-pager { display: flex; gap: 12px; overflow-x: auto; overscroll-behavior-x: contain; scroll-snap-type: x mandatory; scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  margin-right: -16px; padding-right: 16px; scroll-padding-left: 0; align-items: flex-start; }
+.wo-pager::-webkit-scrollbar { display: none; }
+.wo-page { flex: 0 0 100%; min-width: 0; scroll-snap-align: start; scroll-snap-stop: always; }
+.wo-pager.multi .wo-page { flex-basis: calc(100% - 22px); }

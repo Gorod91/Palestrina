@@ -166,7 +166,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     serieSig = '';
     altrove = [];
     schede = null;
-    Object.assign(ui, { view: 'list', sets: null, open: -1, editing: false });
+    Object.assign(ui, { view: 'list' });
+    pages = {};
   }
 
   // ---------- Dati ----------
@@ -200,11 +201,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   /** Ridisegno per i dati arrivati da Firebase: non mentre si tocca o si scrive, ma subito dopo. */
   function softDraw() {
     const typing = root.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
-    if (pressed || typing) later = true;
+    if (pressed || typing || scrolling) later = true;
     else draw();
   }
   function flush() {
-    if (!later || pressed) return;
+    if (!later || pressed || scrolling) return;
     later = false;
     setTimeout(() => {
       if (!(root.contains(document.activeElement) && document.activeElement.tagName === 'INPUT')) draw();
@@ -223,30 +224,41 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       return;
     }
     root.innerHTML = ui.view === 'ex' ? exView() : ui.view === 'pick' ? pickView() : ui.view === 'scheda' ? schedaView() : listView();
-    if (slide && ui.view === 'ex') {
-      root.classList.remove('wo-in-right', 'wo-in-left');
-      void root.offsetWidth; // riparte l'animazione anche con due cambi di fila
-      root.classList.add(slide > 0 ? 'wo-in-right' : 'wo-in-left');
+    const pager = root.querySelector('#wo-pager');
+    if (pager) {
+      pager.scrollLeft = ui.i * pageStep(pager);
+      if (glide) { // tocco su un puntino o su "Prossimo": la pagina scorre fino all'esercizio
+        const to = ui.i * pageStep(pager);
+        pager.scrollLeft = glide.from * pageStep(pager);
+        requestAnimationFrame(() => pager.scrollTo({ left: to, behavior: 'smooth' }));
+      }
+      pager.addEventListener('scroll', onPagerScroll, { passive: true });
     }
-    slide = 0;
+    glide = null;
+    tickRest();
   }
 
-  // Scorrimento col dito tra gli esercizi della scheda
-  let sx = 0, sy = 0, st = 0;
-  root.addEventListener('touchstart', (ev) => {
-    const t = ev.touches[0];
-    sx = t.clientX; sy = t.clientY; st = Date.now();
-  }, { passive: true });
-  root.addEventListener('touchend', (ev) => {
-    if (ui.view !== 'ex' || ui.list.length < 2 || ev.target.closest('input')) return;
-    const t = ev.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5 || Date.now() - st > 800) return;
-    const k = ui.i + (dx < 0 ? 1 : -1);
-    if (k < 0 || k >= ui.list.length) return;
-    openEx(k);
-    draw();
-  }, { passive: true });
-  root.addEventListener('animationend', () => root.classList.remove('wo-in-right', 'wo-in-left'));
+  const pageStep = (pager) => {
+    const a = pager.children[0], b = pager.children[1];
+    return b ? b.offsetLeft - a.offsetLeft : pager.clientWidth;
+  };
+  let glide = null;
+  let scrolling = false, scrollTimer = 0;
+  /** Durante il trascinamento si aggiornano solo numero e puntini; la pagina non si ridisegna. */
+  function onPagerScroll(ev) {
+    const pager = ev.currentTarget;
+    scrolling = true;
+    clearTimeout(scrollTimer);
+    const k = Math.max(0, Math.min(ui.list.length - 1, Math.round(pager.scrollLeft / pageStep(pager))));
+    if (k !== ui.i) {
+      ui.i = k;
+      const num = root.querySelector('#wo-num');
+      if (num) num.textContent = k + 1;
+      root.querySelectorAll('#wo-dots button').forEach((d, j) => d.classList.toggle('cur', j === k));
+    }
+    scrollTimer = setTimeout(() => { scrolling = false; flush(); }, 160);
+  }
+
 
   function listView() {
     const p = proposta();
@@ -277,51 +289,64 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return n <= 0 ? 'oggi' : n === 1 ? 'ieri' : `${n} giorni fa`;
   }
 
+  /** Stato di ogni pagina (esercizio): serie in modifica, serie aperta, "Modifica" dopo Fatto. Resta passando da una pagina all'altra. */
+  let pages = {};
+  const pageOf = (ex) => (pages[ex] ||= { sets: null, open: -1, editing: false });
+  const P = () => pageOf(ui.list[ui.i]);
+
+  /** Esercizi della scheda come pagine affiancate: si trascinano col dito, come le schermate della Home di iPhone. */
   function exView() {
-    const ex = ui.list[ui.i], e = EX[ex] || { n: ex, m: '' };
     const sch = (schede || []).find((s) => s.id === ui.scheda);
+    const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : todayDoc(id) ? 'ok' : ''}" data-a="j:${k}" aria-label="${esc((EX[id] || {}).n || id)}"></button>`).join('');
+    const title = sch ? `${esc(sch.name)} · <span id="wo-num">${ui.i + 1}</span>/${ui.list.length}` : 'Allenamento libero';
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button>${sch ? '<button class="wo-chip" data-a="scheda">Cambia esercizio</button>' : ''}</div>
+      ${ui.list.length > 1 ? `<div class="wo-dots" id="wo-dots">${dots}</div>` : ''}
+      <div class="wo-pager${ui.list.length > 1 ? ' multi' : ''}" id="wo-pager">${ui.list.map((_, k) => pageHtml(k, sch)).join('')}</div>`;
+  }
+
+  function pageHtml(k, sch) {
+    const ex = ui.list[k], e = EX[ex] || { n: ex, m: '' };
+    const pg = pageOf(ex);
     const piano = sch && sch.piano ? sch.piano[ex] : null;
     const t = unit(e);
     const done = todayDoc(ex);
-    const saved = !!done && !ui.editing;
-    if (!ui.sets) ui.sets = copy(done ? done.sets : (lastTime(ex) || { sets: primaVolta(piano) }).sets);
-    const sets = saved ? done.sets : ui.sets;
+    const saved = !!done && !pg.editing;
+    if (!pg.sets) pg.sets = copy(done ? done.sets : (lastTime(ex) || { sets: primaVolta(piano) }).sets);
+    const sets = saved ? done.sets : pg.sets;
     const last = lastTime(ex);
-    const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : todayDoc(id) ? 'ok' : ''}" data-a="j:${k}" aria-label="${esc((EX[id] || {}).n || id)}"></button>`).join('');
     const ref = last ? last.sets : null;
-    const rows = sets.map((s, k) => {
-      const r = ref && (ref[k] || ref[ref.length - 1]);
+    const rows = sets.map((s, j) => {
+      const r = ref && (ref[j] || ref[ref.length - 1]);
       const ck = !saved && r && s.kg !== r.kg, cr = !saved && r && s.reps !== r.reps;
       const kgCell = t === 'kg' ? `<span class="v${ck ? ' ch' : ''}">${kgf(s.kg)}<small>kg</small></span>` : '<span></span>';
-      const row = `<button class="wo-set${saved ? ' done' : ''}${ui.open === k ? ' open' : ''}" data-a="o:${k}"><span class="n">${k + 1}</span>${kgCell}<span class="v${cr ? ' ch' : ''}">${s.reps}<small>${t === 'sec' ? 's' : 'rip'}</small></span><span class="n">${saved ? (done.pending ? '…' : '✓') : '›'}</span></button>`;
-      if (ui.open !== k || saved) return row;
-      const field = (id, value, u, minus, plus, aria) => `<span class="wo-pm">
-          <button data-a="${minus}" aria-label="Meno ${aria}">−</button>
-          <label class="wo-in"><input id="${id}" inputmode="${id === 'wo-kg' ? 'decimal' : 'numeric'}" value="${value}" aria-label="${aria}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${u}</em></label>
-          <button data-a="${plus}" aria-label="Più ${aria}">+</button></span>`;
-      const kgEdit = t === 'kg' ? field('wo-kg', kgf(s.kg), 'kg', `k-:${k}`, `k+:${k}`, 'chili') : '';
-      const repEdit = field('wo-reps', s.reps, t === 'sec' ? 's' : 'rip', `r-:${k}`, `r+:${k}`, t === 'sec' ? 'secondi' : 'ripetizioni');
+      const row = `<button class="wo-set${saved ? ' done' : ''}${pg.open === j ? ' open' : ''}" data-a="o:${j}"><span class="n">${j + 1}</span>${kgCell}<span class="v${cr ? ' ch' : ''}">${s.reps}<small>${t === 'sec' ? 's' : 'rip'}</small></span><span class="n">${saved ? (done.pending ? '…' : '✓') : '›'}</span></button>`;
+      if (pg.open !== j || saved) return row;
+      const field = (kind, value, u, aria) => `<span class="wo-pm">
+          <button data-a="${kind}-:${j}" aria-label="Meno ${aria}">−</button>
+          <label class="wo-in"><input data-f="${kind}" inputmode="${kind === 'k' ? 'decimal' : 'numeric'}" value="${value}" aria-label="${aria}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${u}</em></label>
+          <button data-a="${kind}+:${j}" aria-label="Più ${aria}">+</button></span>`;
+      const kgEdit = t === 'kg' ? field('k', kgf(s.kg), 'kg', 'chili') : '';
+      const repEdit = field('r', s.reps, t === 'sec' ? 's' : 'rip', t === 'sec' ? 'secondi' : 'ripetizioni');
       return `${row}<div class="wo-edit"><div class="wo-pms">${kgEdit}${repEdit}</div><p class="wo-hint">Tocca il numero per scriverlo a mano</p></div>`;
     }).join('');
-    const nx = nextTodo();
+    const nx = nextTodo(k);
     const btn = saved
       ? `${nx >= 0 ? `<button class="primary" data-a="j:${nx}">Prossimo: ${esc((EX[ui.list[nx]] || {}).n || '')} ›</button>` : `<button class="primary" data-a="end">${ui.list.length > 1 ? 'Fine scheda' : 'Fine'}</button>`}
          <button class="link-button" data-a="edit">Modifica</button>${done.pending ? '<p class="wo-sub wo-center">Salvato sul telefono: parte appena c\'è rete</p>' : ''}`
       : `<div class="wo-btns"><button class="secondary" data-a="add">+ Serie</button><button class="secondary" data-a="del">− Serie</button></div><button class="primary" data-a="ok">✓ Fatto</button>`;
-    const title = sch ? `${esc(sch.name)} · ${ui.i + 1}/${ui.list.length}` : 'Allenamento libero';
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button>${sch ? '<button class="wo-chip" data-a="scheda">Cambia esercizio</button>' : ''}</div>
-      ${ui.list.length > 1 ? `<div class="wo-dots">${dots}</div>${navRow()}` : ''}
+    return `<section class="wo-page" data-k="${k}">
       <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(piano.s)}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
       ${last ? `<section class="card wo-last"><small>Ultima volta · ${shortDay(last.day)}</small><b>${summary(last.sets, t)}</b></section>` : ''}
       <div class="wo-sets">${rows}</div>
       ${btn}
-      <div class="wo-rest" id="wo-rest">${restHtml()}</div>`;
+      <div class="wo-rest">${restHtml()}</div>
+    </section>`;
   }
 
   /** Il primo esercizio non ancora fatto oggi dopo quello aperto (poi si ricomincia dall'inizio), -1 se fatti tutti. */
-  function nextTodo() {
+  function nextTodo(from = ui.i) {
     for (let d = 1; d < ui.list.length; d++) {
-      const k = (ui.i + d) % ui.list.length;
+      const k = (from + d) % ui.list.length;
       if (!todayDoc(ui.list[k])) return k;
     }
     return -1;
@@ -352,12 +377,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   }
 
   function tickRest() {
-    const el = root.querySelector('#wo-rest');
-    if (el) {
+    root.querySelectorAll('.wo-rest').forEach((el) => {
       el.innerHTML = restHtml();
       el.classList.toggle('on', !!restEnd && restEnd > Date.now());
       el.classList.toggle('end', !!restEnd && restEnd <= Date.now());
-    }
+    });
     if (!restEnd || restEnd <= Date.now()) {
       clearInterval(restTimer);
       restTimer = null;
@@ -381,33 +405,24 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   // ---------- Tocchi ----------
 
-  /** Esercizio precedente e successivo ai lati: si toccano o si scorre col dito (anche il nome fa capire che si può). */
-  function navRow() {
-    const n = ui.list.length;
-    const prev = ui.i > 0 ? (EX[ui.list[ui.i - 1]] || {}).n : '';
-    const next = ui.i < n - 1 ? (EX[ui.list[ui.i + 1]] || {}).n : '';
-    return `<div class="wo-nav">${prev ? `<button data-a="j:${ui.i - 1}"><span>‹</span><b>${esc(prev)}</b></button>` : '<i></i>'}<em>scorri</em>${next ? `<button data-a="j:${ui.i + 1}"><b>${esc(next)}</b><span>›</span></button>` : '<i></i>'}</div>`;
-  }
-
-  let slide = 0; // verso dell'ultimo cambio di esercizio, per l'animazione
-  function openEx(i) {
-    slide = ui.view === 'ex' && i !== ui.i ? (i > ui.i ? 1 : -1) : 0;
+  function openEx(i, slideFrom) {
+    glide = ui.view === 'ex' && slideFrom != null && slideFrom !== i ? { from: slideFrom } : null;
     ui.i = i;
-    ui.sets = null;
-    ui.open = -1;
-    ui.editing = false;
     ui.view = 'ex';
   }
 
   function setKg(k, v) {
     if (!(v >= 0) || v > 500) return;
     v = Math.round(v * 4) / 4;
-    for (let j = k; j < ui.sets.length; j++) ui.sets[j].kg = v; // cambia anche le serie dopo, come succede di solito
+    const sets = P().sets;
+    for (let j = k; j < sets.length; j++) sets[j].kg = v; // cambia anche le serie dopo, come succede di solito
   }
 
   root.addEventListener('click', (ev) => {
     const a = ev.target.closest('[data-a]')?.dataset.a;
     if (!a) return;
+    const page = ev.target.closest('.wo-page');
+    if (page) ui.i = Number(page.dataset.k); // i tasti valgono per la pagina in cui sono
     const [cmd, arg] = a.split(/:(.*)/s);
     if (cmd === 'timer') return openTimer();
     if (cmd === 'copia') {
@@ -420,6 +435,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       if (!s) return;
       ui.scheda = s.id;
       ui.list = s.ex.slice();
+      pages = {};
       const k = s.ex.findIndex((e) => !todayDoc(e));
       openEx(cmd === 'go' && k >= 0 ? k : 0);
     } else if (cmd === 'libero') {
@@ -427,6 +443,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'pick') {
       ui.scheda = '';
       ui.list = [arg];
+      pages = {};
       openEx(0);
     } else if (cmd === 'g') {
       ui.g = arg;
@@ -437,29 +454,27 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'scheda') {
       ui.view = 'scheda';
     } else if (cmd === 'j') {
-      openEx(Number(arg));
+      openEx(Number(arg), ui.view === 'ex' ? ui.i : null);
     } else if (cmd === 'ok') {
-      save(ui.list[ui.i], ui.sets);
-      ui.editing = false;
-      ui.open = -1;
-      ui.sets = null;
+      save(ui.list[ui.i], P().sets);
+      Object.assign(P(), { editing: false, open: -1, sets: null });
     } else if (cmd === 'edit') {
-      ui.editing = true;
-      ui.sets = copy(todayDoc(ui.list[ui.i]).sets);
+      Object.assign(P(), { editing: true, sets: copy(todayDoc(ui.list[ui.i]).sets) });
     } else if (cmd === 'add') {
-      ui.sets.push({ ...ui.sets[ui.sets.length - 1] });
+      const sets = P().sets;
+      sets.push({ ...sets[sets.length - 1] });
     } else if (cmd === 'del') {
-      if (ui.sets.length > 1) ui.sets.pop();
-      ui.open = -1;
+      if (P().sets.length > 1) P().sets.pop();
+      P().open = -1;
     } else if (cmd === 'o') {
       const k = Number(arg);
-      ui.open = ui.open === k ? -1 : k;
+      P().open = P().open === k ? -1 : k;
     } else if (/^[kr][+-]$/.test(cmd)) {
-      const k = Number(arg), d = cmd[1] === '+' ? 1 : -1;
-      if (cmd[0] === 'k') setKg(k, nextKg(ui.sets[k].kg, d));
+      const k = Number(arg), d = cmd[1] === '+' ? 1 : -1, sets = P().sets;
+      if (cmd[0] === 'k') setKg(k, nextKg(sets[k].kg, d));
       else {
         const step = unit(EX[ui.list[ui.i]]) === 'sec' ? 5 : 1;
-        ui.sets[k].reps = Math.max(step, Math.min(600, ui.sets[k].reps + step * d));
+        sets[k].reps = Math.max(step, Math.min(600, sets[k].reps + step * d));
       }
     } else if (cmd === 'rest') {
       restEnd = Date.now() + REST * 1000;
@@ -468,20 +483,23 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       restEnd = 0;
     }
     draw();
-    if (cmd === 'rest' || cmd === 'stop') tickRest();
   });
 
   root.addEventListener('change', (ev) => {
-    if (ui.open < 0 || !ui.sets) return;
+    const f = ev.target.dataset.f, page = ev.target.closest('.wo-page');
+    if (!f || !page) return;
+    ui.i = Number(page.dataset.k);
+    const pg = P();
+    if (pg.open < 0 || !pg.sets) return;
     const v = Number(ev.target.value.replace(',', '.'));
-    if (ev.target.id === 'wo-kg') setKg(ui.open, v);
-    else if (ev.target.id === 'wo-reps' && v >= 1 && v <= 600) ui.sets[ui.open].reps = Math.round(v);
+    if (f === 'k') setKg(pg.open, v);
+    else if (v >= 1 && v <= 600) pg.sets[pg.open].reps = Math.round(v);
     else return;
     draw();
   });
   // Invio sulla tastiera: conferma il numero e chiude la tastiera
   root.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter' && (ev.target.id === 'wo-kg' || ev.target.id === 'wo-reps')) ev.target.blur();
+    if (ev.key === 'Enter' && ev.target.dataset.f) ev.target.blur();
   });
   root.addEventListener('input', (ev) => {
     if (ev.target.id !== 'wo-q') return;
