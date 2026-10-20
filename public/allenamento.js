@@ -95,6 +95,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '' };
   let restEnd = 0;
   let serieSig = '';
+  let altrove = []; // le mie serie salvate dall'altra parte (prova o dati veri)
   let pressed = false; // dito sullo schermo: il ridisegno aspetta che si alzi
   let later = false;
   let restTimer = null;
@@ -131,6 +132,25 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         softDraw();
       }, (err) => toast(`Allenamento: ${err.message}`)),
     );
+    // Serie salvate dall'altra parte (in prova se ora si è fuori, o viceversa): si possono copiare qui
+    fs.getDocs(fs.query(fs.collection(db, (test ? '' : 'prova_') + 'serie'), fs.where('name', '==', me.name)))
+      .then((snap) => {
+        if (k !== key) return;
+        altrove = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        softDraw();
+      })
+      .catch(() => {});
+  }
+
+  /** Serie dell'altra parte che qui mancano (Firebase accetta solo quelle di oggi e ieri). */
+  const daCopiare = () => altrove.filter((a) => daysAgo(a.day) <= 1 && !serie.some((s) => s.id === a.id));
+
+  function copia() {
+    const { fs, db } = x;
+    daCopiare().forEach((a) => {
+      fs.setDoc(fs.doc(db, pfx + 'serie', a.id), { name: me.name, ex: a.ex, sets: copy(a.sets), day: a.day, scheda: a.scheda || '', at: fs.serverTimestamp() })
+        .catch((err) => toast(`Serie non copiate: ${err.message}`));
+    });
   }
 
   function stop() {
@@ -140,6 +160,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     ready = false;
     serie = [];
     serieSig = '';
+    altrove = [];
     schede = null;
     Object.assign(ui, { view: 'list', sets: null, open: -1, editing: false });
   }
@@ -214,7 +235,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const sub = all ? 'Fatta oggi ✓' : n ? `${n} di ${p.ex.length} esercizi fatti` : `${p.ex.length} esercizi${d ? ` · l'hai fatta ${ago(d)}` : ' · mai fatta'}`;
       hero = `<section class="wo-hero"><div class="wo-hero-name">${esc(p.name)}</div><div class="wo-sub">${sub}</div><button class="primary" data-a="go:${esc(p.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'}</button></section>`;
     }
-    return `${hero}
+    const dc = daCopiare();
+    const recupera = dc.length ? `<section class="card wo-copy"><b>${dc.length} ${dc.length === 1 ? 'esercizio salvato' : 'esercizi salvati'} ${pfx ? 'fuori dalla prova' : 'in modalità prova'}</b>
+      <span class="wo-sub">${esc(dc.map((a) => (EX[a.ex] || { n: a.ex }).n).join(', '))}</span><button class="primary" data-a="copia">Copia qui</button></section>` : '';
+    return `${recupera}${hero}
       <h2 class="section">Le tue schede</h2>
       <section class="card wo-list">${other}</section>
       <div class="wo-btns"><button class="secondary" data-a="libero">Allenamento libero</button><button class="secondary" data-a="nuova">+ Nuova scheda</button></div>
@@ -350,6 +374,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (!a) return;
     const [cmd, arg] = a.split(/:(.*)/s);
     if (cmd === 'timer') return openTimer();
+    if (cmd === 'copia') {
+      copia();
+      return toast('Serie copiate');
+    }
     if (cmd === 'nuova') return toast('Creare le schede arriva nella prossima fase. Per ora c\'è la tua scheda A.');
     if (cmd === 'go' || cmd === 'sch') {
       const s = schede.find((y) => y.id === arg);

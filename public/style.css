@@ -626,6 +626,8 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
   background: linear-gradient(150deg, rgba(166, 255, 0, .2), var(--card) 65%); border: 1px solid rgba(166, 255, 0, .3); }
 .wo-hero-name { font-size: 24px; font-weight: 800; letter-spacing: -.02em; }
 .wo-hero .primary { margin-top: 10px; }
+.wo-copy { display: grid; gap: 4px; margin-top: 6px; border: 1px solid var(--stand); }
+.wo-copy .wo-sub { font-size: 14px; }
 .wo-list { padding: 2px 16px; }
 .wo-row { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 12px; width: 100%; padding: 13px 0; border: 0; border-bottom: 1px solid var(--line); background: none; color: var(--fg); text-align: left; }
 .wo-row > span:first-child:not(.wo-dot):not(.wo-mark) { grid-column: 1 / 3; }
