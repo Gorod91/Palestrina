@@ -1081,13 +1081,13 @@ const workout = createWorkout({
 });
 $('timer-back').addEventListener('click', () => selectTab('allenamento'));
 
-/** Il tab Timer diventa Allenamento (con il timer dentro) in prova e per chi ha l'allenamento attivo; per gli altri resta com'era. */
+/** Il tab Timer diventa Allenamento (con il timer dentro) per chi ha l'allenamento attivo; per gli altri resta com'era. */
 let workoutProva = null;
 function workoutOn() {
-  return testOn() || !!(state && state.me && state.me.allenamento);
+  return !!(state && state.me && state.me.allenamento); // per ora solo chi è in WORKOUT_USERS (server), in prova o no
 }
 function workoutTab() {
-  // in prova per chi prova (dati di prova); fuori dalla prova solo per chi ha l'allenamento attivo (dati veri)
+  // solo per chi ha l'allenamento attivo: in prova con i dati di prova, fuori con quelli veri
   const prova = workoutOn() && !!(state && state.me);
   if (prova) workout.start({ name: state.me.name }, testOn());
   if (prova === workoutProva) return;

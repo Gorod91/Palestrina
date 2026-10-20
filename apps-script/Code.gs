@@ -40,7 +40,7 @@ const TRACE_USERS = []; // es. ['Michy']: diagnostica accesa per quell'account
 // Modalità prova anche per chi non è admin (senza registro admin, "Agisci come" e simulazioni), per provare insieme
 // le novità, per esempio la chat su Firebase. Usa i dati di prova come l'admin.
 const PROVA_USERS = ['Michy'];
-// Allenamento (schede e serie su Firebase) anche fuori dalla prova, con i dati veri: per ora solo Francesco
+// Allenamento (schede e serie su Firebase), in prova e con i dati veri: per ora solo Francesco (anche in firestore.rules)
 const WORKOUT_USERS = ['Francesco'];
 const TZ = Session.getScriptTimeZone();
 const realProps = PropertiesService.getScriptProperties();

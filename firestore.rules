@@ -46,12 +46,16 @@ service cloud.firestore {
         && request.resource.data.at == request.time;
     }
 
-    // Allenamento: tutto visibile al gruppo; ognuno scrive solo le proprie serie e schede
+    // Allenamento: per ora solo Francesco (come WORKOUT_USERS in Code.gs). Poi: tutto visibile al gruppo,
+    // ognuno scrive solo le proprie serie e schede (togliere allenamento() qui sotto).
+    function allenamento() {
+      return request.auth.token.name in ['Francesco'];
+    }
     match /{coll}/{id} {
-      allow read: if pal() && coll in ['serie', 'prova_serie', 'schede', 'prova_schede'];
+      allow read: if pal() && allenamento() && coll in ['serie', 'prova_serie', 'schede', 'prova_schede'];
 
       // Serie di un esercizio in un giorno (id = giorno_uid_esercizio): si possono correggere
-      allow create, update: if pal()
+      allow create, update: if pal() && allenamento()
         && coll in ['serie', 'prova_serie']
         && request.resource.data.keys().hasOnly(['name', 'ex', 'sets', 'day', 'scheda', 'at'])
         && id == request.resource.data.day + '_' + request.auth.uid + '_' + request.resource.data.ex
@@ -67,7 +71,7 @@ service cloud.firestore {
         && dayOk(request.resource.data.day);
 
       // Le proprie schede (id = uid)
-      allow create, update: if pal()
+      allow create, update: if pal() && allenamento()
         && coll in ['schede', 'prova_schede']
         && id == request.auth.uid
         && request.resource.data.keys().hasOnly(['name', 'list', 'at'])
