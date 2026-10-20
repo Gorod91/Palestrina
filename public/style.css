@@ -645,6 +645,7 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .wo-ex { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 10px; margin-bottom: 12px; }
 .wo-ex-name { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
 .wo-pill { padding: 4px 10px; border-radius: 99px; background: var(--card-2); font-size: 13px; font-weight: 600; color: var(--muted); }
+.wo-plan { color: var(--stand); background: rgba(0, 217, 255, .14); }
 .wo-last { display: grid; gap: 2px; padding: 12px 16px; }
 .wo-last small { color: var(--muted); font-size: 13px; }
 .wo-last b { font-size: 17px; font-variant-numeric: tabular-nums; }

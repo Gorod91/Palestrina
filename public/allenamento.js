@@ -4,12 +4,20 @@
 // schede/<uid> = { name, list: [{ id, name, ex: [id esercizio] }], at }.
 import { fbSignIn, fbUid } from './fbchat.js';
 
-// Catalogo di esempio: quello vero delle macchine della nostra palestra arriverà più avanti
+// Catalogo di esempio: quello vero delle macchine della nostra palestra arriverà più avanti.
+// t: 'kg' (peso e ripetizioni, se manca), 'rip' (solo ripetizioni, a corpo libero), 'sec' (a tempo, in secondi)
 export const CATALOGO = [
+  { id: 'squat', n: 'Squat', g: 'Gambe', m: 'Bilanciere' },
+  { id: 'spinte-manubri', n: 'Spinte in alto con manubri in piedi', g: 'Spalle', m: 'Manubri' },
+  { id: 'pulley-medio', n: 'Pulley grip medio', g: 'Schiena', m: 'Cavo' },
+  { id: 'chest-press-sdraiato', n: 'Chest press sdraiato', g: 'Petto', m: 'Macchina' },
+  { id: 'situps', n: 'Sit-up', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
+  { id: 'plank', n: 'Plank sui gomiti', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
+  { id: 'barchetta', n: 'Barchetta', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
   { id: 'panca', n: 'Panca piana', g: 'Petto', m: 'Bilanciere' },
   { id: 'chest-press', n: 'Chest press', g: 'Petto', m: 'Macchina 2' },
   { id: 'croci', n: 'Croci ai cavi', g: 'Petto', m: 'Cavi' },
-  { id: 'lat', n: 'Lat machine', g: 'Schiena', m: 'Macchina 3' },
+  { id: 'lat', n: 'Lat machine', g: 'Schiena', m: 'Macchina' },
   { id: 'pulley', n: 'Pulley basso', g: 'Schiena', m: 'Macchina 6' },
   { id: 'rematore', n: 'Rematore con manubrio', g: 'Schiena', m: 'Manubri' },
   { id: 'leg-press', n: 'Leg press', g: 'Gambe', m: 'Macchina 7' },
@@ -25,14 +33,36 @@ export const CATALOGO = [
 ];
 const EX = Object.fromEntries(CATALOGO.map((e) => [e.id, e]));
 
-// Schede di esempio per chi non ne ha ancora (la creazione delle proprie arriva con la fase 2)
+// Scheda per chi non ne ha ancora (la creazione delle proprie arriva con la fase 2): la scheda A di Francesco.
+// piano: serie × ripetizioni indicate dall'istruttore e note; servono anche per riempire le serie la prima volta.
 const SCHEDE_ESEMPIO = [
-  { id: 'a', name: 'Scheda A · Petto e schiena', ex: ['panca', 'chest-press', 'croci', 'lat', 'pulley', 'rematore'] },
-  { id: 'b', name: 'Scheda B · Gambe', ex: ['leg-press', 'leg-ext', 'leg-curl', 'hip-thrust', 'calf'] },
+  {
+    id: 'a',
+    name: 'Scheda A',
+    ex: ['squat', 'lat', 'spinte-manubri', 'pulley-medio', 'chest-press-sdraiato', 'curl', 'situps', 'plank', 'barchetta'],
+    piano: {
+      squat: { s: '4 × 6-8' },
+      lat: { s: '3 × 8-10' },
+      'spinte-manubri': { s: '4 × 6-8' },
+      'pulley-medio': { s: '3 × 8-10', nota: '1" fermo al petto' },
+      'chest-press-sdraiato': { s: '3 × 8-10', nota: '2° piano' },
+      curl: { s: '3 × 6-8' },
+      situps: { s: '10-12' },
+      plank: { s: '30-40"' },
+      barchetta: { s: '20-30"' },
+    },
+  },
 ];
 
 const REST = 90; // secondi di recupero
-const PRIMA_VOLTA = [{ kg: 0, reps: 10 }, { kg: 0, reps: 10 }, { kg: 0, reps: 10 }];
+
+/** Serie della prima volta: dal piano della scheda ("4 × 6-8" → 4 serie da 6), altrimenti 3 × 10. */
+function primaVolta(piano) {
+  const m = String((piano && piano.s) || '').match(/^(?:(\d+)\s*×\s*)?(\d+)/);
+  const n = m ? Number(m[1] || 1) : 3, reps = m ? Number(m[2]) : 10;
+  return Array.from({ length: n }, () => ({ kg: 0, reps }));
+}
+const unit = (e) => (e && e.t) || 'kg';
 
 const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' });
 const today = () => dayFmt.format(new Date());
@@ -42,10 +72,12 @@ const kgf = (v) => String(v).replace('.', ',');
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const copy = (sets) => sets.map((s) => ({ kg: s.kg, reps: s.reps }));
 
-function summary(sets) {
-  const kg = sets.every((s) => s.kg === sets[0].kg) ? `${kgf(sets[0].kg)} kg` : 'kg diversi';
+function summary(sets, t = 'kg') {
   const r = sets.map((s) => s.reps);
-  return `${r.every((x) => x === r[0]) ? `${r.length} × ${r[0]}` : r.join(' · ')} · ${kg}`;
+  const reps = r.every((x) => x === r[0]) ? `${r.length} × ${r[0]}${t === 'sec' ? '"' : ''}` : r.map((x) => (t === 'sec' ? `${x}"` : x)).join(' · ');
+  if (t !== 'kg') return reps;
+  const kg = sets.every((s) => s.kg === sets[0].kg) ? `${kgf(sets[0].kg)} kg` : 'kg diversi';
+  return `${reps} · ${kg}`;
 }
 
 export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }) {
@@ -149,8 +181,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     let hero = '';
     if (p) {
       const n = doneToday(p), d = lastDone(p);
-      const sub = n ? `${n} di ${p.ex.length} esercizi fatti` : `${p.ex.length} esercizi${d ? ` · l'hai fatta ${ago(d)}` : ' · mai fatta'}`;
-      hero = `<section class="wo-hero"><div class="wo-hero-name">${esc(p.name)}</div><div class="wo-sub">${sub}</div><button class="primary" data-a="go:${esc(p.id)}">${n ? 'Continua' : 'Inizia'}</button></section>`;
+      const all = n === p.ex.length;
+      const sub = all ? 'Fatta oggi ✓' : n ? `${n} di ${p.ex.length} esercizi fatti` : `${p.ex.length} esercizi${d ? ` · l'hai fatta ${ago(d)}` : ' · mai fatta'}`;
+      hero = `<section class="wo-hero"><div class="wo-hero-name">${esc(p.name)}</div><div class="wo-sub">${sub}</div><button class="primary" data-a="go:${esc(p.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'}</button></section>`;
     }
     return `${hero}
       <h2 class="section">Le tue schede</h2>
@@ -167,9 +200,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function exView() {
     const ex = ui.list[ui.i], e = EX[ex] || { n: ex, m: '' };
     const sch = (schede || []).find((s) => s.id === ui.scheda);
+    const piano = sch && sch.piano ? sch.piano[ex] : null;
+    const t = unit(e);
     const done = todayDoc(ex);
     const saved = !!done && !ui.editing;
-    if (!ui.sets) ui.sets = copy(done ? done.sets : (lastTime(ex) || { sets: PRIMA_VOLTA }).sets);
+    if (!ui.sets) ui.sets = copy(done ? done.sets : (lastTime(ex) || { sets: primaVolta(piano) }).sets);
     const sets = saved ? done.sets : ui.sets;
     const last = lastTime(ex);
     const dots = ui.list.map((id, k) => `<i class="${k === ui.i ? 'cur' : todayDoc(id) ? 'ok' : ''}"></i>`).join('');
@@ -177,11 +212,12 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const rows = sets.map((s, k) => {
       const r = ref && (ref[k] || ref[ref.length - 1]);
       const ck = !saved && r && s.kg !== r.kg, cr = !saved && r && s.reps !== r.reps;
-      const row = `<button class="wo-set${saved ? ' done' : ''}${ui.open === k ? ' open' : ''}" data-a="o:${k}"><span class="n">${k + 1}</span><span class="v${ck ? ' ch' : ''}">${kgf(s.kg)}<small>kg</small></span><span class="v${cr ? ' ch' : ''}">${s.reps}<small>rip</small></span><span class="n">${saved ? (done.pending ? '…' : '✓') : '›'}</span></button>`;
+      const kgCell = t === 'kg' ? `<span class="v${ck ? ' ch' : ''}">${kgf(s.kg)}<small>kg</small></span>` : '<span></span>';
+      const row = `<button class="wo-set${saved ? ' done' : ''}${ui.open === k ? ' open' : ''}" data-a="o:${k}"><span class="n">${k + 1}</span>${kgCell}<span class="v${cr ? ' ch' : ''}">${s.reps}<small>${t === 'sec' ? 's' : 'rip'}</small></span><span class="n">${saved ? (done.pending ? '…' : '✓') : '›'}</span></button>`;
       if (ui.open !== k || saved) return row;
-      return `${row}<div class="wo-edit">
-        <span class="wo-pm"><button data-a="k-:${k}" aria-label="Meno peso">−</button><input id="wo-kg" inputmode="decimal" value="${kgf(s.kg)}" aria-label="Chili"><button data-a="k+:${k}" aria-label="Più peso">+</button></span>
-        <span class="wo-pm"><button data-a="r-:${k}" aria-label="Meno ripetizioni">−</button><b>${s.reps}</b><button data-a="r+:${k}" aria-label="Più ripetizioni">+</button></span></div>`;
+      const kgEdit = t === 'kg' ? `<span class="wo-pm"><button data-a="k-:${k}" aria-label="Meno peso">−</button><input id="wo-kg" inputmode="decimal" value="${kgf(s.kg)}" aria-label="Chili"><button data-a="k+:${k}" aria-label="Più peso">+</button></span>` : '';
+      return `${row}<div class="wo-edit">${kgEdit}
+        <span class="wo-pm"><button data-a="r-:${k}" aria-label="${t === 'sec' ? 'Meno secondi' : 'Meno ripetizioni'}">−</button><b>${s.reps}${t === 'sec' ? '"' : ''}</b><button data-a="r+:${k}" aria-label="${t === 'sec' ? 'Più secondi' : 'Più ripetizioni'}">+</button></span></div>`;
     }).join('');
     const isLast = ui.i === ui.list.length - 1;
     const btn = saved
@@ -191,8 +227,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const title = sch ? `${esc(sch.name)} · ${ui.i + 1}/${ui.list.length}` : 'Allenamento libero';
     return `<button class="wo-back" data-a="back">‹ ${title}</button>
       ${ui.list.length > 1 ? `<div class="wo-dots">${dots}</div>` : ''}
-      <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}</div>
-      <section class="card wo-last">${last ? `<small>Ultima volta · ${shortDay(last.day)}</small><b>${summary(last.sets)}</b>` : '<small>Prima volta</small><b>Scegli il peso toccando una serie</b>'}</section>
+      <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(piano.s)}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
+      <section class="card wo-last">${last ? `<small>Ultima volta · ${shortDay(last.day)}</small><b>${summary(last.sets, t)}</b>` : `<small>Prima volta</small><b>${t === 'kg' ? 'Scegli il peso toccando una serie' : 'Tocca una serie per cambiarla'}</b>`}</section>
       <div class="wo-sets">${rows}</div>
       ${btn}
       <div class="wo-rest" id="wo-rest">${restHtml()}</div>`;
@@ -230,7 +266,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <div class="wo-groups"><button class="${ui.g ? '' : 'on'}" data-a="g:">Tutti</button>${groups.map((g) => `<button class="${ui.g === g ? 'on' : ''}" data-a="g:${esc(g)}">${esc(g)}</button>`).join('')}</div>
       <section class="card wo-list">${list.map((e) => {
         const l = lastTime(e.id);
-        return `<button class="wo-row" data-a="pick:${e.id}"><span><b>${esc(e.n)}</b><small>${esc(e.g)} · ${esc(e.m)}${l ? ` · ${summary(l.sets)}` : ''}</small></span><span class="wo-chev">›</span></button>`;
+        return `<button class="wo-row" data-a="pick:${e.id}"><span><b>${esc(e.n)}</b><small>${esc(e.g)} · ${esc(e.m)}${l ? ` · ${summary(l.sets, unit(e))}` : ''}</small></span><span class="wo-chev">›</span></button>`;
       }).join('') || '<p class="wo-empty">Nessun esercizio</p>'}</section>
       <p class="footnote">Catalogo di esempio: quello vero delle nostre macchine arriverà più avanti.</p>`;
   }
@@ -256,7 +292,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (!a) return;
     const [cmd, arg] = a.split(/:(.*)/s);
     if (cmd === 'timer') return openTimer();
-    if (cmd === 'nuova') return toast('Le schede tue arrivano nella prossima fase. Per ora ci sono due schede di esempio.');
+    if (cmd === 'nuova') return toast('Creare le schede arriva nella prossima fase. Per ora c\'è la tua scheda A.');
     if (cmd === 'go' || cmd === 'sch') {
       const s = schede.find((y) => y.id === arg);
       if (!s) return;
@@ -295,7 +331,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (/^[kr][+-]$/.test(cmd)) {
       const k = Number(arg), d = cmd[1] === '+' ? 1 : -1;
       if (cmd[0] === 'k') setKg(k, Math.max(0, ui.sets[k].kg + 2.5 * d));
-      else ui.sets[k].reps = Math.max(1, Math.min(100, ui.sets[k].reps + d));
+      else {
+        const step = unit(EX[ui.list[ui.i]]) === 'sec' ? 5 : 1;
+        ui.sets[k].reps = Math.max(step, Math.min(600, ui.sets[k].reps + step * d));
+      }
     } else if (cmd === 'rest') {
       restEnd = Date.now() + REST * 1000;
       if (!restTimer) restTimer = setInterval(tickRest, 250);
