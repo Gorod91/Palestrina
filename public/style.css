@@ -743,8 +743,8 @@ body.keyboard .wo-bar { display: none; }
 .wo-big[hidden] { display: none; }
 .wo-big .timer-running { margin: 0; }
 .wo-big-head { display: grid; gap: 4px; text-align: center; }
-.wo-big-head b { font-size: 34px; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
-.wo-big-head small { color: var(--muted); font-size: 17px; font-weight: 600; }
+.wo-big-head b { font-size: 46px; line-height: 1.05; font-weight: 800; letter-spacing: -.02em; text-wrap: balance; }
+.wo-big-head small { color: var(--muted); font-size: 20px; font-weight: 600; }
 .wo-big-head small:empty { display: none; }
 /* recupero in azzurro (gli esercizi restano verdi come il timer addominali) */
 .wo-big.rest .timer-running { background: radial-gradient(closest-side, var(--bg) 87%, transparent 88%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0); }
