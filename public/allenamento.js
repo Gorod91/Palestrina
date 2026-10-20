@@ -63,8 +63,12 @@ function primaVolta(piano) {
   return Array.from({ length: n }, () => ({ kg: 0, reps }));
 }
 const unit = (e) => (e && e.t) || 'kg';
-/** Di quanto cambia il peso con − e +: le macchine e i cavi vanno a 1 kg, bilancieri e manubri a 2,5 (si può sempre scrivere). */
-const kgStep = (e) => (e && /^(Macchina|Cavo|Cavi)/.test(e.m || '') ? 1 : 2.5);
+/** Peso dopo − o +: a 1 kg fino a 20, sopra a 2,5 kg (sui multipli di 2,5). Si può sempre scrivere a mano. */
+function nextKg(v, d) {
+  if (d > 0) return v < 20 ? Math.min(20, Math.floor(v) + 1) : Math.floor(v / 2.5 + 1e-9) * 2.5 + 2.5;
+  if (v <= 20) return Math.max(0, Math.ceil(v) - 1);
+  return Math.max(20, Math.ceil(v / 2.5 - 1e-9) * 2.5 - 2.5);
+}
 
 const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' });
 const today = () => dayFmt.format(new Date());
@@ -219,7 +223,30 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       return;
     }
     root.innerHTML = ui.view === 'ex' ? exView() : ui.view === 'pick' ? pickView() : ui.view === 'scheda' ? schedaView() : listView();
+    if (slide && ui.view === 'ex') {
+      root.classList.remove('wo-in-right', 'wo-in-left');
+      void root.offsetWidth; // riparte l'animazione anche con due cambi di fila
+      root.classList.add(slide > 0 ? 'wo-in-right' : 'wo-in-left');
+    }
+    slide = 0;
   }
+
+  // Scorrimento col dito tra gli esercizi della scheda
+  let sx = 0, sy = 0, st = 0;
+  root.addEventListener('touchstart', (ev) => {
+    const t = ev.touches[0];
+    sx = t.clientX; sy = t.clientY; st = Date.now();
+  }, { passive: true });
+  root.addEventListener('touchend', (ev) => {
+    if (ui.view !== 'ex' || ui.list.length < 2 || ev.target.closest('input')) return;
+    const t = ev.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5 || Date.now() - st > 800) return;
+    const k = ui.i + (dx < 0 ? 1 : -1);
+    if (k < 0 || k >= ui.list.length) return;
+    openEx(k);
+    draw();
+  }, { passive: true });
+  root.addEventListener('animationend', () => root.classList.remove('wo-in-right', 'wo-in-left'));
 
   function listView() {
     const p = proposta();
@@ -268,14 +295,13 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const kgCell = t === 'kg' ? `<span class="v${ck ? ' ch' : ''}">${kgf(s.kg)}<small>kg</small></span>` : '<span></span>';
       const row = `<button class="wo-set${saved ? ' done' : ''}${ui.open === k ? ' open' : ''}" data-a="o:${k}"><span class="n">${k + 1}</span>${kgCell}<span class="v${cr ? ' ch' : ''}">${s.reps}<small>${t === 'sec' ? 's' : 'rip'}</small></span><span class="n">${saved ? (done.pending ? '…' : '✓') : '›'}</span></button>`;
       if (ui.open !== k || saved) return row;
-      const step = kgStep(e);
-      const field = (id, label, value, u, minus, plus, aria) => `<div class="wo-field"><span class="wo-lbl">${label}</span><span class="wo-pm">
+      const field = (id, value, u, minus, plus, aria) => `<span class="wo-pm">
           <button data-a="${minus}" aria-label="Meno ${aria}">−</button>
-          <label class="wo-in"><input id="${id}" inputmode="${id === 'wo-kg' ? 'decimal' : 'numeric'}" value="${value}" aria-label="${aria}" onfocus="this.select()" autocomplete="off"><em>${u}</em><svg aria-hidden="true"><use href="#i-pencil"/></svg></label>
-          <button data-a="${plus}" aria-label="Più ${aria}">+</button></span></div>`;
-      const kgEdit = t === 'kg' ? field('wo-kg', `Peso · − e + di ${kgf(step)} kg`, kgf(s.kg), 'kg', `k-:${k}`, `k+:${k}`, 'chili') : '';
-      const repEdit = field('wo-reps', t === 'sec' ? 'Secondi' : 'Ripetizioni', s.reps, t === 'sec' ? 's' : 'rip', `r-:${k}`, `r+:${k}`, t === 'sec' ? 'secondi' : 'ripetizioni');
-      return `${row}<div class="wo-edit">${kgEdit}${repEdit}<p class="wo-hint">Tocca il numero per scrivere il valore che vuoi</p></div>`;
+          <label class="wo-in"><input id="${id}" inputmode="${id === 'wo-kg' ? 'decimal' : 'numeric'}" value="${value}" aria-label="${aria}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${u}</em></label>
+          <button data-a="${plus}" aria-label="Più ${aria}">+</button></span>`;
+      const kgEdit = t === 'kg' ? field('wo-kg', kgf(s.kg), 'kg', `k-:${k}`, `k+:${k}`, 'chili') : '';
+      const repEdit = field('wo-reps', s.reps, t === 'sec' ? 's' : 'rip', `r-:${k}`, `r+:${k}`, t === 'sec' ? 'secondi' : 'ripetizioni');
+      return `${row}<div class="wo-edit"><div class="wo-pms">${kgEdit}${repEdit}</div><p class="wo-hint">Tocca il numero per scriverlo a mano</p></div>`;
     }).join('');
     const nx = nextTodo();
     const btn = saved
@@ -284,7 +310,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       : `<div class="wo-btns"><button class="secondary" data-a="add">+ Serie</button><button class="secondary" data-a="del">− Serie</button></div><button class="primary" data-a="ok">✓ Fatto</button>`;
     const title = sch ? `${esc(sch.name)} · ${ui.i + 1}/${ui.list.length}` : 'Allenamento libero';
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button>${sch ? '<button class="wo-chip" data-a="scheda">Cambia esercizio</button>' : ''}</div>
-      ${ui.list.length > 1 ? `<div class="wo-dots">${dots}</div>` : ''}
+      ${ui.list.length > 1 ? `<div class="wo-dots">${dots}</div>${navRow()}` : ''}
       <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(piano.s)}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
       ${last ? `<section class="card wo-last"><small>Ultima volta · ${shortDay(last.day)}</small><b>${summary(last.sets, t)}</b></section>` : ''}
       <div class="wo-sets">${rows}</div>
@@ -355,7 +381,17 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   // ---------- Tocchi ----------
 
+  /** Esercizio precedente e successivo ai lati: si toccano o si scorre col dito (anche il nome fa capire che si può). */
+  function navRow() {
+    const n = ui.list.length;
+    const prev = ui.i > 0 ? (EX[ui.list[ui.i - 1]] || {}).n : '';
+    const next = ui.i < n - 1 ? (EX[ui.list[ui.i + 1]] || {}).n : '';
+    return `<div class="wo-nav">${prev ? `<button data-a="j:${ui.i - 1}"><span>‹</span><b>${esc(prev)}</b></button>` : '<i></i>'}<em>scorri</em>${next ? `<button data-a="j:${ui.i + 1}"><b>${esc(next)}</b><span>›</span></button>` : '<i></i>'}</div>`;
+  }
+
+  let slide = 0; // verso dell'ultimo cambio di esercizio, per l'animazione
   function openEx(i) {
+    slide = ui.view === 'ex' && i !== ui.i ? (i > ui.i ? 1 : -1) : 0;
     ui.i = i;
     ui.sets = null;
     ui.open = -1;
@@ -420,7 +456,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       ui.open = ui.open === k ? -1 : k;
     } else if (/^[kr][+-]$/.test(cmd)) {
       const k = Number(arg), d = cmd[1] === '+' ? 1 : -1;
-      if (cmd[0] === 'k') setKg(k, Math.max(0, ui.sets[k].kg + kgStep(EX[ui.list[ui.i]]) * d));
+      if (cmd[0] === 'k') setKg(k, nextKg(ui.sets[k].kg, d));
       else {
         const step = unit(EX[ui.list[ui.i]]) === 'sec' ? 5 : 1;
         ui.sets[k].reps = Math.max(step, Math.min(600, ui.sets[k].reps + step * d));

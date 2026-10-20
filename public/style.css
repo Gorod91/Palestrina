@@ -659,7 +659,7 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .wo-last { display: grid; gap: 2px; padding: 12px 16px; }
 .wo-last small { color: var(--muted); font-size: 13px; }
 .wo-last b { font-size: 17px; font-variant-numeric: tabular-nums; }
-.wo-sets { display: grid; gap: 7px; }
+.wo-sets { display: grid; gap: 7px; min-width: 0; }
 .wo-set { display: grid; grid-template-columns: 22px 1fr 1fr 18px; align-items: center; gap: 8px; width: 100%; padding: 12px 14px; border: 0; border-radius: 14px; background: var(--card); color: var(--fg); text-align: left; }
 .wo-set .n { color: var(--muted); font-weight: 700; }
 .wo-set .v { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
@@ -668,17 +668,16 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .wo-set.open { outline: 2px solid var(--stand); outline-offset: -2px; }
 .wo-set.done { background: rgba(166, 255, 0, .12); }
 .wo-set.done .n:last-child { color: var(--exercise); font-size: 17px; }
-.wo-edit { display: grid; gap: 12px; padding: 14px; border-radius: 14px; background: var(--card); }
-.wo-field { display: grid; gap: 6px; }
-.wo-lbl { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
-.wo-pm { display: grid; grid-template-columns: 48px 1fr 48px; align-items: center; gap: 10px; }
-.wo-pm button { width: 48px; height: 48px; border: 0; border-radius: 50%; background: var(--card-2); color: var(--exercise); font-size: 24px; font-weight: 800; }
-.wo-in { display: flex; align-items: center; justify-content: center; gap: 6px; height: 48px; padding: 0 12px; border: 1.5px solid var(--stand); border-radius: 12px; background: var(--bg); cursor: text; }
-.wo-in input { width: 4ch; min-width: 0; padding: 0; border: 0; background: none; color: var(--fg); font: 700 24px/1 inherit; font-family: inherit; text-align: right; font-variant-numeric: tabular-nums; }
-.wo-in input:focus { outline: none; }
+.wo-edit { display: grid; gap: 8px; padding: 10px; border-radius: 14px; background: var(--card); }
+.wo-pms { display: flex; justify-content: space-between; gap: 6px; min-width: 0; }
+.wo-pm { display: flex; align-items: center; gap: 5px; min-width: 0; }
+.wo-pm button { width: 36px; height: 36px; flex: none; border: 0; border-radius: 50%; background: var(--card-2); color: var(--exercise); font-size: 22px; font-weight: 800; }
+/* il numero ha l'aspetto di un campo da scrivere: bordo azzurro e sottolineatura */
+.wo-in { display: flex; align-items: baseline; justify-content: center; gap: 3px; min-width: 0; padding: 6px 6px; border: 1.5px solid var(--stand); border-radius: 10px; background: var(--bg); cursor: text; }
+.wo-in input { width: 3.6ch; min-width: 0; padding: 0; border: 0; border-bottom: 2px dotted rgba(0, 217, 255, .6); background: none; color: var(--fg); font: 700 20px/1.1 inherit; font-family: inherit; text-align: center; font-variant-numeric: tabular-nums; }
+.wo-in input:focus { outline: none; border-bottom-color: var(--stand); }
 .wo-in:focus-within { box-shadow: 0 0 0 3px rgba(0, 217, 255, .25); }
-.wo-in em { font-style: normal; color: var(--muted); font-size: 15px; font-weight: 600; }
-.wo-in svg { width: 16px; height: 16px; color: var(--stand); margin-left: 2px; }
+.wo-in em { font-style: normal; color: var(--muted); font-size: 12px; font-weight: 600; }
 .wo-hint { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }
 .wo-rest { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 14px; border-radius: 16px; background: var(--card); }
 .wo-rest.on { outline: 1.5px solid var(--stand); outline-offset: -1.5px; }
@@ -695,3 +694,17 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 
 /* Link per reinstallare l'app: si può selezionare e copiare */
 .icon-link { word-break: break-all; user-select: text; -webkit-user-select: text; }
+
+/* Allenamento: esercizio precedente e successivo, scorrimento */
+.wo-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -2px 0 10px; }
+.wo-nav button { display: flex; align-items: center; gap: 4px; max-width: 42%; min-width: 0; padding: 4px 0; border: 0; background: none; color: var(--muted); font-size: 13px; font-weight: 600; }
+.wo-nav button b { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.wo-nav button span { flex: none; }
+.wo-nav button span { color: var(--stand); font-size: 20px; line-height: 1; }
+.wo-nav em { font-style: normal; color: var(--muted); font-size: 11px; opacity: .7; letter-spacing: .04em; text-transform: uppercase; }
+.wo-nav i { width: 42%; }
+#workout.wo-in-right { animation: wo-from-right .22s ease-out; }
+#workout.wo-in-left { animation: wo-from-left .22s ease-out; }
+@keyframes wo-from-right { from { transform: translateX(40px); opacity: .3; } }
+@keyframes wo-from-left { from { transform: translateX(-40px); opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { #workout.wo-in-right, #workout.wo-in-left { animation: none; } }
