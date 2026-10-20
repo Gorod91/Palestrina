@@ -304,14 +304,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button></div>
       ${many ? `<div class="wo-dots" id="wo-dots">${dots}</div>` : ''}
       <div class="wo-pager${many ? ' multi' : ''}" id="wo-pager">${ui.list.map((_, k) => pageHtml(k, sch)).join('')}</div>
-      ${many ? `<div class="wo-bar"><button class="wo-all" id="wo-all">▦ Tutti</button></div>
-      <div class="wo-sheet" id="wo-sheet" hidden><div class="wo-sheet-box"><div class="wo-grab"></div>
-        <div class="wo-sheet-head"><b>${sch ? esc(sch.name) : 'Esercizi'}</b><span>${ui.list.filter((id) => todayDoc(id)).length} di ${ui.list.length} fatti</span></div>
-        <p class="wo-sheet-hint">Trascina il dito su un esercizio e lascia, oppure toccalo</p>
+      ${many ? `<div class="wo-bar"><button class="wo-all" id="wo-all"><svg viewBox="0 0 24 24" aria-hidden="true">${[3, 10, 17].map((y) => [3, 10, 17].map((x) => `<rect x="${x}" y="${y}" width="5.5" height="5.5" rx="1.6"/>`).join('')).join('')}</svg>Tutti</button></div>
+      <div class="wo-sheet" id="wo-sheet" hidden><div class="wo-sheet-box"><div class="wo-grab"></div><p class="wo-sheet-hint">Tieni premuto "Tutti" e trascina il dito su un esercizio, poi lascia</p>
         <div class="wo-grid">${ui.list.map((id, k) => {
           const e = EX[id] || { n: id }, d = todayDoc(id), pi = sch && sch.piano ? sch.piano[id] : null;
-          const tag = k === ui.i ? '<em>Adesso</em>' : d ? '<em>Fatto</em>' : '';
-          return `<button class="wo-tile${k === ui.i ? ' cur' : ''}${d ? ' ok' : ''}" data-a="j:${k}" data-k="${k}"><span class="wo-tile-top"><i>${d ? '✓' : k + 1}</i>${tag}</span><b>${esc(e.n)}</b><small>${esc(pi ? pi.s : e.g || '')}</small></button>`;
+          return `<button class="wo-tile${k === ui.i ? ' cur' : ''}${d ? ' ok' : ''}" data-a="j:${k}" data-k="${k}"><span>${d ? '✓' : k + 1}</span><b>${esc(e.n)}</b><small>${esc(pi ? pi.s : e.g || '')}</small></button>`;
         }).join('')}</div></div></div>` : ''}`;
   }
 
