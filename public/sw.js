@@ -24,8 +24,8 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || 'Palestrina', {
       body: data.body || '',
-      icon: 'icons/icon-192.png',
-      badge: 'icons/icon-192.png',
+      icon: 'icons/icon-192.png?v=2',
+      badge: 'icons/icon-192.png?v=2',
       data: { tab: data.tab || '' },
     })
   );
