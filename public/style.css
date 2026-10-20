@@ -668,10 +668,10 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .wo-pms { display: flex; justify-content: space-between; gap: 6px; min-width: 0; }
 .wo-pm { display: flex; align-items: center; gap: 5px; min-width: 0; }
 .wo-pm button { width: 36px; height: 36px; flex: none; border: 0; border-radius: 50%; background: var(--card-2); color: var(--exercise); font-size: 22px; font-weight: 800; }
-/* il numero ha l'aspetto di un campo da scrivere: bordo azzurro e sottolineatura */
+/* il numero ha l'aspetto di un campo da scrivere: bordo azzurro */
 .wo-in { display: flex; align-items: baseline; justify-content: center; gap: 3px; min-width: 0; padding: 6px 6px; border: 1.5px solid var(--stand); border-radius: 10px; background: var(--bg); cursor: text; }
-.wo-in input { width: 3.6ch; min-width: 0; padding: 0; border: 0; border-bottom: 2px dotted rgba(0, 217, 255, .6); background: none; color: var(--fg); font: 700 20px/1.1 inherit; font-family: inherit; text-align: center; font-variant-numeric: tabular-nums; }
-.wo-in input:focus { outline: none; border-bottom-color: var(--stand); }
+.wo-in input { width: 3.6ch; min-width: 0; padding: 0; border: 0; background: none; color: var(--fg); font: 700 20px/1.1 inherit; font-family: inherit; text-align: center; font-variant-numeric: tabular-nums; }
+.wo-in input:focus { outline: none; }
 .wo-in:focus-within { box-shadow: 0 0 0 3px rgba(0, 217, 255, .25); }
 .wo-in em { font-style: normal; color: var(--muted); font-size: 12px; font-weight: 600; }
 .wo-hint { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }

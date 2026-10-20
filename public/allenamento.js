@@ -338,7 +338,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     });
     btn.addEventListener('pointerup', () => {
       if (over >= 0) {
-        openEx(over, ui.i);
+        openEx(over); // dalla griglia si salta direttamente, senza far scorrere le pagine
         draw();
       } else if (Date.now() - t0 > 400) sheet.hidden = true; // tenuto premuto ma lasciato fuori dalle tessere
     });
@@ -522,7 +522,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'end' || cmd === 'home') {
       ui.view = 'list';
     } else if (cmd === 'j') {
-      openEx(Number(arg), ui.view === 'ex' ? ui.i : null);
+      openEx(Number(arg), ui.view === 'ex' && !ev.target.closest('.wo-sheet') ? ui.i : null); // dalla griglia senza scorrimento
     } else if (cmd === 'ok') {
       save(ui.list[ui.i], P().sets);
       Object.assign(P(), { editing: false, open: -1, sets: null });
