@@ -286,7 +286,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button>${sch ? '<button class="wo-chip" data-a="scheda">Cambia esercizio</button>' : ''}</div>
       ${ui.list.length > 1 ? `<div class="wo-dots">${dots}</div>` : ''}
       <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(piano.s)}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
-      <section class="card wo-last">${last ? `<small>Ultima volta · ${shortDay(last.day)}</small><b>${summary(last.sets, t)}</b>` : `<small>Prima volta</small><b>${t === 'kg' ? 'Scegli il peso toccando una serie' : 'Tocca una serie per cambiarla'}</b>`}</section>
+      ${last ? `<section class="card wo-last"><small>Ultima volta · ${shortDay(last.day)}</small><b>${summary(last.sets, t)}</b></section>` : ''}
       <div class="wo-sets">${rows}</div>
       ${btn}
       <div class="wo-rest" id="wo-rest">${restHtml()}</div>`;
