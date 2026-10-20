@@ -40,6 +40,8 @@ const TRACE_USERS = []; // es. ['Michy']: diagnostica accesa per quell'account
 // Modalità prova anche per chi non è admin (senza registro admin, "Agisci come" e simulazioni), per provare insieme
 // le novità, per esempio la chat su Firebase. Usa i dati di prova come l'admin.
 const PROVA_USERS = ['Michy'];
+// Allenamento (schede e serie su Firebase) anche fuori dalla prova, con i dati veri: per ora solo Francesco
+const WORKOUT_USERS = ['Francesco'];
 const TZ = Session.getScriptTimeZone();
 const realProps = PropertiesService.getScriptProperties();
 
@@ -613,7 +615,7 @@ function handle(req, user) {
         }
         return json({ ok: true });
       case 'fbToken':
-        if (!fbChatOn()) return json({ error: 'Non disponibile' });
+        if (!fbChatOn() && !WORKOUT_USERS.includes(user.name)) return json({ error: 'Non disponibile' });
         return json(firebaseToken(user));
       case 'setTimer': {
         const s = Math.round(Number(req.seconds));
@@ -938,6 +940,7 @@ function buildState(user) {
       debug: user.debug,
       admin: user.admin,
       tester: user.admin || PROVA_USERS.includes(user.name),
+      allenamento: WORKOUT_USERS.includes(user.name),
       actingAs: !!user.actingAs,
       checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
       sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title, photoId: mySudoToday.photoId, refId: mySudoToday.refId } : null,

@@ -94,6 +94,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   // cosa si vede: lista, esercizio, catalogo (allenamento libero)
   const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '' };
   let restEnd = 0;
+  let serieSig = '';
+  let pressed = false; // dito sullo schermo: il ridisegno aspetta che si alzi
+  let later = false;
   let restTimer = null;
 
   async function start(user, test) {
@@ -115,13 +118,17 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const { fs, db } = x;
     unsubs.push(
       fs.onSnapshot(fs.query(fs.collection(db, pfx + 'serie'), fs.where('name', '==', me.name)), { includeMetadataChanges: true }, (snap) => {
-        serie = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }), pending: d.metadata.hasPendingWrites }));
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }), pending: d.metadata.hasPendingWrites }));
+        const sig = JSON.stringify(list.map((s) => [s.id, s.sets, s.pending]));
+        serie = list;
+        if (ready && sig === serieSig) return; // solo metadati cambiati: ridisegnare farebbe perdere tocchi e tastiera
+        serieSig = sig;
         ready = true;
-        draw();
+        softDraw();
       }, (err) => toast(`Allenamento: ${err.message}`)),
       fs.onSnapshot(fs.doc(db, pfx + 'schede', fbUid(me.name)), (snap) => {
         schede = snap.exists() ? snap.data().list || [] : SCHEDE_ESEMPIO;
-        draw();
+        softDraw();
       }, (err) => toast(`Allenamento: ${err.message}`)),
     );
   }
@@ -132,6 +139,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     key = '';
     ready = false;
     serie = [];
+    serieSig = '';
     schede = null;
     Object.assign(ui, { view: 'list', sets: null, open: -1, editing: false });
   }
@@ -164,13 +172,32 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   // ---------- Disegno ----------
 
+  /** Ridisegno per i dati arrivati da Firebase: non mentre si tocca o si scrive, ma subito dopo. */
+  function softDraw() {
+    const typing = root.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
+    if (pressed || typing) later = true;
+    else draw();
+  }
+  function flush() {
+    if (!later || pressed) return;
+    later = false;
+    setTimeout(() => {
+      if (!(root.contains(document.activeElement) && document.activeElement.tagName === 'INPUT')) draw();
+      else later = true;
+    }, 0);
+  }
+  root.addEventListener('pointerdown', () => (pressed = true));
+  document.addEventListener('pointerup', () => { pressed = false; flush(); });
+  document.addEventListener('pointercancel', () => { pressed = false; flush(); });
+  root.addEventListener('focusout', () => setTimeout(flush, 0));
+
   function draw() {
     if (!me) return;
     if (!ready || !schede) {
       root.innerHTML = '<p class="wo-empty">Carico l\'allenamento…</p>';
       return;
     }
-    root.innerHTML = ui.view === 'ex' ? exView() : ui.view === 'pick' ? pickView() : listView();
+    root.innerHTML = ui.view === 'ex' ? exView() : ui.view === 'pick' ? pickView() : ui.view === 'scheda' ? schedaView() : listView();
   }
 
   function listView() {
@@ -209,7 +236,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (!ui.sets) ui.sets = copy(done ? done.sets : (lastTime(ex) || { sets: primaVolta(piano) }).sets);
     const sets = saved ? done.sets : ui.sets;
     const last = lastTime(ex);
-    const dots = ui.list.map((id, k) => `<i class="${k === ui.i ? 'cur' : todayDoc(id) ? 'ok' : ''}"></i>`).join('');
+    const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : todayDoc(id) ? 'ok' : ''}" data-a="j:${k}" aria-label="${esc((EX[id] || {}).n || id)}"></button>`).join('');
     const ref = last ? last.sets : null;
     const rows = sets.map((s, k) => {
       const r = ref && (ref[k] || ref[ref.length - 1]);
@@ -217,23 +244,52 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const kgCell = t === 'kg' ? `<span class="v${ck ? ' ch' : ''}">${kgf(s.kg)}<small>kg</small></span>` : '<span></span>';
       const row = `<button class="wo-set${saved ? ' done' : ''}${ui.open === k ? ' open' : ''}" data-a="o:${k}"><span class="n">${k + 1}</span>${kgCell}<span class="v${cr ? ' ch' : ''}">${s.reps}<small>${t === 'sec' ? 's' : 'rip'}</small></span><span class="n">${saved ? (done.pending ? '…' : '✓') : '›'}</span></button>`;
       if (ui.open !== k || saved) return row;
-      const kgEdit = t === 'kg' ? `<span class="wo-pm"><button data-a="k-:${k}" aria-label="Meno peso">−</button><input id="wo-kg" inputmode="decimal" value="${kgf(s.kg)}" aria-label="Chili" onfocus="this.select()"><button data-a="k+:${k}" aria-label="Più peso">+</button></span>` : '';
-      return `${row}<div class="wo-edit">${kgEdit}
-        <span class="wo-pm"><button data-a="r-:${k}" aria-label="${t === 'sec' ? 'Meno secondi' : 'Meno ripetizioni'}">−</button><b>${s.reps}${t === 'sec' ? '"' : ''}</b><button data-a="r+:${k}" aria-label="${t === 'sec' ? 'Più secondi' : 'Più ripetizioni'}">+</button></span></div>`;
+      const step = kgStep(e);
+      const field = (id, label, value, u, minus, plus, aria) => `<div class="wo-field"><span class="wo-lbl">${label}</span><span class="wo-pm">
+          <button data-a="${minus}" aria-label="Meno ${aria}">−</button>
+          <label class="wo-in"><input id="${id}" inputmode="${id === 'wo-kg' ? 'decimal' : 'numeric'}" value="${value}" aria-label="${aria}" onfocus="this.select()" autocomplete="off"><em>${u}</em><svg aria-hidden="true"><use href="#i-pencil"/></svg></label>
+          <button data-a="${plus}" aria-label="Più ${aria}">+</button></span></div>`;
+      const kgEdit = t === 'kg' ? field('wo-kg', `Peso · − e + di ${kgf(step)} kg`, kgf(s.kg), 'kg', `k-:${k}`, `k+:${k}`, 'chili') : '';
+      const repEdit = field('wo-reps', t === 'sec' ? 'Secondi' : 'Ripetizioni', s.reps, t === 'sec' ? 's' : 'rip', `r-:${k}`, `r+:${k}`, t === 'sec' ? 'secondi' : 'ripetizioni');
+      return `${row}<div class="wo-edit">${kgEdit}${repEdit}<p class="wo-hint">Tocca il numero per scrivere il valore che vuoi</p></div>`;
     }).join('');
-    const isLast = ui.i === ui.list.length - 1;
+    const nx = nextTodo();
     const btn = saved
-      ? `${ui.list.length > 1 ? `<button class="primary" data-a="${isLast ? 'end' : 'next'}">${isLast ? 'Fine scheda' : `Prossimo: ${esc((EX[ui.list[ui.i + 1]] || {}).n || '')} ›`}</button>` : `<button class="primary" data-a="end">Fine</button>`}
+      ? `${nx >= 0 ? `<button class="primary" data-a="j:${nx}">Prossimo: ${esc((EX[ui.list[nx]] || {}).n || '')} ›</button>` : `<button class="primary" data-a="end">${ui.list.length > 1 ? 'Fine scheda' : 'Fine'}</button>`}
          <button class="link-button" data-a="edit">Modifica</button>${done.pending ? '<p class="wo-sub wo-center">Salvato sul telefono: parte appena c\'è rete</p>' : ''}`
       : `<div class="wo-btns"><button class="secondary" data-a="add">+ Serie</button><button class="secondary" data-a="del">− Serie</button></div><button class="primary" data-a="ok">✓ Fatto</button>`;
     const title = sch ? `${esc(sch.name)} · ${ui.i + 1}/${ui.list.length}` : 'Allenamento libero';
-    return `<button class="wo-back" data-a="back">‹ ${title}</button>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button>${sch ? '<button class="wo-chip" data-a="scheda">Cambia esercizio</button>' : ''}</div>
       ${ui.list.length > 1 ? `<div class="wo-dots">${dots}</div>` : ''}
       <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(piano.s)}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
       <section class="card wo-last">${last ? `<small>Ultima volta · ${shortDay(last.day)}</small><b>${summary(last.sets, t)}</b>` : `<small>Prima volta</small><b>${t === 'kg' ? 'Scegli il peso toccando una serie' : 'Tocca una serie per cambiarla'}</b>`}</section>
       <div class="wo-sets">${rows}</div>
       ${btn}
       <div class="wo-rest" id="wo-rest">${restHtml()}</div>`;
+  }
+
+  /** Il primo esercizio non ancora fatto oggi dopo quello aperto (poi si ricomincia dall'inizio), -1 se fatti tutti. */
+  function nextTodo() {
+    for (let d = 1; d < ui.list.length; d++) {
+      const k = (ui.i + d) % ui.list.length;
+      if (!todayDoc(ui.list[k])) return k;
+    }
+    return -1;
+  }
+
+  /** La scheda intera: si sceglie l'esercizio, in qualsiasi ordine (le macchine non sono sempre libere). */
+  function schedaView() {
+    const sch = (schede || []).find((s) => s.id === ui.scheda);
+    if (!sch) return listView();
+    const n = doneToday(sch);
+    return `<button class="wo-back" data-a="home">‹ Allenamento</button>
+      <div class="wo-ex"><div class="wo-ex-name">${esc(sch.name)}</div><span class="wo-pill">${n} di ${sch.ex.length} fatti</span></div>
+      <p class="wo-sub wo-intro">Scegli da quale esercizio partire: l'ordine è libero.</p>
+      <section class="card wo-list">${sch.ex.map((id, k) => {
+        const e = EX[id] || { n: id }, d = todayDoc(id), l = lastTime(id), pi = sch.piano ? sch.piano[id] : null;
+        const info = d ? `Fatto oggi · ${summary(d.sets, unit(e))}` : [pi && pi.s, l && `ultima volta ${summary(l.sets, unit(e))}`].filter(Boolean).join(' · ');
+        return `<button class="wo-row${d ? ' fatto' : ''}" data-a="j:${k}"><span class="wo-mark">${d ? '✓' : k + 1}</span><span><b>${esc(e.n)}</b><small>${esc(info)}</small></span><span class="wo-chev">›</span></button>`;
+      }).join('')}</section>`;
   }
 
   function restHtml() {
@@ -310,10 +366,14 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       openEx(0);
     } else if (cmd === 'g') {
       ui.g = arg;
-    } else if (cmd === 'back' || cmd === 'end') {
-      ui.view = ui.view === 'ex' && !ui.scheda && cmd === 'back' ? 'pick' : 'list';
-    } else if (cmd === 'next') {
-      openEx(ui.i + 1);
+    } else if (cmd === 'back') {
+      ui.view = ui.view === 'ex' ? (ui.scheda ? 'scheda' : 'pick') : 'list';
+    } else if (cmd === 'end' || cmd === 'home') {
+      ui.view = 'list';
+    } else if (cmd === 'scheda') {
+      ui.view = 'scheda';
+    } else if (cmd === 'j') {
+      openEx(Number(arg));
     } else if (cmd === 'ok') {
       save(ui.list[ui.i], ui.sets);
       ui.editing = false;
@@ -348,10 +408,16 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   });
 
   root.addEventListener('change', (ev) => {
-    if (ev.target.id === 'wo-kg' && ui.open >= 0) {
-      setKg(ui.open, Number(ev.target.value.replace(',', '.')));
-      draw();
-    }
+    if (ui.open < 0 || !ui.sets) return;
+    const v = Number(ev.target.value.replace(',', '.'));
+    if (ev.target.id === 'wo-kg') setKg(ui.open, v);
+    else if (ev.target.id === 'wo-reps' && v >= 1 && v <= 600) ui.sets[ui.open].reps = Math.round(v);
+    else return;
+    draw();
+  });
+  // Invio sulla tastiera: conferma il numero e chiude la tastiera
+  root.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Enter' && (ev.target.id === 'wo-kg' || ev.target.id === 'wo-reps')) ev.target.blur();
   });
   root.addEventListener('input', (ev) => {
     if (ev.target.id !== 'wo-q') return;

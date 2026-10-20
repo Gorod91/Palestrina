@@ -1080,11 +1080,15 @@ const workout = createWorkout({
 });
 $('timer-back').addEventListener('click', () => selectTab('allenamento'));
 
-/** In prova il tab Timer diventa Allenamento (con il timer dentro); fuori dalla prova resta com'era. */
+/** Il tab Timer diventa Allenamento (con il timer dentro) in prova e per chi ha l'allenamento attivo; per gli altri resta com'era. */
 let workoutProva = null;
+function workoutOn() {
+  return testOn() || !!(state && state.me && state.me.allenamento);
+}
 function workoutTab() {
-  const prova = testOn() && !!(state && state.me);
-  if (prova) workout.start({ name: state.me.name }, true);
+  // in prova per chi prova (dati di prova); fuori dalla prova solo per chi ha l'allenamento attivo (dati veri)
+  const prova = workoutOn() && !!(state && state.me);
+  if (prova) workout.start({ name: state.me.name }, testOn());
   if (prova === workoutProva) return;
   workoutProva = prova;
   const btn = $('tab-timer');
@@ -1104,10 +1108,10 @@ const TABS = ['oggi', 'classifica', 'chat', 'timer', 'allenamento', 'altro'];
 
 function selectTab(name) {
   if (!TABS.includes(name)) name = 'oggi';
-  if (name === 'allenamento' && !testOn()) name = 'timer';
+  if (name === 'allenamento' && !workoutOn()) name = 'timer';
   document.querySelectorAll('.tab-panel').forEach((p) => (p.hidden = p.dataset.tab !== name));
   // in prova il timer sta dentro Allenamento: resta acceso il tasto di Allenamento
-  const on = name === 'timer' && testOn() ? 'allenamento' : name;
+  const on = name === 'timer' && workoutOn() ? 'allenamento' : name;
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === on));
   store.set('tab', name);
   $('page-title').textContent = TAB_TITLES[name];
