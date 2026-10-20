@@ -380,6 +380,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return `<section class="wo-page" data-k="${k}">
       <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(piano.s)}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
       ${last ? `<section class="card wo-last"><small>Ultima volta · ${shortDay(last.day)}</small><b>${summary(last.sets, t)}</b></section>` : ''}
+      ${t === 'sec' && !saved ? `<div class="wo-tmr" data-ex="${ex}">${tmrHtml(ex, sets)}</div>` : ''}
       <div class="wo-sets">${rows}</div>
       ${btn}
       <div class="wo-rest">${restHtml()}</div>
@@ -397,11 +398,50 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   function restHtml() {
     const left = Math.max(0, Math.ceil((restEnd - Date.now()) / 1000));
-    if (!restEnd) return `<svg class="wo-rest-ic" aria-hidden="true"><use href="#i-timer"/></svg><b>Recupero</b><button class="wo-chip" data-a="rest">1:30 ▸</button>`;
+    if (!restEnd) return `<svg class="wo-rest-ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9" fill="none" stroke="rgba(166,255,0,.22)" stroke-width="4"/><path d="M12 3a9 9 0 0 1 2.8.45" fill="none" stroke="#b8ff3d" stroke-width="4"/></svg><b>Recupero</b><button class="wo-chip" data-a="rest">1:30 ▸</button>`;
     if (!left) return `<span class="wo-rest-ic">✓</span><b>Recupero finito</b><button class="wo-chip" data-a="stop">OK</button>`;
     const off = 126 * (1 - left / REST);
     return `<svg class="wo-ring" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="20" fill="none" stroke="var(--card-2)" stroke-width="6"/><circle cx="24" cy="24" r="20" fill="none" stroke="var(--stand)" stroke-width="6" stroke-linecap="round" stroke-dasharray="126" stroke-dashoffset="${off}" transform="rotate(-90 24 24)"/></svg>
       <span><small>Recupero</small><b>${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}</b></span><button class="wo-chip" data-a="stop">Stop</button>`;
+  }
+
+  // ---------- Timer degli esercizi a tempo (plank, barchetta…): conta la serie scelta, poi passa alla successiva ----------
+  let tmr = { ex: '', j: 0, end: 0, total: 0, fine: 0 };
+  let tmrTimer = null;
+  const tmrSets = (ex) => (pageOf(ex).sets || []);
+
+  function tmrHtml(ex, sets) {
+    const j = tmr.ex === ex ? Math.min(tmr.j, sets.length - 1) : 0;
+    const left = tmr.ex === ex && tmr.end ? Math.max(0, Math.ceil((tmr.end - Date.now()) / 1000)) : 0;
+    if (left) {
+      const off = 295 * (left / tmr.total); // come il nostro timer: il tratto lime cresce con il tempo passato
+      return `<div class="wo-tmr-dial"><svg viewBox="0 0 108 108" aria-hidden="true"><circle cx="54" cy="54" r="47" fill="none" stroke="rgba(166,255,0,.18)" stroke-width="10"/><circle cx="54" cy="54" r="47" fill="none" stroke="#b8ff3d" stroke-width="10" stroke-dasharray="295" stroke-dashoffset="${off}" transform="rotate(-90 54 54)"/></svg><b>${left}</b></div>
+        <div class="wo-tmr-txt"><small>Serie ${j + 1} di ${sets.length}</small></div><button class="wo-chip" data-a="tstop">Stop</button>`;
+    }
+    const finito = tmr.ex === ex && tmr.fine && Date.now() - tmr.fine < 4000;
+    const s = sets[j] || sets[0];
+    return `${finito ? '<span class="wo-tmr-ok">✓ Serie finita</span>' : ''}<button class="wo-tmr-go" data-a="tgo:${j}"><span>▶</span>${sets.length > 1 ? `Serie ${j + 1} · ` : ''}${s ? s.reps : 0}"</button>`;
+  }
+
+  function tickTmr() {
+    if (tmr.end && Date.now() >= tmr.end) {
+      // serie finita: vibra (dove si può), lo schermo lampeggia piano e si prepara la serie dopo
+      tmr.end = 0;
+      tmr.fine = Date.now();
+      tmr.j = Math.min(tmr.j + 1, Math.max(0, tmrSets(tmr.ex).length - 1));
+      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+      root.classList.add('wo-flash');
+      setTimeout(() => root.classList.remove('wo-flash'), 1200);
+    }
+    root.querySelectorAll('.wo-tmr').forEach((el) => {
+      const ex = el.dataset.ex;
+      el.innerHTML = tmrHtml(ex, tmrSets(ex));
+      el.classList.toggle('on', tmr.ex === ex && !!tmr.end);
+    });
+    if (!tmr.end && !(tmr.fine && Date.now() - tmr.fine < 4000)) {
+      clearInterval(tmrTimer);
+      tmrTimer = null;
+    }
   }
 
   function tickRest() {
@@ -499,6 +539,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'o') {
       const k = Number(arg);
       P().open = P().open === k ? -1 : k;
+      if (unit(EX[ui.list[ui.i]]) === 'sec' && !tmr.end) tmr = { ...tmr, ex: ui.list[ui.i], j: k, fine: 0 };
     } else if (/^[kr][+-]$/.test(cmd)) {
       const k = Number(arg), d = cmd[1] === '+' ? 1 : -1, sets = P().sets;
       if (cmd[0] === 'k') setKg(k, nextKg(sets[k].kg, d));
@@ -506,6 +547,14 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         const step = unit(EX[ui.list[ui.i]]) === 'sec' ? 5 : 1;
         sets[k].reps = Math.max(step, Math.min(600, sets[k].reps + step * d));
       }
+    } else if (cmd === 'tgo') {
+      const ex = ui.list[ui.i], sets = P().sets || [];
+      const j = Math.max(0, Math.min(Number(arg) || 0, sets.length - 1));
+      const sec = (sets[j] || {}).reps || 30;
+      tmr = { ex, j, end: Date.now() + sec * 1000, total: sec, fine: 0 };
+      if (!tmrTimer) tmrTimer = setInterval(tickTmr, 200);
+    } else if (cmd === 'tstop') {
+      tmr.end = 0;
     } else if (cmd === 'rest') {
       restEnd = Date.now() + REST * 1000;
       if (!restTimer) restTimer = setInterval(tickRest, 250);
