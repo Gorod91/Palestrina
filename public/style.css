@@ -676,11 +676,10 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .wo-in em { font-style: normal; color: var(--muted); font-size: 12px; font-weight: 600; }
 .wo-hint { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }
 .wo-rest { cursor: pointer; display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 14px; border-radius: 16px; background: var(--card); }
-.wo-rest.on { outline: 1.5px solid rgba(184, 255, 61, .6); outline-offset: -1.5px; }
+.wo-rest.on { outline: 1.5px solid rgba(166, 255, 0, .6); outline-offset: -1.5px; }
 .wo-rest.end { outline: 1.5px solid var(--exercise); outline-offset: -1.5px; }
 .wo-rest small { display: block; color: var(--muted); font-size: 12px; }
 .wo-rest b { font-size: 17px; font-variant-numeric: tabular-nums; }
-.wo-ring { width: 40px; height: 40px; flex: none; }
 .wo-chip { margin-left: auto; padding: 8px 14px; border: 0; border-radius: 99px; background: var(--card-2); color: var(--fg); font-size: 15px; font-weight: 700; white-space: nowrap; }
 .wo-search { margin: 0 0 10px; }
 .wo-groups { display: flex; gap: 6px; overflow-x: auto; margin: 0 0 12px; padding-bottom: 2px; scrollbar-width: none; }
@@ -727,11 +726,20 @@ body.keyboard .wo-bar { display: none; }
 .wo-tmr-go { display: flex; align-items: center; justify-content: center; gap: 10px; flex: 1; padding: 16px; border: 0; border-radius: 14px; background: var(--exercise); color: #000; font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; }
 .wo-tmr-go span { font-size: 18px; }
 .wo-tmr-ok { color: var(--exercise); font-weight: 700; font-size: 15px; white-space: nowrap; }
-.wo-tmr-dial { position: relative; width: 112px; height: 112px; flex: none; display: grid; place-items: center; }
-.wo-tmr-dial svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-.wo-tmr-dial b { position: relative; font-size: 44px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .wo-tmr-txt { flex: 1; }
+.wo-tmr-txt span { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
+.wo-tmr .wo-dial { width: 112px; }
+.wo-dial-n { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.wo-dial.counting .wo-dial-n { color: var(--exercise); animation: count-pop 1s ease-out infinite; }
 .wo-tmr-txt small { display: block; color: var(--muted); font-size: 13px; }
-#workout.wo-flash { animation: wo-flash 1.2s ease-in-out; }
-@keyframes wo-flash { 0%, 100% { background: transparent; } 30%, 70% { background: rgba(166, 255, 0, .18); } }
-@media (prefers-reduced-motion: reduce) { #workout.wo-flash { animation: none; } }
+/* l'anello di tutti i timer dell'allenamento: lo stesso del timer addominali (.timer-running), in piccolo */
+.wo-dial { --p: 0; flex: none; width: 40px; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; color: var(--fg);
+  background: radial-gradient(closest-side, var(--card) 80%, transparent 81%), conic-gradient(var(--exercise) calc(var(--p) * 360deg), rgba(166, 255, 0, .18) 0); }
+.wo-tmr .wo-dial { background: radial-gradient(closest-side, var(--card) 87%, transparent 88%), conic-gradient(var(--exercise) calc(var(--p) * 360deg), rgba(166, 255, 0, .18) 0); }
+
+/* Allenamento: timer a tutto schermo, uguale al timer addominali */
+.wo-big { position: fixed; inset: 0; z-index: 30; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; background: var(--bg);
+  padding: env(safe-area-inset-top) 16px env(safe-area-inset-bottom); }
+.wo-big[hidden] { display: none; }
+.wo-big .timer-running { margin: 0; }
+.wo-big-title { margin: 0; color: var(--muted); font-size: 17px; font-weight: 600; text-align: center; }

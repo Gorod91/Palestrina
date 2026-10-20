@@ -102,7 +102,6 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let altrove = []; // le mie serie salvate dall'altra parte (prova o dati veri)
   let pressed = false; // dito sullo schermo: il ridisegno aspetta che si alzi
   let later = false;
-  let restTimer = null;
 
   async function start(user, test) {
     const k = `${user.name}|${test}`;
@@ -396,70 +395,115 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return -1;
   }
 
-  /** Anello del recupero: lo stesso del timer grande in miniatura (fermo pieno di verde; poi il tratto verde cresce col tempo). */
-  function restRing(frac) {
-    return `<svg class="wo-ring" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="19" fill="none" stroke="rgba(166,255,0,.18)" stroke-width="7"/><circle cx="24" cy="24" r="19" fill="none" stroke="#b8ff3d" stroke-width="7" stroke-dasharray="119.4" stroke-dashoffset="${(119.4 * (1 - frac)).toFixed(1)}" transform="rotate(-90 24 24)"/></svg>`;
-  }
+  // ---------- Timer (recupero ed esercizi a tempo): uguali al timer grande ----------
+  // Stesso anello (verde che cresce col tempo passato), aggiornato a ogni fotogramma; gli esercizi a tempo partono
+  // dopo 3 secondi di conto alla rovescia; alla fine lo schermo pulsa come il timer addominali finché non lo tocchi.
+  const COUNTDOWN = 3000;
+  let tmr = { ex: '', j: 0, go: 0, end: 0, total: 0 };
+  let raf = 0;
+  const tmrSets = (ex) => pageOf(ex).sets || [];
+  const dial = (p, inner = '') => `<span class="wo-dial" style="--p:${p}">${inner}</span>`;
+  const mmss = (s) => (s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : String(s));
 
   function restHtml() {
-    const ms = restEnd - Date.now(), left = Math.max(0, Math.ceil(ms / 1000));
-    if (!restEnd) return `${restRing(1)}<b>Recupero</b><button class="wo-chip" data-a="rest">1:30 ▸</button>`;
-    if (!left) return `${restRing(1)}<b>Recupero finito</b><button class="wo-chip" data-a="stop">OK</button>`;
-    return `${restRing(1 - Math.max(0, ms) / (REST * 1000))}
-      <span><small>Recupero</small><b>${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}</b></span><button class="wo-chip" data-a="stop">Stop</button>`;
+    if (!restEnd) return `${dial(1)}<b>Recupero</b><button class="wo-chip" data-a="rest">1:30 ▸</button>`;
+    return `${dial(0)}<span><small>Recupero</small><b class="wo-rest-left">1:30</b></span><button class="wo-chip" data-a="stop">Stop</button>`;
   }
-
-  // ---------- Timer degli esercizi a tempo (plank, barchetta…): conta la serie scelta, poi passa alla successiva ----------
-  let tmr = { ex: '', j: 0, end: 0, total: 0, fine: 0 };
-  let tmrTimer = null;
-  const tmrSets = (ex) => (pageOf(ex).sets || []);
 
   function tmrHtml(ex, sets) {
     const j = tmr.ex === ex ? Math.min(tmr.j, sets.length - 1) : 0;
-    const left = tmr.ex === ex && tmr.end ? Math.max(0, Math.ceil((tmr.end - Date.now()) / 1000)) : 0;
-    if (left) {
-      const off = 295 * (left / tmr.total); // come il nostro timer: il tratto lime cresce con il tempo passato
-      return `<div class="wo-tmr-dial"><svg viewBox="0 0 108 108" aria-hidden="true"><circle cx="54" cy="54" r="47" fill="none" stroke="rgba(166,255,0,.18)" stroke-width="10"/><circle cx="54" cy="54" r="47" fill="none" stroke="#b8ff3d" stroke-width="10" stroke-dasharray="295" stroke-dashoffset="${off}" transform="rotate(-90 54 54)"/></svg><b>${left}</b></div>
-        <div class="wo-tmr-txt"><small>Serie ${j + 1} di ${sets.length}</small></div><button class="wo-chip" data-a="tstop">Stop</button>`;
+    if (tmr.ex === ex && tmr.end) {
+      return `${dial(0, '<b class="wo-dial-n"></b>')}<div class="wo-tmr-txt"><small>Serie ${j + 1} di ${sets.length}</small><span>tocca Stop per annullare</span></div><button class="wo-chip" data-a="tstop">Stop</button>`;
     }
-    const finito = tmr.ex === ex && tmr.fine && Date.now() - tmr.fine < 4000;
     const s = sets[j] || sets[0];
-    return `${finito ? '<span class="wo-tmr-ok">✓ Serie finita</span>' : ''}<button class="wo-tmr-go" data-a="tgo:${j}"><span>▶</span>${sets.length > 1 ? `Serie ${j + 1} · ` : ''}${s ? s.reps : 0}"</button>`;
+    return `<button class="wo-tmr-go" data-a="tgo:${j}"><span>▶</span>${sets.length > 1 ? `Serie ${j + 1} · ` : ''}${s ? s.reps : 0}"</button>`;
   }
 
-  function tickTmr() {
-    if (tmr.end && Date.now() >= tmr.end) {
-      // serie finita: vibra (dove si può), lo schermo lampeggia piano e si prepara la serie dopo
-      tmr.end = 0;
-      tmr.fine = Date.now();
-      tmr.j = Math.min(tmr.j + 1, Math.max(0, tmrSets(tmr.ex).length - 1));
-      if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-      root.classList.add('wo-flash');
-      setTimeout(() => root.classList.remove('wo-flash'), 1200);
-    }
-    root.querySelectorAll('.wo-tmr').forEach((el) => {
-      const ex = el.dataset.ex;
-      el.innerHTML = tmrHtml(ex, tmrSets(ex));
-      el.classList.toggle('on', tmr.ex === ex && !!tmr.end);
-    });
-    if (!tmr.end && !(tmr.fine && Date.now() - tmr.fine < 4000)) {
-      clearInterval(tmrTimer);
-      tmrTimer = null;
-    }
-  }
+  // Timer grande a tutto schermo: compare appena parte un timer (lo stesso anello del timer addominali); un tocco lo annulla
+  const big = document.createElement('div');
+  big.className = 'wo-big';
+  big.hidden = true;
+  big.innerHTML = '<p class="wo-big-title"></p><button class="timer-running" type="button"><span>0</span><small>tocca per annullare</small></button>';
+  document.body.append(big);
+  big.querySelector('button').addEventListener('click', () => {
+    restEnd = 0;
+    tmr.end = 0;
+    tickRest();
+  });
 
+  /** Ridisegna i riquadri dei timer (all'avvio, allo stop, alla fine); il conto lo aggiorna frame(). */
   function tickRest() {
+    big.hidden = !(restEnd || tmr.end);
+    if (!big.hidden) {
+      const e = EX[tmr.ex] || {};
+      big.querySelector('.wo-big-title').textContent = tmr.end ? `${e.n || ''} · serie ${tmr.j + 1} di ${tmrSets(tmr.ex).length}` : 'Recupero';
+    }
     root.querySelectorAll('.wo-rest').forEach((el) => {
       el.innerHTML = restHtml();
-      el.classList.toggle('on', !!restEnd && restEnd > Date.now());
-      el.classList.toggle('end', !!restEnd && restEnd <= Date.now());
+      el.classList.toggle('on', !!restEnd);
     });
-    if (!restEnd || restEnd <= Date.now()) {
-      clearInterval(restTimer);
-      restTimer = null;
-      if (restEnd && navigator.vibrate) navigator.vibrate(300);
-    }
+    root.querySelectorAll('.wo-tmr').forEach((el) => {
+      el.innerHTML = tmrHtml(el.dataset.ex, tmrSets(el.dataset.ex));
+      el.classList.toggle('on', tmr.ex === el.dataset.ex && !!tmr.end);
+    });
+    cancelAnimationFrame(raf);
+    if (restEnd || tmr.end) raf = requestAnimationFrame(frame);
   }
+
+  function frame() {
+    const now = Date.now();
+    const bd = big.querySelector('button'), bn = bd.querySelector('span');
+    if (restEnd && !tmr.end) {
+      const left = Math.max(0, restEnd - now);
+      bd.classList.remove('counting');
+      bd.style.setProperty('--p', String(1 - left / (REST * 1000)));
+      bn.textContent = mmss(Math.ceil(left / 1000));
+    }
+    if (tmr.end) {
+      const counting = now < tmr.go, left = Math.max(0, counting ? tmr.go - now : tmr.end - now);
+      bd.classList.toggle('counting', counting);
+      bd.style.setProperty('--p', counting ? '0' : String(1 - left / (tmr.total * 1000)));
+      bn.textContent = mmss(Math.ceil(left / 1000));
+    }
+    if (restEnd) {
+      if (now >= restEnd) return finish('rest');
+      const left = restEnd - now;
+      root.querySelectorAll('.wo-rest .wo-dial').forEach((d) => d.style.setProperty('--p', String(1 - left / (REST * 1000))));
+      root.querySelectorAll('.wo-rest-left').forEach((b) => (b.textContent = mmss(Math.ceil(left / 1000))));
+    }
+    if (tmr.end) {
+      if (now >= tmr.end) return finish('tmr');
+      const counting = now < tmr.go;
+      const left = counting ? tmr.go - now : tmr.end - now;
+      root.querySelectorAll(`.wo-tmr[data-ex="${tmr.ex}"] .wo-dial`).forEach((d) => {
+        d.classList.toggle('counting', counting);
+        d.style.setProperty('--p', counting ? '0' : String(1 - left / (tmr.total * 1000)));
+        const n = d.querySelector('.wo-dial-n');
+        if (n) n.textContent = mmss(Math.ceil(left / 1000));
+      });
+    }
+    raf = requestAnimationFrame(frame);
+  }
+
+  function finish(which) {
+    if (which === 'rest') restEnd = 0;
+    else {
+      tmr.end = 0;
+      tmr.j = Math.min(tmr.j + 1, Math.max(0, tmrSets(tmr.ex).length - 1)); // pronta la serie dopo
+    }
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    const alarm = document.getElementById('timer-alarm'); // lo stesso lampeggio del timer addominali
+    if (alarm) alarm.hidden = false;
+    tickRest();
+  }
+
+  // Tornando nell'app dopo la fine di un timer: il lampeggio parte subito
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && (restEnd || tmr.end)) {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(frame);
+    }
+  });
 
   function pickView() {
     const groups = [...new Set(CATALOGO.map((e) => e.g))];
@@ -543,7 +587,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'o') {
       const k = Number(arg);
       P().open = P().open === k ? -1 : k;
-      if (unit(EX[ui.list[ui.i]]) === 'sec' && !tmr.end) tmr = { ...tmr, ex: ui.list[ui.i], j: k, fine: 0 };
+      if (unit(EX[ui.list[ui.i]]) === 'sec' && !tmr.end) tmr = { ...tmr, ex: ui.list[ui.i], j: k };
     } else if (/^[kr][+-]$/.test(cmd)) {
       const k = Number(arg), d = cmd[1] === '+' ? 1 : -1, sets = P().sets;
       if (cmd[0] === 'k') setKg(k, nextKg(sets[k].kg, d));
@@ -555,13 +599,12 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const ex = ui.list[ui.i], sets = P().sets || [];
       const j = Math.max(0, Math.min(Number(arg) || 0, sets.length - 1));
       const sec = (sets[j] || {}).reps || 30;
-      tmr = { ex, j, end: Date.now() + sec * 1000, total: sec, fine: 0 };
-      if (!tmrTimer) tmrTimer = setInterval(tickTmr, 200);
+      const go = Date.now() + COUNTDOWN; // 3, 2, 1 come il timer grande
+      tmr = { ex, j, go, end: go + sec * 1000, total: sec };
     } else if (cmd === 'tstop') {
       tmr.end = 0;
     } else if (cmd === 'rest') {
       restEnd = Date.now() + REST * 1000;
-      if (!restTimer) restTimer = setInterval(tickRest, 250);
     } else if (cmd === 'stop') {
       restEnd = 0;
     }
