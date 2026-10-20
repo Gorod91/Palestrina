@@ -111,27 +111,28 @@ async function waitCount(P, name, n, ms = 15000) {
   const pres = await post('/run/sheet', { name: SH('Presenze') });
   ok((pres || []).some((r) => r[2] === 'Francesco' && r[0] === today), 'nella tabella di prova (su Firestore)');
 
-  console.log('3. Check-in di Michy senza rete, app chiusa e riaperta più tardi con la rete');
+  console.log('3. Check-in di Michy senza rete: errore subito, non parte niente');
   await M.ctx.setOffline(true);
-  const tap = new Date();
   await M.page.$eval('#btn-checkin', (b) => b.click());
-  ok((await waitCount(M, 'Michy', 1, 1500)) >= 0, 'M: si vede subito anche offline');
-  await sleep(1000);
-  await M.page.close(); // app chiusa senza rete
-  await sleep(65000); // più di un minuto: l'ora di arrivo sarà diversa da quella del tocco
+  const toast = await M.page.waitForFunction(() => !document.getElementById('toast').hidden && /offline/.test(document.getElementById('toast').textContent), null, { timeout: 5000 }).then(() => true).catch(() => false);
+  ok(toast, 'M: messaggio "sei offline"');
+  ok((await waitCount(M, 'Michy', 0, 1500)) >= 0, 'M: il check-in non resta sullo schermo');
   await M.ctx.setOffline(false);
-  const tR = Date.now();
-  M.page = await M.ctx.newPage();
-  M.page.on('console', (m) => M.logs.push(m.text()));
-  M.page.on('pageerror', (e) => M.logs.push('ERRORE ' + e.message));
-  M.page.on('dialog', (d) => d.accept());
-  await M.page.goto('http://localhost:8000/');
-  const dO = await waitCount(F, 'Michy', 1, 90000);
-  ok(dO >= 0, `F vede il check-in di Michy ${Date.now() - tR} ms dopo la riapertura`);
-  const hhmm = (d) => d.toLocaleTimeString('it-IT', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit' });
-  const presM = ((await post('/run/sheet', { name: SH('Presenze') })) || []).find((r) => r[2] === 'Michy' && r[0] === today);
-  ok(presM && presM[1] === hhmm(tap), `registrato all'ora del tocco (${presM && presM[1]}, tocco ${hhmm(tap)}, arrivo ${hhmm(new Date(tR))})`);
-  ok((await waitCount(M, 'Michy', 1, 5000)) >= 0, 'M: dopo la riapertura il check-in c\'è');
+  await sleep(5000);
+  ok((await countOf(F, 'Michy')) === 0, 'F: nessun check-in di Michy arrivato dopo');
+  // Azione arrivata su Firebase molto dopo il tocco (rete instabile): il server la scarta
+  const late = await M.page.evaluate(async (pfx) => {
+    const { fbSignIn } = await import('./fbchat.js');
+    const { fs, db } = await fbSignIn({ name: 'Michy' }, () => Promise.reject(new Error('già dentro')));
+    await fs.setDoc(fs.doc(db, pfx + 'azioni', 'tardiva1'), { name: 'Michy', action: 'checkin', data: JSON.stringify({ tapAt: Date.now() - 10 * 60000 }), stato: 'nuova', at: fs.serverTimestamp() });
+    return 'ok';
+  }, PFX);
+  await post('', { action: 'coda', code: 'MIC-1', test: !VERO });
+  const d = await owner(`${PFX}azioni/tardiva1`);
+  ok(late === 'ok' && d.fields && /tardi/.test(d.fields.esito.stringValue), 'azione arrivata 10 minuti dopo il tocco: scartata');
+  ok((await countOf(F, 'Michy')) === 0, 'e nessun check-in registrato');
+  await M.page.$eval('#btn-checkin', (b) => b.click());
+  ok((await waitCount(F, 'Michy', 1)) >= 0, 'con la rete il check-in di Michy arriva');
 
   console.log('4. Sudometro con foto su Firebase (azione in coda, come il telefono)');
   const jpeg = fs.readFileSync(path.join(PUB, 'icons/icon-192.png')).toString('base64'); // contenuto qualsiasi: si controlla il giro

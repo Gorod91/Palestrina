@@ -535,7 +535,7 @@ function handle(req, user) {
       case 'trace':
         return json(saveTrace(user, req.events));
       case 'checkin':
-        return json(checkin(user, 'app', req.tapAt));
+        return json(checkin(user, 'app'));
       case 'checkinUndo':
         return json(checkinUndo(user));
       case 'setReference':
@@ -721,54 +721,27 @@ function doGet(e) {
 
 // ---------- Logica ----------
 
-function checkin(user, source, tapAt) {
-  const when = actionTime(tapAt);
-  const late = Date.now() - when.getTime() > LATE_MS;
+function checkin(user, source) {
   const lock = scriptLock();
   lock.waitLock(10000);
   try {
-    const today = dayString(when);
+    const today = dayString(new Date());
     const already = rows('presenze').some((r) => r.day === today && r.name === user.name);
     if (already) return { ok: true, alreadyToday: true };
-    sheet('presenze').appendRow([today, Utilities.formatDate(when, TZ, 'HH:mm'), user.name, source]);
+    sheet('presenze').appendRow([today, Utilities.formatDate(new Date(), TZ, 'HH:mm'), user.name, source]);
   } finally {
     lock.releaseLock();
   }
-  const count = countInWeek(rows('presenze'), user.name, weekKey(dayString(when)));
-  addChatEvent(user.name, { kind: 'checkin', count, goal: user.goal, auto: source === 'automatico' }, late ? when : null);
+  const count = countInWeek(rows('presenze'), user.name, weekKey(dayString(new Date())));
+  addChatEvent(user.name, { kind: 'checkin', count, goal: user.goal, auto: source === 'automatico' });
   announceAchievements(user);
   dispatch('checkin', user.name);
-  // Un check-in arrivato tardi (fatto senza rete) non apre sfide: chi era lì nel frattempo non lo sapeva
-  if (!late) {
-    try {
-      maybeOpenSfida(user);
-    } catch (err) {
-      console.error('Sfida non aperta', err);
-    }
+  try {
+    maybeOpenSfida(user);
+  } catch (err) {
+    console.error('Sfida non aperta', err);
   }
   return { ok: true, alreadyToday: false };
-}
-
-const LATE_MS = 15 * 60000; // oltre questo ritardo un'azione si considera fatta senza rete
-const TAP_MAX_MS = 6 * 3600000;
-
-/**
- * Momento di un'azione: quello del tocco sul telefono (`tapAt`, millisecondi) se è arrivata in ritardo perché
- * il telefono era senza rete, ma solo se è di oggi, al massimo di 6 ore fa, nel passato e dopo l'ultima
- * chiusura (recap della domenica alle 19, premiazioni di fine mese alle 21). Altrimenti adesso.
- */
-function actionTime(tapAt) {
-  const now = new Date();
-  const t = new Date(Number(tapAt));
-  if (!tapAt || isNaN(t.getTime()) || t > now || now - t > TAP_MAX_MS) return now;
-  const today = dayString(now);
-  if (dayString(t) !== today) return now;
-  const hhmm = Utilities.formatDate(t, TZ, 'HH:mm');
-  const nowHm = Utilities.formatDate(now, TZ, 'HH:mm');
-  const weekday = Number(Utilities.formatDate(now, TZ, 'u')); // 7 = domenica
-  if (weekday === 7 && nowHm >= '19:00' && hhmm < '19:00') return now; // recap della settimana già partito
-  if (addDays(today, 1).slice(8) === '01' && nowHm >= '21:00' && hhmm < '21:00') return now; // Re del mese già incoronato
-  return t;
 }
 
 /** Annulla il check-in di oggi: lo toglie dalle presenze e dalla chat, senza notifiche. */
@@ -834,16 +807,14 @@ function saveSudometro(user, req) {
   if (!getReference(user)) return { error: 'Prima fai la foto di riferimento' };
   // Un Sudometro al giorno. Le prove degli utenti debug non contano, non avvisano nessuno e si possono ripetere.
   const debug = user.debug && req.debug === true;
-  const when = actionTime(req.tapAt); // fatto senza rete: vale il momento dello scatto
-  const late = Date.now() - when.getTime() > LATE_MS;
-  const today = dayString(when);
+  const today = dayString(new Date());
   const done = !debug && rows('sudometro').some((r) => r.day === today && r.name === user.name);
   if (done && user.debug && req.overwrite === true) return overwriteSudometro(user, req, today);
   if (done) return { error: 'Il Sudometro di oggi è già fatto' };
   const score = Math.max(0, Math.min(100, Math.round(Number(req.score) || 0)));
   const saved = savePhoto(user, req.photo, `sudato ${score}${debug ? ' debug' : ''}`, req.photoId);
   const refId = getReference(user).photoId || ''; // il riferimento di oggi: domani se ne farà un altro
-  const now = when;
+  const now = new Date();
   sheet('sudometro').appendRow([
     dayString(now),
     Utilities.formatDate(now, TZ, 'HH:mm'),
@@ -856,7 +827,7 @@ function saveSudometro(user, req) {
     refId,
   ]);
   if (!debug) {
-    addChatEvent(user.name, { kind: 'sudometro', score, title: String(req.title || '').slice(0, 60), photoId: saved.id || '', ref: refId }, late ? when : null);
+    addChatEvent(user.name, { kind: 'sudometro', score, title: String(req.title || '').slice(0, 60), photoId: saved.id || '', ref: refId });
     dispatch('sudometro', user.name);
   }
   return { ok: true, score, debug, photoError: saved.error };
@@ -1304,12 +1275,12 @@ function withRef(data) {
 }
 
 /** Evento automatico in chat (check-in, Sudometro, premiazioni). I dati restano strutturati: il testo lo fa l'app. */
-function addChatEvent(name, data, when) {
+function addChatEvent(name, data) {
   try {
     const lock = scriptLock();
     lock.waitLock(10000);
     try {
-      appendChat({ name }, 'event', JSON.stringify(data), '', '', '', when);
+      appendChat({ name }, 'event', JSON.stringify(data));
       bumpChat();
     } finally {
       lock.releaseLock();
@@ -1319,10 +1290,9 @@ function addChatEvent(name, data, when) {
   }
 }
 
-/** `when`: momento a cui appartiene la riga (per un'azione fatta senza rete, quello del tocco). */
-function appendChat(user, type, text, ref, at, id0, when) {
-  const now = when || new Date();
-  const id = id0 || (when ? when.getTime().toString(36) + Math.random().toString(36).slice(2, 6) : newId());
+function appendChat(user, type, text, ref, at, id0) {
+  const now = new Date();
+  const id = id0 || newId();
   sheet('chat').appendRow([id, dayString(now), Utilities.formatDate(now, TZ, 'HH:mm'), user.name, type, text || '', ref || '', at || '']);
   return id;
 }
@@ -3081,6 +3051,9 @@ function stateStale() {
   return fbAllOn() && realProps.getProperty(fbPfx() + 'STATO_GIORNO') !== dayString(new Date());
 }
 
+// Un'azione arrivata su Firebase più di 5 minuti dopo il tocco si scarta (margine anche per l'orologio del telefono)
+const STALE_ACTION_MS = 5 * 60000;
+
 // Azioni che il telefono può mettere in coda (le altre passano dalla richiesta diretta)
 const QUEUE_ACTIONS = ['checkin', 'checkinUndo', 'sudometro', 'setReference', 'setAlias', 'setTimer', 'chatMute', 'subscribe', 'sfida', 'state'];
 
@@ -3112,7 +3085,10 @@ function processQueue(test) {
       if (claim.code >= 300) return;
       let out;
       try {
-        out = runQueued(d.fields.name.stringValue, d.fields.action.stringValue, safeJson(d.fields.data.stringValue) || {});
+        const data = safeJson(d.fields.data.stringValue) || {};
+        const late = Number(data.tapAt) > 0 && new Date(d.fields.at.timestampValue).getTime() - Number(data.tapAt) > STALE_ACTION_MS;
+        // Arrivata molto dopo il tocco (rete instabile): non si esegue, il telefono ha già detto che non è partita
+        out = late ? { error: 'Arrivata troppo tardi (connessione assente): rifalla' } : runQueued(d.fields.name.stringValue, d.fields.action.stringValue, data);
       } catch (err) {
         out = { error: String(err.message || err) };
       }
