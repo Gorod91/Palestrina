@@ -791,3 +791,12 @@ body.keyboard .wo-bar { display: none; }
 .wo-run-sum span { color: var(--muted); font-variant-numeric: tabular-nums; }
 .wo-run .primary { width: min(100%, 360px); }
 .wo-run .timer-start { margin: 0; }
+
+/* circuito guidato: i passaggi come pagine con lo scorrimento nativo */
+.wo-run { justify-content: flex-start; padding-left: 0; padding-right: 0; }
+.wo-run-pager { display: flex; width: 100%; flex: 1; min-height: 0; overflow-x: auto; scroll-snap-type: x mandatory; overscroll-behavior-x: contain; scrollbar-width: none; }
+.wo-run-pager::-webkit-scrollbar { display: none; }
+.wo-run-page { flex: 0 0 100%; scroll-snap-align: start; scroll-snap-stop: always; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 22px; padding: 0 16px; }
+.wo-run-page .timer-running, .wo-run-page .timer-start { margin: 0; }
+.wo-run-rest { background: radial-gradient(closest-side, var(--bg) 87%, transparent 88%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0) !important; }
+.wo-rest-head b { color: var(--stand); }

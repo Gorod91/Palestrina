@@ -405,32 +405,89 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }
     runAt = 0;
     run.hidden = false;
-    runStep();
+    runRender();
   }
 
-  function runStep() {
+  // I passaggi sono pagine affiancate con lo scorrimento nativo (come gli esercizi della scheda): si trascinano col dito;
+  // "fatto", "tocca per saltare" e la fine di un timer scorrono alla pagina dopo. L'ultima pagina chiude il circuito.
+  const runPager = () => run.querySelector('.wo-run-pager');
+
+  /** Contenuto di una pagina a riposo: sit-up da toccare, "Inizia" per gli esercizi a tempo, recupero pronto a partire. */
+  function runPageInner(j) {
+    const c = circIn(curSch(), runId), st = pageOf(runId).circ;
+    if (j >= runPlan.length) return `<div class="wo-run-done">✓</div><div class="wo-big-head"><b>Fine circuito</b><small>lascia qui per salvare</small></div>`;
+    const s = runPlan[j];
+    if (s.rest) return `<div class="wo-big-head wo-rest-head"><b>Recupero</b><small>poi giro ${s.g + 2}</small></div>
+      <button class="timer-running wo-run-rest" data-r="next"><span>${mmss(c.rec)}</span><small>tocca per saltare</small></button>`;
+    if (unit(EX[s.e]) !== 'sec') return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>
+      <button class="wo-run-reps" data-r="next">${st.vals[s.e]}<small>ripetizioni · fatto ✓</small></button>`;
+    const total = st.vals[s.e];
+    return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>${mmss(total)}${total < 60 ? '"' : ''}</small></div>
+      <button class="timer-start" data-r="start">Inizia</button>`;
+  }
+
+  function runTop() {
+    const st = pageOf(runId).circ, s = runPlan[Math.min(runAt, runPlan.length - 1)];
+    return `<div class="wo-run-steps">${runPlan.map((x, j) => `<i class="${x.rest ? 'rest ' : ''}${j < runAt ? 'ok' : j === runAt ? 'cur' : ''}"></i>`).join('')}</div>
+      <div class="wo-run-giro">${runAt >= runPlan.length ? 'Fine' : `Giro ${s.g + 1} di ${st.giri}`}</div>`;
+  }
+
+  function runRender() {
+    cancelAnimationFrame(runRaf);
+    run.classList.remove('rest');
+    run.innerHTML = `<div class="wo-run-top">${runTop()}</div>
+      <div class="wo-run-pager">${[...runPlan, null].map((_, j) => `<section class="wo-run-page" data-j="${j}">${runPageInner(j)}</section>`).join('')}</div>
+      <p class="wo-run-hint">‹ scorri per il passaggio prima o dopo ›</p><button class="wo-run-stop" data-r="stop">Interrompi circuito</button>`;
+    const pager = runPager();
+    pager.scrollLeft = runAt * pager.clientWidth;
+    pager.addEventListener('scroll', () => {
+      clearTimeout(pager._t);
+      pager._t = setTimeout(() => runSettle(Math.round(pager.scrollLeft / pager.clientWidth)), 110);
+    }, { passive: true });
+    runActivate();
+  }
+
+  /** La pagina k è arrivata al centro: i giri si chiudono (o si riaprono tornando indietro) e parte quello che serve. */
+  function runSettle(k) {
+    k = Math.max(0, Math.min(runPlan.length, k));
+    if (k === runAt) return;
     cancelAnimationFrame(runRaf);
     const c = circIn(curSch(), runId), st = pageOf(runId).circ;
-    if (runAt >= runPlan.length) return runFinish(c);
-    const s = runPlan[runAt];
-    const bar = `<div class="wo-run-steps">${runPlan.map((x, j) => `<i class="${x.rest ? 'rest ' : ''}${j < runAt ? 'ok' : j === runAt ? 'cur' : ''}"></i>`).join('')}</div>
-      <div class="wo-run-giro">Giro ${s.g + 1} di ${st.giri}</div>`;
-    const stop = '<p class="wo-run-hint">‹ scorri per il passaggio prima o dopo ›</p><button class="wo-run-stop" data-r="stop">Interrompi circuito</button>';
-    if (!s.rest && unit(EX[s.e]) !== 'sec') {
-      run.innerHTML = `${bar}<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>
-        <button class="wo-run-reps" data-r="next">${st.vals[s.e]}<small>ripetizioni · fatto ✓</small></button>${stop}`;
-      return;
+    while (runAt < k) {
+      if (runPlan[runAt].last) circRound(runId);
+      runAt++;
     }
+    while (runAt > k) {
+      runAt--;
+      if (runPlan[runAt].last && st.cur > 0) {
+        c.ex.forEach((e) => st.done[e].pop());
+        st.cur--;
+      }
+    }
+    if (runAt >= runPlan.length) return runFinish(c);
+    runPlan.forEach((x) => (x.started = false));
+    run.querySelectorAll('.wo-run-page').forEach((pg) => (pg.innerHTML = runPageInner(Number(pg.dataset.j))));
+    run.querySelector('.wo-run-top').innerHTML = runTop();
+    runActivate();
+  }
+
+  /** Va alla pagina dopo con lo stesso scorrimento del dito. */
+  function runGoNext() {
+    const pager = runPager();
+    if (pager) pager.scrollTo({ left: (runAt + 1) * pager.clientWidth, behavior: 'smooth' });
+  }
+
+  /** Il recupero parte da solo; gli esercizi a tempo dopo "Inizia" (3-2-1); i sit-up aspettano il tocco. */
+  function runActivate() {
+    const s = runPlan[runAt];
+    if (!s || !(s.rest || s.started)) return;
+    const c = circIn(curSch(), runId), st = pageOf(runId).circ;
+    const page = run.querySelector(`.wo-run-page[data-j="${runAt}"]`);
     const total = s.rest ? c.rec : st.vals[s.e];
     run.classList.toggle('rest', !!s.rest);
-    if (!s.rest && !s.started) { // esercizio a tempo: parte solo con il grande "Inizia" (poi 3-2-1)
-      run.innerHTML = `${bar}<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>${mmss(total)}${total < 60 ? '"' : ''}</small></div>
-        <button class="timer-start" data-r="start">Inizia</button>${stop}`;
-      return;
-    }
-    run.innerHTML = `${bar}<div class="wo-big-head"><b>${s.rest ? 'Recupero' : esc(nameOf(s.e))}</b><small>${s.rest ? `poi giro ${s.g + 2}` : ''}</small></div>
-      <button class="timer-running" data-r="next"><span></span><small>tocca per saltare</small></button>${stop}`;
-    const d = run.querySelector('.timer-running'), n = d.querySelector('span');
+    page.innerHTML = `<div class="wo-big-head${s.rest ? ' wo-rest-head' : ''}"><b>${s.rest ? 'Recupero' : esc(nameOf(s.e))}</b><small>${s.rest ? `poi giro ${s.g + 2}` : ''}</small></div>
+      <button class="timer-running${s.rest ? ' wo-run-rest' : ''}" data-r="next"><span></span><small>tocca per saltare</small></button>`;
+    const d = page.querySelector('.timer-running'), n = d.querySelector('span');
     const go = Date.now() + (s.rest ? 0 : COUNTDOWN), end = go + total * 1000;
     const tick = () => {
       const now = Date.now(), counting = now < go;
@@ -441,7 +498,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       } else {
         if (now >= end) {
           if (navigator.vibrate) navigator.vibrate(200);
-          return runNext();
+          return runGoNext();
         }
         n.textContent = mmss(Math.ceil((end - now) / 1000));
         d.style.setProperty('--p', String(1 - (end - now) / (total * 1000)));
@@ -450,38 +507,6 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     };
     runRaf = requestAnimationFrame(tick);
   }
-
-  function runNext() {
-    const s = runPlan[runAt];
-    if (s && s.last) circRound(runId);
-    runAt++;
-    runStep();
-  }
-
-  /** Passaggio precedente (scorrendo verso destra): se si torna dentro il giro appena chiuso, quel giro si riapre. */
-  function runPrev() {
-    if (runAt <= 0) return;
-    runAt--;
-    const s = runPlan[runAt], st = pageOf(runId).circ, c = circIn(curSch(), runId);
-    if (s.last && st && c && st.cur > 0) {
-      c.ex.forEach((e) => st.done[e].pop());
-      st.cur--;
-    }
-    runPlan.forEach((x, j) => { if (j >= runAt) x.started = false; });
-    runStep();
-  }
-
-  // Scorrendo col dito a sinistra o a destra si passa al passaggio dopo o prima del circuito
-  let rx = 0, ry = 0;
-  run.addEventListener('touchstart', (ev) => { rx = ev.touches[0].clientX; ry = ev.touches[0].clientY; }, { passive: true });
-  run.addEventListener('touchend', (ev) => {
-    const t = ev.changedTouches[0], dx = t.clientX - rx, dy = t.clientY - ry;
-    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.5 || runAt >= runPlan.length) return;
-    swiped = Date.now();
-    if (dx < 0) runNext();
-    else runPrev();
-  }, { passive: true });
-  let swiped = 0;
 
   function runFinish(c) {
     const st = pageOf(runId).circ;
@@ -494,11 +519,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   run.addEventListener('click', (ev) => {
     const r = ev.target.closest('[data-r]')?.dataset.r;
-    if (Date.now() - swiped < 400) return; // il tocco che chiude uno scorrimento non vale come clic
-    if (r === 'next') runNext();
-    if (r === 'start') {
+    if (r === 'next') runGoNext();
+    if (r === 'start' && runPlan[runAt]) {
       runPlan[runAt].started = true;
-      runStep();
+      runActivate();
     }
     if (r === 'stop' || r === 'close') {
       cancelAnimationFrame(runRaf);
