@@ -85,8 +85,8 @@ const SCHEDE_ESEMPIO = [
 ];
 
 // Schede di Rizzo (di: non vengono proposte come "da fare"): in fondo a tutte il circuito addome,
-// 30" di lavoro per esercizio con 15" di pausa tra uno e l'altro (pausa) e recupero tra i giri.
-const ADDOME_R = { n: 'Circuito addome', ex: ['russian-twist', 'plank-laterale', 'situps-tempo', 'v-sit', 'barchetta'], giri: 2, rec: 60, pausa: 15 };
+// 30" di lavoro per esercizio, di fila, e recupero tra i giri (pausa: secondi tra un esercizio e l'altro, se servono).
+const ADDOME_R = { n: 'Circuito addome', ex: ['russian-twist', 'plank-laterale', 'situps-tempo', 'v-sit', 'barchetta'], giri: 2, rec: 60 };
 const PIANO_ADDOME_R = Object.fromEntries(ADDOME_R.ex.map((e) => [e, { s: '30"' }]));
 const rizzo = (id, name, piano) => ({
   id, name, di: 'Rizzo',
