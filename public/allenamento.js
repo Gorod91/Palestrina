@@ -5,7 +5,7 @@
 import { fbSignIn, fbUid } from './fbchat.js';
 
 // Catalogo di esempio: quello vero delle macchine della nostra palestra arriverà più avanti.
-// t: 'kg' (peso e ripetizioni, se manca), 'rip' (solo ripetizioni, a corpo libero), 'sec' (a tempo, in secondi)
+// t: 'kg' (peso e ripetizioni, se manca), 'rip' (solo ripetizioni, a corpo libero), 'sec' (a tempo, in secondi), 'm' (metri)
 export const CATALOGO = [
   { id: 'rot-anca', n: 'Rotazioni d\'anca', g: 'Mobilità', m: 'Apertura e chiusura', t: 'rip' },
   { id: 'slanci', n: 'Slanci per lato', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
@@ -50,6 +50,38 @@ export const CATALOGO = [
   { id: 'plank-laterale', n: 'Plank laterale', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
   { id: 'situps-tempo', n: 'Sit-up', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
   { id: 'v-sit', n: 'V-sit crunch', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
+  // Ceppo
+  { id: 'riscaldamento', n: 'Riscaldamento', g: 'Mobilità', m: 'Cardio a scelta', t: 'rip' },
+  { id: 'capo', n: 'Rotazioni e circonduzioni del capo', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
+  { id: 'spalle-mob', n: 'Spalle su e giù, avanti e indietro, circonduzioni', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
+  { id: 'circ-braccia', n: 'Circonduzioni braccia', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
+  { id: 'rot-busto', n: 'Rotazioni busto', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
+  { id: 'circ-anca', n: 'Circonduzioni anca', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
+  { id: 'caviglia-rialzo', n: 'Piegamenti caviglia su rialzo', g: 'Mobilità', m: 'Rialzo', t: 'rip' },
+  { id: 'tappetino-mob', n: 'Su tappetino: cane-gatto e allungamento', g: 'Mobilità', m: 'Tappetino', t: 'rip' },
+  { id: 'ponte', n: 'Ponte su tappetino', g: 'Addominali', m: 'Tappetino', t: 'rip' },
+  { id: 'plank-ginocchia', n: 'Plank sollevo ginocchia', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
+  { id: 'ponte-mono', n: 'Ponte monopodalico', g: 'Glutei', m: 'Tappetino', t: 'rip' },
+  { id: 'plank-commando', n: 'Plank commando', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
+  { id: 'ercolina-rot', n: 'Rotazioni busto all\'ercolina', g: 'Addominali', m: 'Ercolina' },
+  { id: 'goblet-box', n: 'Goblet squat con box', g: 'Gambe', m: 'Manubrio' },
+  { id: 'pekdek-or', n: 'Pek dek orizzontale', g: 'Petto', m: 'Pek dek' },
+  { id: 'rematore-armstrong', n: 'Rematore Armstrong', g: 'Schiena', m: 'Armstrong' },
+  { id: 'eps-trazioni', n: 'Trazioni all\'EPS', g: 'Schiena', m: 'EPS' },
+  { id: 'pekdek-vert', n: 'Pek dek verticale', g: 'Petto', m: 'Pek dek' },
+  // Gualo
+  { id: 'inarco-gobba', n: 'Inarco e gobba', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
+  { id: 'leg-press-mono', n: 'Leg press orizzontale monopodalica', g: 'Gambe', m: 'Macchina' },
+  { id: 'shoulder-bil', n: 'Shoulder press in piedi con bilanciere', g: 'Spalle', m: 'Bilanciere' },
+  { id: 'curl-alt', n: 'Curl alternato con manubri', g: 'Bicipiti', m: 'Manubri' },
+  { id: 'crunch-terra', n: 'Crunch', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
+  { id: 'russian-twist-rip', n: 'Russian twist', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
+  { id: 'v-sit-rip', n: 'V-sit crunch', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
+  { id: 'low-row', n: 'Low row', g: 'Schiena', m: 'Macchina' },
+  { id: 'leg-curl-sdraiato', n: 'Leg curl sdraiato', g: 'Gambe', m: 'Macchina' },
+  { id: 'hyper-ext', n: 'Hyper extension', g: 'Schiena', m: 'Panca', t: 'rip' },
+  { id: 'piegamenti', n: 'Piegamenti', g: 'Petto', m: 'Corpo libero', t: 'rip' },
+  { id: 'vogatore', n: 'Vogatore', g: 'Cardio', m: 'Concept', t: 'm' },
 ];
 const EX = Object.fromEntries(CATALOGO.map((e) => [e.id, e]));
 
@@ -126,15 +158,84 @@ SCHEDE_ESEMPIO.push(
   }),
 );
 
+// Scheda di Ceppo (una sola, dell'istruttore Simone); kg: peso da cui partire, rec: recupero in secondi
+SCHEDE_ESEMPIO.push({
+  id: 'c-ceppo', name: 'Ceppo', di: 'Ceppo',
+  ex: ['@mob-c', '@colonna-c', 'ercolina-rot', 'leg-press', 'goblet-box', 'pekdek-or', 'rematore-armstrong', 'eps-trazioni', 'pekdek-vert'],
+  circuiti: {
+    'mob-c': { n: 'Riscaldamento e mobilità', lista: true, durata: "10'", ex: ['riscaldamento', 'capo', 'spalle-mob', 'circ-braccia', 'rot-busto', 'circ-anca', 'caviglia-rialzo', 'tappetino-mob'] },
+    'colonna-c': { n: 'Muscoli della colonna', ex: ['ponte', 'plank-ginocchia', 'ponte-mono', 'plank-commando'], giri: 2, rec: 30 },
+  },
+  piano: {
+    riscaldamento: { s: "3-5'" },
+    ponte: { s: '10' },
+    'plank-ginocchia': { s: '10' },
+    'ponte-mono': { s: '10 per gamba' },
+    'plank-commando': { s: '6' },
+    'ercolina-rot': { s: '2 × 8 per lato', kg: 10 },
+    'leg-press': { s: '3 × 6', kg: 80, nota: 'altezza 6', rec: 90 },
+    'goblet-box': { s: '3 × 8', kg: 12, nota: 'box + 2 dischi', rec: 60 },
+    'pekdek-or': { s: '3 × 8-10', kg: 35 },
+    'rematore-armstrong': { s: '3 × 8-10', kg: 25 },
+    'eps-trazioni': { s: '3 × 8-10', kg: 50, nota: 'in superserie col pek dek verticale; in alternativa tirate al cavo basso (ercolina) 25 kg' },
+    'pekdek-vert': { s: '3 × 8-10', kg: 20, nota: 'in superserie con le trazioni; in alternativa dips all\'EPS 50 kg' },
+  },
+});
+
+// Schede A e B di Gualo (istruttore Federico): mobilità all'inizio di entrambe, addome a circuito in fondo alla A
+const MOB_G = { n: 'Mobilità', lista: true, durata: "5'", ex: ['circ-braccia', 'circ-anca', 'inarco-gobba', 'plank'] };
+const PIANO_MOB_G = { 'circ-braccia': { s: '10 avanti, 10 indietro' }, 'circ-anca': { s: '10 orario, 10 antiorario' }, plank: { s: '30"' } };
+SCHEDE_ESEMPIO.push(
+  {
+    id: 'g-a', name: 'Gualo A', di: 'Gualo',
+    ex: ['@mob-g', 'leg-press-mono', 'shoulder-bil', 'leg-ext', 'chest-press', 'curl-alt', '@addome-g'],
+    circuiti: {
+      'mob-g': MOB_G,
+      'addome-g': { n: 'Circuito addome', ex: ['crunch-terra', 'russian-twist-rip', 'barchetta', 'v-sit-rip', 'plank-laterale'], giri: 2, rec: 60 },
+    },
+    piano: {
+      ...PIANO_MOB_G,
+      'leg-press-mono': { s: '3 × 8-10' },
+      'shoulder-bil': { s: '4 × 8' },
+      'leg-ext': { s: '3 × 8-10' },
+      'chest-press': { s: '3 × 8-10' },
+      'curl-alt': { s: '3 × 8-10' },
+      'crunch-terra': { s: '15' },
+      'russian-twist-rip': { s: '30' },
+      barchetta: { s: '30"' },
+      'v-sit-rip': { s: '12 dx, sx, centro' },
+      'plank-laterale': { s: '20"' },
+    },
+  },
+  {
+    id: 'g-b', name: 'Gualo B', di: 'Gualo',
+    ex: ['@mob-g', 'lat', 'low-row', 'leg-curl-sdraiato', 'hyper-ext', 'piegamenti', 'vogatore', 'pushdown-corda'],
+    circuiti: { 'mob-g': MOB_G },
+    piano: {
+      ...PIANO_MOB_G,
+      lat: { s: '3 × 8-10' },
+      'low-row': { s: '3 × 8-10' },
+      'leg-curl-sdraiato': { s: '3 × 8-10' },
+      'hyper-ext': { s: '3 × 8-10' },
+      piegamenti: { s: '4 × 20', nota: 'se serve, recupero 1:30', rec: 60 },
+      vogatore: { s: "10'", rip: 2000, nota: 'segna i metri fatti' },
+      'pushdown-corda': { s: '3 × 10-12', nota: 'bonus, se hai tempo' },
+    },
+  },
+);
+
 const REST = 90; // secondi di recupero
 
-/** Serie della prima volta: dal piano della scheda ("4 × 6-8" → 4 serie da 6), altrimenti 3 × 10. */
+/** Serie della prima volta: dal piano della scheda ("4 × 6-8" → 4 serie da 6), altrimenti 3 × 10; kg e rip se indicati. */
 function primaVolta(piano) {
   const m = String((piano && piano.s) || '').match(/^(?:(\d+)\s*×\s*)?(\d+)/);
-  const n = m ? Number(m[1] || 1) : 3, reps = m ? Number(m[2]) : 10;
-  return Array.from({ length: n }, () => ({ kg: 0, reps }));
+  const n = m ? Number(m[1] || 1) : 3, reps = (piano && piano.rip) || (m ? Number(m[2]) : 10);
+  return Array.from({ length: n }, () => ({ kg: (piano && piano.kg) || 0, reps }));
 }
 const unit = (e) => (e && e.t) || 'kg';
+const uShort = (t) => (t === 'sec' ? 's' : t === 'm' ? 'm' : 'rip');
+const uLong = (t) => (t === 'sec' ? 'secondi' : t === 'm' ? 'metri' : 'ripetizioni');
+const uStep = (t) => (t === 'sec' ? 5 : t === 'm' ? 50 : 1);
 /** Peso dopo − o +: a 1 kg fino a 20, sopra a 2,5 kg (sui multipli di 2,5). Si può sempre scrivere a mano. */
 function nextKg(v, d) {
   if (d > 0) return v < 20 ? Math.min(20, Math.floor(v) + 1) : Math.floor(v / 2.5 + 1e-9) * 2.5 + 2.5;
@@ -152,7 +253,8 @@ const copy = (sets) => sets.map((s) => ({ kg: s.kg, reps: s.reps }));
 
 function summary(sets, t = 'kg') {
   const r = sets.map((s) => s.reps);
-  const reps = r.every((x) => x === r[0]) ? `${r.length} × ${r[0]}${t === 'sec' ? '"' : ''}` : r.map((x) => (t === 'sec' ? `${x}"` : x)).join(' · ');
+  const u = (x) => (t === 'sec' ? `${x}"` : t === 'm' ? `${x} m` : x);
+  const reps = r.every((x) => x === r[0]) ? (r.length > 1 || t !== 'm' ? `${r.length} × ${u(r[0])}` : u(r[0])) : r.map(u).join(' · ');
   if (t !== 'kg') return reps;
   const kg = sets.every((s) => s.kg === sets[0].kg) ? `${kgf(sets[0].kg)} kg` : 'kg diversi';
   return `${reps} · ${kg}`;
@@ -170,6 +272,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   // cosa si vede: lista, esercizio, catalogo (allenamento libero)
   const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '' };
   let restEnd = 0;
+  let restTotal = REST; // secondi del recupero in corso
   let serieSig = '';
   let altrove = []; // le mie serie salvate dall'altra parte (prova o dati veri)
   let pressed = false; // dito sullo schermo: il ridisegno aspetta che si alzi
@@ -504,7 +607,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const id = ui.list[k], c = circIn(sch, id);
     if (c.lista) return listaHtml(k, sch, c);
     const st = circState(id, c, sch);
-    const head = `<div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${st.giri} giri</span><span class="wo-pill">recupero ${mmss(c.rec)}</span>${c.pausa ? `<span class="wo-pill">pausa ${c.pausa}"</span>` : ''}</div>`;
+    const head = `<div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${st.giri} giri</span><span class="wo-pill">recupero ${mmss(c.rec)}${c.rec < 60 ? '"' : ''}</span>${c.pausa ? `<span class="wo-pill">pausa ${c.pausa}"</span>` : ''}</div>`;
     if (isDone(id, sch) && !pageOf(id).rifai) {
       const nx = nextTodo(k);
       return `<section class="wo-page" data-k="${k}">${head}
@@ -516,7 +619,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const t = unit(EX[e]), l = lastTime(e), pi = sch && sch.piano ? sch.piano[e] : null;
       const info = [pi && pi.s, l && `ultima volta ${summary(l.sets, t)}`].filter(Boolean).join(' · ');
       return `<div class="wo-cex"><span class="wo-cn">${j + 1}</span><div class="wo-cname"><b>${esc(nameOf(e))}</b><small>${esc(info)}</small></div>
-        <span class="wo-pm"><button data-a="cv-:${e}" aria-label="Meno">−</button><label class="wo-in"><input data-f="c:${e}" inputmode="numeric" value="${st.vals[e]}" aria-label="${esc(nameOf(e))}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${t === 'sec' ? 's' : 'rip'}</em></label><button data-a="cv+:${e}" aria-label="Più">+</button></span></div>`;
+        <span class="wo-pm"><button data-a="cv-:${e}" aria-label="Meno">−</button><label class="wo-in"><input data-f="c:${e}" inputmode="numeric" value="${st.vals[e]}" aria-label="${esc(nameOf(e))}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${uShort(t)}</em></label><button data-a="cv+:${e}" aria-label="Più">+</button></span></div>`;
     }).join('');
     return `<section class="wo-page" data-k="${k}">${head}
       <div class="wo-rounds"><button data-a="cg-" aria-label="Un giro in meno">−</button>${rounds}<button data-a="cg+" aria-label="Un giro in più">+</button></div>
@@ -752,14 +855,14 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const r = ref && (ref[j] || ref[ref.length - 1]);
       const ck = !saved && r && s.kg !== r.kg, cr = !saved && r && s.reps !== r.reps;
       const kgCell = t === 'kg' ? `<span class="v${ck ? ' ch' : ''}">${kgf(s.kg)}<small>kg</small></span>` : '<span></span>';
-      const row = `<button class="wo-set${saved ? ' done' : ''}${pg.open === j ? ' open' : ''}" data-a="o:${j}"><span class="n">${j + 1}</span>${kgCell}<span class="v${cr ? ' ch' : ''}">${s.reps}<small>${t === 'sec' ? 's' : 'rip'}</small></span><span class="n">${saved ? (done.pending ? '…' : '✓') : '›'}</span></button>`;
+      const row = `<button class="wo-set${saved ? ' done' : ''}${pg.open === j ? ' open' : ''}" data-a="o:${j}"><span class="n">${j + 1}</span>${kgCell}<span class="v${cr ? ' ch' : ''}">${s.reps}<small>${uShort(t)}</small></span><span class="n">${saved ? (done.pending ? '…' : '✓') : '›'}</span></button>`;
       if (pg.open !== j || saved) return row;
       const field = (kind, value, u, aria) => `<span class="wo-pm">
           <button data-a="${kind}-:${j}" aria-label="Meno ${aria}">−</button>
           <label class="wo-in"><input data-f="${kind}" inputmode="${kind === 'k' ? 'decimal' : 'numeric'}" value="${value}" aria-label="${aria}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${u}</em></label>
           <button data-a="${kind}+:${j}" aria-label="Più ${aria}">+</button></span>`;
       const kgEdit = t === 'kg' ? field('k', kgf(s.kg), 'kg', 'chili') : '';
-      const repEdit = field('r', s.reps, t === 'sec' ? 's' : 'rip', t === 'sec' ? 'secondi' : 'ripetizioni');
+      const repEdit = field('r', s.reps, uShort(t), uLong(t));
       return `${row}<div class="wo-edit"><div class="wo-pms">${kgEdit}${repEdit}</div><p class="wo-hint">Tocca il numero per scriverlo a mano</p></div>`;
     }).join('');
     const nx = nextTodo(k);
@@ -773,7 +876,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       ${t === 'sec' && !saved ? `<div class="wo-tmr" data-ex="${ex}">${tmrHtml(ex, sets)}</div>` : ''}
       <div class="wo-sets">${rows}</div>
       ${btn}
-      <div class="wo-rest">${restHtml()}</div>
+      <div class="wo-rest" data-ex="${ex}">${restHtml(ex)}</div>
     </section>`;
   }
 
@@ -796,9 +899,14 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   const dial = (p, inner = '') => `<span class="wo-dial" style="--p:${p}">${inner}</span>`;
   const mmss = (s) => (s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : String(s));
 
-  function restHtml() {
-    if (!restEnd) return `${dial(1)}<b>Recupero</b><button class="wo-chip" data-a="rest">1:30 ▸</button>`;
-    return `${dial(0)}<span><small>Recupero</small><b class="wo-rest-left">1:30</b></span><button class="wo-chip" data-a="stop">Stop</button>`;
+  /** Recupero dell'esercizio: quello del piano della scheda (rec), altrimenti 1:30. */
+  const restOf = (ex) => {
+    const sch = curSch(), pi = sch && sch.piano ? sch.piano[ex] : null;
+    return (pi && pi.rec) || REST;
+  };
+  function restHtml(ex) {
+    if (!restEnd) return `${dial(1)}<b>Recupero</b><button class="wo-chip" data-a="rest">${mmss(restOf(ex))} ▸</button>`;
+    return `${dial(0)}<span><small>Recupero</small><b class="wo-rest-left">${mmss(restTotal)}</b></span><button class="wo-chip" data-a="stop">Stop</button>`;
   }
 
   function tmrHtml(ex, sets) {
@@ -832,7 +940,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       big.classList.toggle('rest', !tmr.end); // il recupero è azzurro
     }
     root.querySelectorAll('.wo-rest').forEach((el) => {
-      el.innerHTML = restHtml();
+      el.innerHTML = restHtml(el.dataset.ex);
       el.classList.toggle('on', !!restEnd);
     });
     root.querySelectorAll('.wo-tmr').forEach((el) => {
@@ -849,7 +957,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (restEnd && !tmr.end) {
       const left = Math.max(0, restEnd - now);
       bd.classList.remove('counting');
-      bd.style.setProperty('--p', String(1 - left / (REST * 1000)));
+      bd.style.setProperty('--p', String(1 - left / (restTotal * 1000)));
       bn.textContent = mmss(Math.ceil(left / 1000));
     }
     if (tmr.end) {
@@ -861,7 +969,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (restEnd) {
       if (now >= restEnd) return finish('rest');
       const left = restEnd - now;
-      root.querySelectorAll('.wo-rest .wo-dial').forEach((d) => d.style.setProperty('--p', String(1 - left / (REST * 1000))));
+      root.querySelectorAll('.wo-rest .wo-dial').forEach((d) => d.style.setProperty('--p', String(1 - left / (restTotal * 1000))));
       root.querySelectorAll('.wo-rest-left').forEach((b) => (b.textContent = mmss(Math.ceil(left / 1000))));
     }
     if (tmr.end) {
@@ -985,8 +1093,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const k = Number(arg), d = cmd[1] === '+' ? 1 : -1, sets = P().sets;
       if (cmd[0] === 'k') setKg(k, nextKg(sets[k].kg, d));
       else {
-        const step = unit(EX[ui.list[ui.i]]) === 'sec' ? 5 : 1;
-        sets[k].reps = Math.max(step, Math.min(600, sets[k].reps + step * d));
+        const t = unit(EX[ui.list[ui.i]]), step = uStep(t);
+        sets[k].reps = Math.max(step, Math.min(t === 'm' ? 20000 : 600, sets[k].reps + step * d));
       }
     } else if (cmd === 'mob' || cmd === 'moball') {
       const sch = curSch(), id = ui.list[ui.i], c = circIn(sch, id);
@@ -1026,7 +1134,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'tstop') {
       tmr.end = 0;
     } else if (cmd === 'rest') {
-      restEnd = Date.now() + REST * 1000;
+      restTotal = restOf(ui.list[ui.i]);
+      restEnd = Date.now() + restTotal * 1000;
     } else if (cmd === 'stop') {
       restEnd = 0;
     }
