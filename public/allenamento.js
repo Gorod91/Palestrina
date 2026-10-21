@@ -490,9 +490,12 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function circRun(id) {
     const c = circIn(curSch(), id), st = pageOf(id).circ;
     if (!c || !st) return;
+    // Riparte sempre dal primo giro, anche se qualche giro era già segnato
+    st.cur = 0;
+    c.ex.forEach((e) => (st.done[e] = []));
     runId = id;
     runPlan = [];
-    for (let g = st.cur; g < st.giri; g++) {
+    for (let g = 0; g < st.giri; g++) {
       c.ex.forEach((e, j) => {
         runPlan.push({ e, g, last: j === c.ex.length - 1 });
         if (c.pausa && j < c.ex.length - 1) runPlan.push({ rest: true, pausa: true, g, poi: c.ex[j + 1] });
