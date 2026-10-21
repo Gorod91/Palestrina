@@ -7,6 +7,10 @@ import { fbSignIn, fbUid } from './fbchat.js';
 // Catalogo di esempio: quello vero delle macchine della nostra palestra arriverà più avanti.
 // t: 'kg' (peso e ripetizioni, se manca), 'rip' (solo ripetizioni, a corpo libero), 'sec' (a tempo, in secondi)
 export const CATALOGO = [
+  { id: 'rot-anca', n: 'Rotazioni d\'anca', g: 'Mobilità', m: 'Apertura e chiusura', t: 'rip' },
+  { id: 'slanci', n: 'Slanci per lato', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
+  { id: 'cane-gatto', n: 'Cane-gatto a 4 zampe', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
+  { id: 'aperture-bastone', n: 'Aperture con bastone', g: 'Mobilità', m: 'Bastone', t: 'rip' },
   { id: 'squat', n: 'Squat', g: 'Gambe', m: 'Bilanciere' },
   { id: 'spinte-manubri', n: 'Spinte in alto con manubri in piedi', g: 'Spalle', m: 'Manubri' },
   { id: 'pulley-medio', n: 'Pulley grip medio', g: 'Schiena', m: 'Cavo' },
@@ -40,8 +44,12 @@ const SCHEDE_ESEMPIO = [
     id: 'a',
     name: 'Scheda A',
     // "@addome" è un circuito: sit-up, plank e barchetta di fila, ripetuti per più giri (ogni giro salvato come una serie)
-    ex: ['squat', 'lat', 'spinte-manubri', 'pulley-medio', 'chest-press-sdraiato', 'curl', '@addome'],
-    circuiti: { addome: { n: 'Circuito addome', ex: ['situps', 'plank', 'barchetta'], giri: 3, rec: 60 } },
+    // "@mobilita" è una lista da spuntare (5 minuti di mobilità all'inizio)
+    ex: ['@mobilita', 'squat', 'lat', 'spinte-manubri', 'pulley-medio', 'chest-press-sdraiato', 'curl', '@addome'],
+    circuiti: {
+      mobilita: { n: 'Mobilità', lista: true, durata: "5'", ex: ['rot-anca', 'slanci', 'cane-gatto', 'aperture-bastone'] },
+      addome: { n: 'Circuito addome', ex: ['situps', 'plank', 'barchetta'], giri: 3, rec: 60 },
+    },
     piano: {
       squat: { s: '4 × 6-8' },
       lat: { s: '3 × 8-10' },
@@ -49,6 +57,10 @@ const SCHEDE_ESEMPIO = [
       'pulley-medio': { s: '3 × 8-10', nota: '1" fermo al petto' },
       'chest-press-sdraiato': { s: '3 × 8-10', nota: '2° piano' },
       curl: { s: '3 × 6-8' },
+      'rot-anca': { s: '8' },
+      slanci: { s: '8 per lato' },
+      'cane-gatto': { s: '12' },
+      'aperture-bastone': { s: '10' },
       situps: { s: '10-12' },
       plank: { s: '30-40"' },
       barchetta: { s: '20-30"' },
@@ -319,7 +331,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <div class="wo-sheet" id="wo-sheet" hidden><div class="wo-sheet-box"><div class="wo-grab"></div><p class="wo-sheet-hint">Tieni premuto "Tutti" e trascina il dito su un esercizio, poi lascia</p>
         <div class="wo-grid">${ui.list.map((id, k) => {
           const c = circIn(sch, id), e = EX[id] || { n: id }, d = isDone(id), pi = sch && sch.piano ? sch.piano[id] : null;
-          const sub = c ? `${c.giri} giri · ${c.ex.length} esercizi` : pi ? pi.s : e.g || '';
+          const sub = c ? (c.lista ? `${c.durata} · ${c.ex.length} esercizi` : `${c.giri} giri · ${c.ex.length} esercizi`) : pi ? pi.s : e.g || '';
           return `<button class="wo-tile${k === ui.i ? ' cur' : ''}${d ? ' ok' : ''}" data-a="j:${k}" data-k="${k}"><span>${d ? '✓' : k + 1}</span><b>${esc(nameOf(id))}</b><small>${esc(sub)}</small></button>`;
         }).join('')}</div></div></div>` : ''}`;
   }
@@ -341,8 +353,31 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return pg.circ;
   }
 
+  /** Lista da spuntare (es. 5 minuti di mobilità): ogni esercizio si segna con un tocco; spuntati tutti si passa avanti. */
+  function listaHtml(k, sch, c) {
+    const all = c.ex.every((e) => todayDoc(e));
+    return `<section class="wo-page" data-k="${k}">
+      <div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${esc(c.durata || '')}</span></div>
+      <div class="wo-mobs">${c.ex.map((e) => {
+        const d = todayDoc(e), pi = sch && sch.piano ? sch.piano[e] : null;
+        return `<button class="wo-mob${d ? ' ok' : ''}" data-a="mob:${e}"><span class="wo-mob-ck">${d ? '✓' : ''}</span><span class="wo-mob-n"><b>${esc(nameOf(e))}</b><small>${esc((EX[e] || {}).m || '')}</small></span><span class="wo-mob-r">${esc(pi ? pi.s : '')}</span></button>`;
+      }).join('')}</div>
+      ${all ? (nextTodo(k) < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : '') : '<button class="primary" data-a="moball">✓ Fatto tutto</button>'}
+      <p class="wo-sub wo-center">Tocca un esercizio per spuntarlo</p>
+    </section>`;
+  }
+
+  const listReps = (sch, e) => Number(String((sch && sch.piano && sch.piano[e] && sch.piano[e].s) || '1').match(/\d+/)?.[0] || 1);
+
+  function unsave(ex) {
+    const { fs, db } = x;
+    fs.deleteDoc(fs.doc(db, pfx + 'serie', `${today()}_${fbUid(me.name)}_${ex}`)).catch((err) => toast(`Non annullato: ${err.message}`));
+  }
+
   function circHtml(k, sch) {
-    const id = ui.list[k], c = circIn(sch, id), st = circState(id, c, sch);
+    const id = ui.list[k], c = circIn(sch, id);
+    if (c.lista) return listaHtml(k, sch, c);
+    const st = circState(id, c, sch);
     const head = `<div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${st.giri} giri</span><span class="wo-pill">recupero ${mmss(c.rec)}</span></div>`;
     if (isDone(id, sch) && !pageOf(id).rifai) {
       const nx = nextTodo(k);
@@ -817,6 +852,17 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       else {
         const step = unit(EX[ui.list[ui.i]]) === 'sec' ? 5 : 1;
         sets[k].reps = Math.max(step, Math.min(600, sets[k].reps + step * d));
+      }
+    } else if (cmd === 'mob' || cmd === 'moball') {
+      const sch = curSch(), id = ui.list[ui.i], c = circIn(sch, id);
+      if (!c) return;
+      const todo = cmd === 'moball' ? c.ex.filter((e) => !todayDoc(e)) : [arg];
+      if (cmd === 'mob' && todayDoc(arg)) unsave(arg); // tocco su uno già spuntato: si toglie
+      else todo.forEach((e) => save(e, [{ kg: 0, reps: listReps(sch, e) }]));
+      const fatti = c.ex.every((e) => todayDoc(e) || todo.includes(e)) && !(cmd === 'mob' && todayDoc(arg));
+      if (fatti) { // spuntati tutti: si passa al prossimo esercizio da fare
+        const nx = nextTodo(ui.i);
+        if (nx >= 0) openEx(nx, ui.i);
       }
     } else if (cmd === 'cg-' || cmd === 'cg+') {
       const st = P().circ;

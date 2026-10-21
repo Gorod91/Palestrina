@@ -810,3 +810,13 @@ body.keyboard .wo-bar { display: none; }
 .fold[open] .fold-more { font-size: 0; }
 .fold[open] .fold-more::after { content: "Chiudi"; font-size: 15px; }
 .fold[open] summary { margin-bottom: 6px; }
+
+/* Allenamento: lista da spuntare (mobilità) */
+.wo-mobs { display: grid; gap: 8px; margin-bottom: 4px; }
+.wo-mob { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; align-items: center; gap: 12px; width: 100%; padding: 14px; border: 0; border-radius: 16px; background: var(--card); color: var(--fg); text-align: left; }
+.wo-mob-ck { width: 30px; height: 30px; border-radius: 50%; border: 2px solid #48484a; display: grid; place-items: center; font-size: 16px; font-weight: 900; }
+.wo-mob.ok { background: rgba(166, 255, 0, .1); }
+.wo-mob.ok .wo-mob-ck { background: var(--exercise); border-color: var(--exercise); color: #000; }
+.wo-mob-n b { display: block; font-size: 16px; }
+.wo-mob-n small { display: block; color: var(--muted); font-size: 12px; }
+.wo-mob-r { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--stand); white-space: nowrap; }
