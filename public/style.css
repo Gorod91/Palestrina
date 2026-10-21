@@ -874,7 +874,7 @@ body.keyboard .wo-bar { display: none; }
 .wo-danger { color: var(--danger); margin-bottom: 12px; }
 .wo-edsheet { position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; justify-content: flex-end; }
 .wo-edsheet-dim { position: absolute; inset: 0; background: rgba(0, 0, 0, .55); }
-.wo-edsheet-box { position: relative; max-height: 88vh; overflow-y: auto; padding: 8px 16px calc(24px + env(safe-area-inset-bottom)); border-radius: 22px 22px 0 0; background: #161618; display: grid; gap: 4px; }
+.wo-edsheet-box { position: relative; max-height: 88vh; overflow-y: auto; padding: 8px 16px calc(96px + env(safe-area-inset-bottom)); /* sopra la barra dei tab */ border-radius: 22px 22px 0 0; background: #161618; display: grid; gap: 4px; }
 .wo-edsheet-box .primary { margin-top: 14px; }
 .wo-sh-t { font-size: 20px; }
 .wo-sh-step { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: 8px; }
