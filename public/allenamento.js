@@ -34,6 +34,22 @@ export const CATALOGO = [
   { id: 'curl', n: 'Curl con manubri', g: 'Bicipiti', m: 'Manubri' },
   { id: 'pushdown', n: 'Push down ai cavi', g: 'Tricipiti', m: 'Cavi' },
   { id: 'crunch', n: 'Crunch alla macchina', g: 'Addominali', m: 'Macchina 10' },
+  { id: 'croci-alto', n: 'Croci ai cavi dall\'alto', g: 'Petto', m: 'Cavi' },
+  { id: 'leg-press-or', n: 'Leg press orizzontale', g: 'Gambe', m: 'Macchina' },
+  { id: 'polpacci-lp', n: 'Polpacci alla leg press orizzontale', g: 'Polpacci', m: 'Macchina' },
+  { id: 'affondi-indietro', n: 'Affondi monopodalici indietro', g: 'Gambe', m: 'Manubri' },
+  { id: 'abductor', n: 'Abductor machine', g: 'Glutei', m: 'Macchina' },
+  { id: 'spinte-multipower', n: 'Spinte in alto al multipower', g: 'Spalle', m: 'Multipower' },
+  { id: 'step-ups', n: 'Step up', g: 'Gambe', m: 'Manubri' },
+  { id: 'curl-ez', n: 'Curl con bilanciere EZ', g: 'Bicipiti', m: 'Bilanciere EZ' },
+  { id: 'hammer-curl', n: 'Hammer curl con manubri', g: 'Bicipiti', m: 'Manubri' },
+  { id: 'trazioni-elastico', n: 'Trazioni con elastico', g: 'Schiena', m: 'Sbarra', t: 'rip' },
+  { id: 'pushdown-corda', n: 'Push down con corda', g: 'Tricipiti', m: 'Cavi' },
+  { id: 'french-press', n: 'French press con manubri', g: 'Tricipiti', m: 'Manubri' },
+  { id: 'russian-twist', n: 'Russian twist', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
+  { id: 'plank-laterale', n: 'Plank laterale', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
+  { id: 'situps-tempo', n: 'Sit-up', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
+  { id: 'v-sit', n: 'V-sit crunch', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
 ];
 const EX = Object.fromEntries(CATALOGO.map((e) => [e.id, e]));
 
@@ -67,6 +83,48 @@ const SCHEDE_ESEMPIO = [
     },
   },
 ];
+
+// Schede di Rizzo (di: non vengono proposte come "da fare"): in fondo a tutte il circuito addome,
+// 30" di lavoro per esercizio con 15" di pausa tra uno e l'altro (pausa) e recupero tra i giri.
+const ADDOME_R = { n: 'Circuito addome', ex: ['russian-twist', 'plank-laterale', 'situps-tempo', 'v-sit', 'barchetta'], giri: 2, rec: 60, pausa: 15 };
+const PIANO_ADDOME_R = Object.fromEntries(ADDOME_R.ex.map((e) => [e, { s: '30"' }]));
+const rizzo = (id, name, piano) => ({
+  id, name, di: 'Rizzo',
+  ex: [...Object.keys(piano), '@addome-r'],
+  circuiti: { 'addome-r': ADDOME_R },
+  piano: { ...piano, ...PIANO_ADDOME_R },
+});
+SCHEDE_ESEMPIO.push(
+  rizzo('r-upper', 'Rizzo Upper', {
+    panca: { s: '5 × 5' },
+    'croci-alto': { s: '3 × 12' },
+    lat: { s: '3 × 8-10' },
+    pulley: { s: '3 × 8-10' },
+    alzate: { s: '3 × 10-12' },
+  }),
+  rizzo('r-lower', 'Rizzo Lower', {
+    'leg-press-or': { s: '4 × 8-10' },
+    'leg-ext': { s: '3 × 8-10' },
+    'leg-curl': { s: '3 × 8-10' },
+    'polpacci-lp': { s: '3 × 10-12' },
+    'affondi-indietro': { s: '3 × 8-10' },
+    abductor: { s: '3 × 10-12' },
+  }),
+  rizzo('r-davanti', 'Rizzo Davanti', {
+    panca: { s: '4 × 10' },
+    'spinte-multipower': { s: '3 × 8-10' },
+    'step-ups': { s: '3 × 8-10' },
+    'curl-ez': { s: '3 × 8-10' },
+    'hammer-curl': { s: '3 × 8-10' },
+  }),
+  rizzo('r-dietro', 'Rizzo Dietro', {
+    'trazioni-elastico': { s: '4 × 6', nota: 'più diventi forte, più aumenti le ripetizioni' },
+    pulley: { s: '3 × 8-10' },
+    'pushdown-corda': { s: '3 × 10-12' },
+    'french-press': { s: '3 × 10-12' },
+    'leg-curl': { s: '3 × 8-10' },
+  }),
+);
 
 const REST = 90; // secondi di recupero
 
@@ -204,7 +262,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   /** La scheda da fare: quella iniziata oggi, se non finita; altrimenti quella non fatta da più tempo. */
   function proposta() {
-    const list = schede || [];
+    const list = (schede || []).filter((s) => !s.di);
     const started = list.find((s) => doneToday(s) > 0 && doneToday(s) < s.ex.length);
     if (started) return started;
     return list.slice().sort((a, b) => (lastDone(a) < lastDone(b) ? -1 : lastDone(a) > lastDone(b) ? 1 : 0))[0];
@@ -378,7 +436,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const id = ui.list[k], c = circIn(sch, id);
     if (c.lista) return listaHtml(k, sch, c);
     const st = circState(id, c, sch);
-    const head = `<div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${st.giri} giri</span><span class="wo-pill">recupero ${mmss(c.rec)}</span></div>`;
+    const head = `<div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${st.giri} giri</span><span class="wo-pill">recupero ${mmss(c.rec)}</span>${c.pausa ? `<span class="wo-pill">pausa ${c.pausa}"</span>` : ''}</div>`;
     if (isDone(id, sch) && !pageOf(id).rifai) {
       const nx = nextTodo(k);
       return `<section class="wo-page" data-k="${k}">${head}
@@ -435,7 +493,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     runId = id;
     runPlan = [];
     for (let g = st.cur; g < st.giri; g++) {
-      c.ex.forEach((e, j) => runPlan.push({ e, g, last: j === c.ex.length - 1 }));
+      c.ex.forEach((e, j) => {
+        runPlan.push({ e, g, last: j === c.ex.length - 1 });
+        if (c.pausa && j < c.ex.length - 1) runPlan.push({ rest: true, pausa: true, g, poi: c.ex[j + 1] });
+      });
       if (g < st.giri - 1) runPlan.push({ rest: true, g });
     }
     runAt = 0;
@@ -452,14 +513,17 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const c = circIn(curSch(), runId), st = pageOf(runId).circ;
     if (j >= runPlan.length) return `<div class="wo-run-done">✓</div><div class="wo-big-head"><b>Fine circuito</b><small>lascia qui per salvare</small></div>`;
     const s = runPlan[j];
-    if (s.rest) return `<div class="wo-big-head wo-rest-head"><b>Recupero</b><small>poi giro ${s.g + 2}</small></div>
-      <button class="timer-running wo-run-rest" data-r="next"><span>${mmss(c.rec)}</span><small>tocca per saltare</small></button>`;
+    if (s.rest) return `<div class="wo-big-head wo-rest-head"><b>${restName(s)}</b><small>${restNext(s)}</small></div>
+      <button class="timer-running wo-run-rest" data-r="next"><span>${mmss(s.pausa ? c.pausa : c.rec)}</span><small>tocca per saltare</small></button>`;
     if (unit(EX[s.e]) !== 'sec') return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>
       <button class="wo-run-reps" data-r="next">${st.vals[s.e]}<small>ripetizioni · fatto ✓</small></button>`;
     const total = st.vals[s.e];
     return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>${mmss(total)}${total < 60 ? '"' : ''}</small></div>
       <button class="timer-start" data-r="start">Inizia</button>`;
   }
+
+  const restName = (s) => (s.pausa ? 'Pausa' : 'Recupero');
+  const restNext = (s) => (s.pausa ? `poi ${esc(nameOf(s.poi))}` : `poi giro ${s.g + 2}`);
 
   function runTop() {
     const st = pageOf(runId).circ, s = runPlan[Math.min(runAt, runPlan.length - 1)];
@@ -518,9 +582,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (!s || !(s.rest || s.started)) return;
     const c = circIn(curSch(), runId), st = pageOf(runId).circ;
     const page = run.querySelector(`.wo-run-page[data-j="${runAt}"]`);
-    const total = s.rest ? c.rec : st.vals[s.e];
+    const total = s.rest ? (s.pausa ? c.pausa : c.rec) : st.vals[s.e];
     run.classList.toggle('rest', !!s.rest);
-    page.innerHTML = `<div class="wo-big-head${s.rest ? ' wo-rest-head' : ''}"><b>${s.rest ? 'Recupero' : esc(nameOf(s.e))}</b><small>${s.rest ? `poi giro ${s.g + 2}` : ''}</small></div>
+    page.innerHTML = `<div class="wo-big-head${s.rest ? ' wo-rest-head' : ''}"><b>${s.rest ? restName(s) : esc(nameOf(s.e))}</b><small>${s.rest ? restNext(s) : ''}</small></div>
       <button class="timer-running${s.rest ? ' wo-run-rest' : ''}" data-r="next"><span></span><small>tocca per saltare</small></button>`;
     const d = page.querySelector('.timer-running'), n = d.querySelector('span');
     const go = Date.now() + (s.rest ? 0 : COUNTDOWN), end = go + total * 1000;
