@@ -525,8 +525,7 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .poll-names .poll-side .ask-link { vertical-align: baseline; }
 
 /* Conto alla rovescia di 3 secondi prima che parta il timer */
-.timer-running.counting span { font-size: 140px; color: var(--exercise); animation: count-pop 1s ease-out infinite; }
-@keyframes count-pop { from { transform: scale(1.25); opacity: .4; } 30% { transform: scale(1); opacity: 1; } }
+.timer-running.counting span { font-size: 140px; color: var(--exercise); } /* il salto lo fa popCount() a ogni cambio di numero */
 
 /* Domande per giorno: giorni chiusi, pallino "devi rispondere" */
 .pday.closed { opacity: .45; }
@@ -730,7 +729,7 @@ body.keyboard .wo-bar { display: none; }
 .wo-tmr-txt span { display: block; color: var(--muted); font-size: 12px; margin-top: 2px; }
 .wo-tmr .wo-dial { width: 112px; }
 .wo-dial-n { font-size: 44px; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
-.wo-dial.counting .wo-dial-n { color: var(--exercise); animation: count-pop 1s ease-out infinite; }
+.wo-dial.counting .wo-dial-n { color: var(--exercise); }
 .wo-tmr-txt small { display: block; color: var(--muted); font-size: 13px; }
 /* l'anello di tutti i timer dell'allenamento: lo stesso del timer addominali (.timer-running), in piccolo */
 .wo-dial { --p: 0; flex: none; width: 40px; aspect-ratio: 1; border-radius: 50%; display: grid; place-items: center; color: var(--fg);

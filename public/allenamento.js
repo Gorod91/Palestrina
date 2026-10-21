@@ -4,6 +4,7 @@
 // schede/<uid> = { name, list: [{ id, name, ex: [id esercizio] }], at }.
 import { fbSignIn, fbUid } from './fbchat.js';
 import { figSvg } from './figure.js';
+import { popCount } from './timer.js';
 
 // Catalogo di esempio: quello vero delle macchine della nostra palestra arriverà più avanti.
 // t: 'kg' (peso e ripetizioni, se manca), 'rip' (solo ripetizioni, a corpo libero), 'sec' (a tempo, in secondi), 'm' (metri)
@@ -853,7 +854,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const now = Date.now(), counting = now < go;
       d.classList.toggle('counting', counting);
       if (counting) {
-        n.textContent = String(Math.ceil((go - now) / 1000));
+        popCount(n, String(Math.ceil((go - now) / 1000)));
         d.style.setProperty('--p', '0');
       } else {
         if (now >= end) {
@@ -1055,7 +1056,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const counting = now < tmr.go, left = Math.max(0, counting ? tmr.go - now : tmr.end - now);
       bd.classList.toggle('counting', counting);
       bd.style.setProperty('--p', counting ? '0' : String(1 - left / (tmr.total * 1000)));
-      bn.textContent = mmss(Math.ceil(left / 1000));
+      if (counting) popCount(bn, mmss(Math.ceil(left / 1000)));
+      else bn.textContent = mmss(Math.ceil(left / 1000));
     }
     if (restEnd) {
       if (now >= restEnd) return finish('rest');
@@ -1071,7 +1073,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         d.classList.toggle('counting', counting);
         d.style.setProperty('--p', counting ? '0' : String(1 - left / (tmr.total * 1000)));
         const n = d.querySelector('.wo-dial-n');
-        if (n) n.textContent = mmss(Math.ceil(left / 1000));
+        if (n && counting) popCount(n, mmss(Math.ceil(left / 1000)));
+        else if (n) n.textContent = mmss(Math.ceil(left / 1000));
       });
     }
     raf = requestAnimationFrame(frame);

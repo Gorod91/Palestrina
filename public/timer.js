@@ -38,6 +38,14 @@ function saveLocal() {
  * arrivasse la risposta del server), l'ultimo tempo usato su questo telefono, quello salvato in Apps Script
  * (per un telefono nuovo), 30 secondi. Se il server ha un valore diverso (es. salvataggio perso per la rete) lo riallinea.
  */
+/** Numero del conto alla rovescia 3-2-1: il "salto" parte quando il numero cambia, non a tempo fisso
+ *  (altrimenti per un attimo si ingrandisce il numero vecchio prima di cambiare). */
+export function popCount(el, txt) {
+  if (el.textContent === txt) return;
+  el.textContent = txt;
+  if (el.animate) el.animate([{ transform: 'scale(1.25)', opacity: 0.4 }, { transform: 'scale(1)', opacity: 1, offset: 0.3 }, { transform: 'scale(1)', opacity: 1 }], { duration: 1000, easing: 'ease-out' });
+}
+
 export function setTimerAccount(name, serverSeconds, save) {
   if (account && account.name === name) return; // già impostato: non sovrascrive le modifiche in corso
   account = { name, save };
@@ -107,7 +115,7 @@ function tick() {
   const counting = now < goAt;
   $('timer-running').classList.toggle('counting', counting);
   if (counting) {
-    $('timer-left').textContent = String(Math.ceil((goAt - now) / 1000));
+    popCount($('timer-left'), String(Math.ceil((goAt - now) / 1000)));
     $('timer-running').style.setProperty('--p', '0');
     frame = requestAnimationFrame(tick);
     return;
