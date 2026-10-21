@@ -397,6 +397,7 @@ function render() {
   renderRefCard(me.reference);
   $('debug-mode-card').hidden = !me.debug;
   $('icon-card').hidden = testOn(); // per tutti, con i dati veri
+  $('workout-card').hidden = !workoutOn();
   // Admin: tutto. Chi è solo tester (PROVA_USERS nel server): solo l'interruttore della modalità prova.
   $('admin-card').hidden = !(me.admin || me.tester);
   $('admin-card-title').textContent = me.admin ? 'Admin' : 'Prova';
@@ -1080,6 +1081,15 @@ const workout = createWorkout({
   timerSeconds: () => (state && state.me && state.me.timerSeconds) || 30,
 });
 $('timer-back').addEventListener('click', () => selectTab('allenamento'));
+$('btn-workout-reset').addEventListener('click', async () => {
+  if (!confirm("Segnare l'allenamento di oggi come non fatto? Le serie salvate oggi vengono cancellate.")) return;
+  try {
+    const n = await workout.resetToday();
+    toast(n ? `Allenamento di oggi segnato come non fatto (${n} ${n === 1 ? 'esercizio' : 'esercizi'})` : 'Oggi non c\'erano esercizi segnati');
+  } catch (err) {
+    toast(`Errore: ${err.message}`);
+  }
+});
 
 /** Il tab Timer diventa Allenamento (con il timer dentro) per chi ha l'allenamento attivo; per gli altri resta com'era. */
 let workoutProva = null;

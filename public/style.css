@@ -800,3 +800,13 @@ body.keyboard .wo-bar { display: none; }
 .wo-run-page .timer-running, .wo-run-page .timer-start { margin: 0; }
 .wo-run-rest { background: radial-gradient(closest-side, var(--bg) 87%, transparent 88%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0) !important; }
 .wo-rest-head b { color: var(--stand); }
+
+/* Impostazioni: riquadro che si apre toccandolo (check-in automatico) */
+.fold summary { list-style: none; cursor: pointer; display: grid; gap: 8px; color: var(--muted); font-size: 15px; }
+.fold summary::-webkit-details-marker { display: none; }
+.fold summary b { color: var(--fg); }
+.fold-more { color: var(--stand); font-weight: 600; }
+.fold-more::after { content: " ›"; }
+.fold[open] .fold-more { font-size: 0; }
+.fold[open] .fold-more::after { content: "Chiudi"; font-size: 15px; }
+.fold[open] summary { margin-bottom: 6px; }

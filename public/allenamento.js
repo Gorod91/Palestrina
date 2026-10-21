@@ -883,5 +883,16 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     el.setSelectionRange(pos, pos);
   });
 
-  return { start, stop, draw };
+  /** Impostazioni → "Segna l'allenamento di oggi come non fatto": cancella le serie salvate oggi. Restituisce quante. */
+  async function resetToday() {
+    if (!x || !me) throw new Error('Allenamento non collegato');
+    const { fs, db } = x;
+    const mine = serie.filter((s) => s.day === today());
+    await Promise.all(mine.map((s) => fs.deleteDoc(fs.doc(db, pfx + 'serie', s.id))));
+    pages = {};
+    draw();
+    return mine.length;
+  }
+
+  return { start, stop, draw, resetToday };
 }

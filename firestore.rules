@@ -70,6 +70,11 @@ service cloud.firestore {
         && request.resource.data.at == request.time
         && dayOk(request.resource.data.day);
 
+      // Le proprie serie si possono cancellare ("Segna l'allenamento di oggi come non fatto")
+      allow delete: if pal() && allenamento()
+        && coll in ['serie', 'prova_serie']
+        && resource.data.name == request.auth.token.name;
+
       // Le proprie schede (id = uid)
       allow create, update: if pal() && allenamento()
         && coll in ['schede', 'prova_schede']

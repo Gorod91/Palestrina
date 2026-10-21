@@ -235,8 +235,8 @@
         </div>
 
         <h2 class="section">Check-in automatico</h2>
-        <section class="card">
-          <p class="muted">Con l'app <b>Comandi</b> l'iPhone fa il check-in da solo quando si collega al Wi-Fi della palestra.</p>
+        <details class="card fold">
+          <summary><span>Con l'app <b>Comandi</b> l'iPhone fa il check-in da solo quando si collega al Wi-Fi della palestra.</span><span class="fold-more">Come si fa</span></summary>
           <ol class="steps">
             <li>Copia il tuo link personale. Non condividerlo: fa il check-in a nome tuo.<button id="btn-copy-link" class="secondary small">Copia link</button></li>
             <li>In palestra collegati almeno una volta al loro <b>Wi-Fi</b></li>
@@ -247,7 +247,14 @@
             <li>Tocca <b>URL</b>, incolla il link e tocca <b>Fine</b></li>
           </ol>
           <p class="muted">Se il telefono si ricollega più volte conta lo stesso: vale al massimo un check-in al giorno.</p>
-        </section>
+        </details>
+
+        <!-- Allenamento (solo per chi ce l'ha): rimette da fare gli esercizi segnati oggi -->
+        <div id="workout-card" hidden>
+          <h2 class="section">Allenamento</h2>
+          <section class="card list"><button id="btn-workout-reset" class="row destructive">Segna l'allenamento di oggi come non fatto</button></section>
+          <p class="footnote">Cancella le serie salvate oggi: gli esercizi tornano da fare.</p>
+        </div>
 
         <h2 class="section">Notifiche</h2>
         <section class="card list">
