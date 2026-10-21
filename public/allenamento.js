@@ -3,6 +3,7 @@
 // Raccolte (in prova con prefisso prova_): serie/<giorno>_<uid>_<esercizio> = { name, ex, sets: [{ kg, reps }], day, scheda, at },
 // schede/<uid> = { name, list: [{ id, name, ex: [id esercizio] }], at }.
 import { fbSignIn, fbUid } from './fbchat.js';
+import { figSvg } from './figure.js';
 
 // Catalogo di esempio: quello vero delle macchine della nostra palestra arriverà più avanti.
 // t: 'kg' (peso e ripetizioni, se manca), 'rip' (solo ripetizioni, a corpo libero), 'sec' (a tempo, in secondi), 'm' (metri)
@@ -589,7 +590,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${esc(c.durata || '')}</span></div>
       <div class="wo-mobs">${c.ex.map((e) => {
         const d = todayDoc(e), pi = sch && sch.piano ? sch.piano[e] : null;
-        return `<button class="wo-mob${d ? ' ok' : ''}" data-a="mob:${e}"><span class="wo-mob-ck">${d ? '✓' : ''}</span><span class="wo-mob-n"><b>${esc(nameOf(e))}</b><small>${esc((EX[e] || {}).m || '')}</small></span><span class="wo-mob-r">${esc(pi ? pi.s : '')}</span></button>`;
+        return `<button class="wo-mob${d ? ' ok' : ''}" data-a="mob:${e}"><span class="wo-mob-ck">${d ? '✓' : ''}</span>${figSvg(e, 'sm')}<span class="wo-mob-n"><b>${esc(nameOf(e))}</b><small>${esc((EX[e] || {}).m || '')}</small></span><span class="wo-mob-r">${esc(pi ? pi.s : '')}</span></button>`;
       }).join('')}</div>
       ${all ? (nextTodo(k) < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : '') : '<button class="primary" data-a="moball">✓ Fatto tutto</button>'}
       <p class="wo-sub wo-center">Tocca un esercizio per spuntarlo</p>
@@ -618,7 +619,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const rows = c.ex.map((e, j) => {
       const t = unit(EX[e]), l = lastTime(e), pi = sch && sch.piano ? sch.piano[e] : null;
       const info = [pi && pi.s, l && `ultima volta ${summary(l.sets, t)}`].filter(Boolean).join(' · ');
-      return `<div class="wo-cex"><span class="wo-cn">${j + 1}</span><div class="wo-cname"><b>${esc(nameOf(e))}</b><small>${esc(info)}</small></div>
+      return `<div class="wo-cex"><span class="wo-cn">${j + 1}</span>${figSvg(e, 'sm')}<div class="wo-cname"><b>${esc(nameOf(e))}</b><small>${esc(info)}</small></div>
         <span class="wo-pm"><button data-a="cv-:${e}" aria-label="Meno">−</button><label class="wo-in"><input data-f="c:${e}" inputmode="numeric" value="${st.vals[e]}" aria-label="${esc(nameOf(e))}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${uShort(t)}</em></label><button data-a="cv+:${e}" aria-label="Più">+</button></span></div>`;
     }).join('');
     return `<section class="wo-page" data-k="${k}">${head}
@@ -689,10 +690,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const s = runPlan[j];
     if (s.rest) return `<div class="wo-big-head wo-rest-head"><b>${restName(s)}</b><small>${restNext(s)}</small></div>
       <button class="timer-running wo-run-rest" data-r="next"><span>${mmss(s.pausa ? c.pausa : c.rec)}</span><small>tocca per saltare</small></button>`;
-    if (unit(EX[s.e]) !== 'sec') return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>
+    if (unit(EX[s.e]) !== 'sec') return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>${figSvg(s.e, 'run')}
       <button class="wo-run-reps" data-r="next">${st.vals[s.e]}<small>ripetizioni · fatto ✓</small></button>`;
     const total = st.vals[s.e];
-    return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>${mmss(total)}${total < 60 ? '"' : ''}</small></div>
+    return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>${mmss(total)}${total < 60 ? '"' : ''}</small></div>${figSvg(s.e, 'run')}
       <button class="timer-start" data-r="start">Inizia</button>`;
   }
 
@@ -872,6 +873,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       : `<div class="wo-btns"><button class="secondary" data-a="add">+ Serie</button><button class="secondary" data-a="del">− Serie</button></div><button class="primary" data-a="ok">✓ Fatto</button>`;
     return `<section class="wo-page" data-k="${k}">
       <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(piano.s)}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
+      ${figSvg(ex, 'card')}
       ${last ? `<section class="card wo-last"><small>Ultima volta · ${shortDay(last.day)}</small><b>${summary(last.sets, t)}</b></section>` : ''}
       ${t === 'sec' && !saved ? `<div class="wo-tmr" data-ex="${ex}">${tmrHtml(ex, sets)}</div>` : ''}
       <div class="wo-sets">${rows}</div>

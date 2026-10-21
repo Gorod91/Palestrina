@@ -828,3 +828,20 @@ body.keyboard .wo-bar { display: none; }
 .wo-under { position: absolute; z-index: 0; top: 0; left: 0; right: 0; pointer-events: none; }
 .wo-cover { position: absolute; z-index: 1; top: 0; left: -16px; right: -16px; height: max(100%, 100vh); background: var(--bg); box-shadow: -10px 0 24px rgba(0, 0, 0, .6); pointer-events: none; }
 #workout.wo-swiping > :not(.wo-under):not(.wo-cover):not(.wo-edge):not(.wo-bar):not(.wo-sheet) { position: relative; z-index: 2; }
+
+/* Omini animati degli esercizi (disegnini della scheda di carta) */
+.wo-fig { display: block; flex: none; }
+.wo-fig-body { fill: none; stroke: var(--fg, #fff); stroke-width: 3.6; stroke-linecap: round; stroke-linejoin: round; }
+.wo-fig-body.back { stroke: #8e8e93; }
+.wo-fig-head { fill: var(--fg, #fff); }
+.wo-fig-floor { stroke: #3a3a3c; stroke-width: 1.5; }
+.wo-fig-prop { fill: rgba(0, 217, 255, .22); stroke: #00d9ff; stroke-width: 1.5; }
+.wo-fig-w { fill: #00d9ff; }
+.wo-fig-cable { fill: none; stroke: #00d9ff; stroke-width: 1.2; stroke-dasharray: 2 2; }
+.wo-fig.card { width: 100%; max-height: 150px; background: #1c1c1e; border-radius: 16px; padding: 6px 0; margin-bottom: 10px; }
+.wo-fig.sm { width: 54px; height: 36px; background: #2c2c2e; border-radius: 9px; }
+.wo-fig.run { width: min(56vw, 210px); height: auto; margin-block: -6px; }
+.wo-fig.sm .wo-fig-floor { display: none; }
+.wo-cex:has(> .wo-fig) { grid-template-columns: 54px minmax(0, 1fr) auto; }
+.wo-cex:has(> .wo-fig) .wo-cn { display: none; }
+.wo-mob:has(> .wo-fig) { grid-template-columns: 30px 54px minmax(0, 1fr) auto; }
