@@ -781,7 +781,10 @@ body.keyboard .wo-bar { display: none; }
 .wo-run-reps { width: min(76vw, 330px); aspect-ratio: 1; border: 0; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center;
   background: var(--exercise); color: #000; font-size: 110px; font-weight: 800; line-height: 1; box-shadow: 0 0 0 12px rgba(166, 255, 0, .14); }
 .wo-run-reps small { font-size: 17px; font-weight: 700; margin-top: 10px; }
-.wo-run-stop { border: 0; background: none; color: var(--muted); font-size: 15px; padding: 8px; }
+.wo-run { padding-bottom: calc(env(safe-area-inset-bottom) + 110px); }
+.wo-run-stop { position: absolute; left: 16px; right: 16px; bottom: calc(env(safe-area-inset-bottom) + 22px); max-width: 420px; margin: 0 auto; padding: 17px; border: 0; border-radius: 16px;
+  background: var(--card-2); color: var(--danger); font-size: 18px; font-weight: 700; }
+.wo-run-hint { margin: 0; color: var(--muted); font-size: 13px; }
 .wo-run-done { width: 150px; height: 150px; border-radius: 50%; display: grid; place-items: center; background: var(--exercise); color: #000; font-size: 72px; font-weight: 900; }
 .wo-run-sum { display: grid; gap: 6px; width: min(100%, 360px); }
 .wo-run-sum div { display: flex; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 14px; background: var(--card); font-size: 16px; }
