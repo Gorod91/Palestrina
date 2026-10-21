@@ -1215,12 +1215,13 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <input id="wo-q" class="plain wo-search" placeholder="Cerca un esercizio" value="${esc(ui.q)}" autocomplete="off">
       <div class="wo-groups"><button class="${ui.g ? '' : 'on'}" data-a="g:">Tutti</button>${groups.map((g) => `<button class="${ui.g === g ? 'on' : ''}" data-a="g:${esc(g)}">${esc(g)}</button>`).join('')}</div>
       <section class="card wo-list">
-        <button class="wo-row wo-prow" data-a="newex"><span class="wo-chk add">+</span><span><b>Nuova macchina</b><small>se non è nell'elenco</small></span></button>
+        <button class="wo-row wo-prow" data-a="newex"><span class="wo-chk add"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></span><span><b>Nuova macchina</b><small>se non è nell'elenco</small></span></button>
         ${list.map((e) => {
           const h = had.includes(e.id), on = ui.sel.includes(e.id);
           return `<button class="wo-row wo-prow" data-a="${h ? '' : `psel:${e.id}`}"${h ? ' aria-disabled="true"' : ''}><span class="wo-chk${on ? ' on' : ''}${h ? ' had' : ''}">${on || h ? '✓' : ''}</span><span><b>${esc(e.n)}</b><small>${h ? 'già nella scheda' : `${esc(e.g)} · ${esc(e.m)}`}</small></span></button>`;
         }).join('')}
       </section>
+      <div class="wo-pickpad"></div>
       <div class="wo-pickbar"><button class="primary" data-a="padd"${n ? '' : ' disabled'}>${n ? `Aggiungi ${n} ${n === 1 ? 'esercizio' : 'esercizi'}` : 'Scegli gli esercizi'}</button></div>`;
   }
 

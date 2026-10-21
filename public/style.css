@@ -895,10 +895,13 @@ body.keyboard .wo-bar { display: none; }
 .wo-chk { width: 24px; height: 24px; border-radius: 50%; border: 2px solid #48484a; display: grid; place-items: center; font-size: 13px; font-weight: 900; color: #000; }
 .wo-chk.on { background: var(--exercise); border-color: var(--exercise); }
 .wo-chk.had { background: var(--card-2); border-color: var(--card-2); color: var(--muted); }
-.wo-chk.add { border-color: var(--move); color: var(--move); font-size: 18px; }
+.wo-chk.add { border: 0; background: var(--card-2); color: var(--stand); }
+.wo-chk.add svg { width: 14px; height: 14px; }
 .wo-prow[aria-disabled="true"] b { color: var(--muted); }
-.wo-pickbar { position: sticky; bottom: calc(76px + max(4px, env(safe-area-inset-bottom) - 8px)); padding-top: 10px; z-index: 3; }
+.wo-pickbar { position: fixed; z-index: 6; left: max(16px, calc((100% - 480px) / 2)); right: max(16px, calc((100% - 480px) / 2)); bottom: calc(76px + max(4px, env(safe-area-inset-bottom) - 8px)); }
 .wo-pickbar .primary { margin: 0; box-shadow: 0 6px 20px rgba(0, 0, 0, .6); }
+.wo-pickbar .primary:disabled { opacity: 1; background: var(--card-2); color: var(--muted); }
+.wo-pickpad { height: 84px; }
 .wo-who { display: flex; align-items: center; gap: 8px; margin: 16px 2px 8px; }
 .wo-av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--card-2); font-size: 12px; font-weight: 800; }
 .wo-cprow { grid-template-columns: 1fr auto; }
