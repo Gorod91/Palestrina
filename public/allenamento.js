@@ -231,6 +231,48 @@ SCHEDE_ESEMPIO.push(
   },
 );
 
+// Aggiornamenti mirati delle schede (quando Francesco chiede di sistemarne una già salvata nei dati di qualcuno):
+// ognuno si applica una sola volta alla copia salvata (gli id fatti restano in `agg`) e cambia solo quello che dice,
+// lasciando il resto come l'ha personalizzato la persona. Chi non ha ancora salvato niente usa SCHEDE_ESEMPIO,
+// quindi la stessa modifica va fatta anche lì. id: numero crescente, mai riusato; per: nomi (se manca, tutti).
+//   { id, op: 'piano', scheda, ex, set: { s, nota, kg, rec, rip } }  piano di un esercizio (se c'è ancora; null toglie il campo)
+//   { id, op: 'aggiungi', scheda, ex, dopo, piano }                  esercizio in più (se manca), dopo `dopo` o in fondo
+//   { id, op: 'togli', scheda, ex }                                  toglie un esercizio
+//   { id, op: 'circuito', scheda, c, set: { n, giri, rec, ex } }     cambia un circuito (c senza @)
+//   { id, op: 'nome', scheda, name }                                 rinomina una scheda
+//   { id, op: 'scheda', scheda: { id, name, ex, piano, circuiti } }  scheda intera nuova (se non c'è già)
+const AGGIORNAMENTI = [];
+
+/** Applica un aggiornamento all'elenco di schede (già copiato); quello che non trova lo salta. */
+function applyAgg(list, a) {
+  if (a.op === 'scheda') {
+    if (!list.some((y) => y.id === a.scheda.id)) list.push(JSON.parse(JSON.stringify(a.scheda)));
+    return;
+  }
+  const sc = list.find((y) => y.id === a.scheda);
+  if (!sc) return;
+  sc.piano ||= {};
+  if (a.op === 'piano') {
+    const inUse = sc.ex.includes(a.ex) || Object.values(sc.circuiti || {}).some((c) => c.ex.includes(a.ex));
+    if (!inUse) return;
+    const pi = (sc.piano[a.ex] ||= {});
+    Object.entries(a.set).forEach(([k, v]) => (v == null ? delete pi[k] : (pi[k] = v)));
+  } else if (a.op === 'aggiungi') {
+    if (sc.ex.includes(a.ex)) return;
+    const k = a.dopo ? sc.ex.indexOf(a.dopo) : -1;
+    if (k >= 0) sc.ex.splice(k + 1, 0, a.ex);
+    else sc.ex.push(a.ex);
+    if (a.piano) sc.piano[a.ex] = { ...a.piano };
+  } else if (a.op === 'togli') {
+    sc.ex = sc.ex.filter((e) => e !== a.ex);
+  } else if (a.op === 'circuito') {
+    const c = sc.circuiti && sc.circuiti[a.c];
+    if (c) Object.assign(c, JSON.parse(JSON.stringify(a.set)));
+  } else if (a.op === 'nome') {
+    sc.name = a.name;
+  }
+}
+
 const REST = 90; // secondi di recupero
 
 /** Serie della prima volta: dal piano della scheda ("4 × 6-8" → 4 serie da 6), altrimenti 3 × 10; kg e rip se indicati. */
@@ -288,6 +330,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let extra = []; // macchine aggiunte da me (nel documento delle schede)
   let recMap = {}; // recupero scelto da me per esercizio, in secondi
   let otherSchede = []; // documenti delle schede degli altri, per "Copia una scheda"
+  let hasDoc = false; // le mie schede sono già salvate su Firebase (altrimenti si usano quelle di esempio)
+  let aggDone = []; // id degli aggiornamenti mirati già applicati alle mie schede
 
   async function start(user, test) {
     const k = `${user.name}|${test}`;
@@ -318,10 +362,19 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       }, (err) => toast(`Allenamento: ${err.message}`)),
       fs.onSnapshot(fs.doc(db, pfx + 'schede', fbUid(me.name)), (snap) => {
         const d = snap.exists() ? snap.data() : null;
+        hasDoc = !!d;
         schede = d ? d.list || [] : SCHEDE_ESEMPIO;
         extra = (d && d.extra) || [];
         extra.forEach(addEx);
         recMap = (d && d.rec) || {};
+        aggDone = (d && d.agg) || [];
+        const todo = d ? AGGIORNAMENTI.filter((a) => !aggDone.includes(a.id) && (!a.per || a.per.includes(me.name))) : [];
+        if (todo.length) { // aggiornamenti mirati non ancora applicati: si applicano e si salvano subito
+          const list = JSON.parse(JSON.stringify(schede));
+          todo.forEach((a) => applyAgg(list, a));
+          aggDone = [...aggDone, ...todo.map((a) => a.id)];
+          writeDoc(list);
+        }
         softDraw();
       }, (err) => toast(`Allenamento: ${err.message}`)),
     );
@@ -358,6 +411,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     extra = [];
     recMap = {};
     otherSchede = [];
+    hasDoc = false;
+    aggDone = [];
     Object.assign(ui, { view: 'list', ed: null, pickFor: '', sel: [], sheet: null });
     pages = {};
   }
@@ -1065,7 +1120,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function writeDoc(list = schede) {
     const { fs, db } = x;
     schede = list;
-    const data = JSON.parse(JSON.stringify({ name: me.name, list, extra, rec: recMap })); // via i campi undefined
+    if (!hasDoc) aggDone = AGGIORNAMENTI.map((a) => a.id); // le schede di esempio li contengono già
+    hasDoc = true;
+    const data = JSON.parse(JSON.stringify({ name: me.name, list, extra, rec: recMap, agg: aggDone })); // via i campi undefined
     fs.setDoc(fs.doc(db, pfx + 'schede', fbUid(me.name)), { ...data, at: fs.serverTimestamp() })
       .catch((err) => toast(`Schede non salvate: ${err.message}`));
   }
