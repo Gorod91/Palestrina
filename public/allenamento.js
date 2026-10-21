@@ -297,13 +297,81 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   document.addEventListener('pointercancel', () => { pressed = false; flush(); });
   root.addEventListener('focusout', () => setTimeout(flush, 0));
 
+  // Indietro trascinando dal bordo sinistro, come in Safari (dalla Home iOS non lo fa da solo):
+  // la pagina segue il dito e sotto compare quella prima; oltre metà schermo o con uno scatto si torna lì.
+  const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : 'list');
+  let edge = null;
+  root.addEventListener('pointerdown', (ev) => {
+    if (!ev.target.classList.contains('wo-edge')) return;
+    ev.target.setPointerCapture(ev.pointerId);
+    edge = { x: ev.clientX, t: ev.timeStamp, dx: 0, v: 0, under: null, els: [] };
+  });
+  root.addEventListener('pointermove', (ev) => {
+    if (!edge) return;
+    const dx = Math.max(0, ev.clientX - edge.x);
+    if (!edge.under && dx > 6) {
+      edge.els = [...root.children].filter((el) => !el.classList.contains('wo-edge'));
+      const v = ui.view;
+      ui.view = backView();
+      const html = ui.view === 'pick' ? pickView() : listView();
+      ui.view = v;
+      edge.under = document.createElement('div');
+      edge.under.className = 'wo-under';
+      edge.under.innerHTML = html;
+      const cover = document.createElement('div'); // fondo della pagina che scorre via, con l'ombra sul bordo
+      cover.className = 'wo-cover';
+      root.prepend(edge.under, cover);
+      edge.els.push(cover);
+      root.classList.add('wo-swiping');
+    }
+    if (!edge.under) return;
+    edge.v = (dx - edge.dx) / Math.max(1, ev.timeStamp - edge.t);
+    edge.dx = dx;
+    edge.t = ev.timeStamp;
+    swipeTo(dx, false);
+  });
+  const swipeTo = (dx, anim) => {
+    const w = root.clientWidth, f = Math.min(1, dx / w);
+    edge.els.forEach((el) => {
+      el.style.transition = anim ? 'transform .22s ease-out' : '';
+      el.style.transform = `translateX(${dx}px)`;
+    });
+    edge.under.style.transition = anim ? 'transform .22s ease-out, opacity .22s ease-out' : '';
+    edge.under.style.transform = `translateX(${(f - 1) * 30}%)`;
+    edge.under.style.opacity = String(0.4 + 0.6 * f);
+  };
+  const edgeEnd = () => {
+    const e = edge;
+    edge = null;
+    if (!e || !e.under) return;
+    const w = root.clientWidth, go = e.dx > w / 2 || e.v > 0.5;
+    edge = e;
+    swipeTo(go ? w : 0, true);
+    edge = null;
+    setTimeout(() => {
+      root.classList.remove('wo-swiping');
+      if (go) {
+        ui.view = backView();
+        draw();
+        window.scrollTo(0, 0);
+      } else {
+        e.under.remove();
+        root.querySelector('.wo-cover')?.remove();
+        e.els.forEach((el) => { el.style.transform = ''; el.style.transition = ''; });
+      }
+    }, 230);
+  };
+  root.addEventListener('pointerup', edgeEnd);
+  root.addEventListener('pointercancel', edgeEnd);
+
   function draw() {
     if (!me) return;
     if (!ready || !schede) {
       root.innerHTML = '<p class="wo-empty">Carico l\'allenamento…</p>';
       return;
     }
-    root.innerHTML = ui.view === 'ex' ? exView() : ui.view === 'pick' ? pickView() : listView();
+    root.innerHTML = (ui.view === 'ex' ? exView() : ui.view === 'pick' ? pickView() : listView())
+      + (ui.view === 'list' ? '' : '<div class="wo-edge" aria-hidden="true"></div>');
     const pager = root.querySelector('#wo-pager');
     if (pager) {
       pager.scrollLeft = ui.i * pageStep(pager);
