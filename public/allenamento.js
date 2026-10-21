@@ -85,6 +85,12 @@ export const CATALOGO = [
   { id: 'vogatore', n: 'Vogatore', g: 'Cardio', m: 'Concept', t: 'm' },
 ];
 const EX = Object.fromEntries(CATALOGO.map((e) => [e.id, e]));
+/** Macchina aggiunta da qualcuno ("Nuova macchina"): entra nel catalogo come le altre. */
+function addEx(e) {
+  if (EX[e.id]) return;
+  EX[e.id] = e;
+  CATALOGO.push(e);
+}
 
 // Scheda per chi non ne ha ancora (la creazione delle proprie arriva con la fase 2): la scheda A di Francesco.
 // piano: serie × ripetizioni indicate dall'istruttore e note; servono anche per riempire le serie la prima volta.
@@ -271,13 +277,17 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let serie = []; // le mie serie (tutte)
   let schede = null; // le mie schede (null finché non arrivano)
   // cosa si vede: lista, esercizio, catalogo (allenamento libero)
-  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '' };
+  // ed: scheda in modifica; pickFor: il catalogo sceglie esercizi per la scheda ('edit'), un circuito nuovo ('circnew') o uno esistente ('circ:id')
+  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null };
   let restEnd = 0;
   let restTotal = REST; // secondi del recupero in corso
   let serieSig = '';
   let altrove = []; // le mie serie salvate dall'altra parte (prova o dati veri)
   let pressed = false; // dito sullo schermo: il ridisegno aspetta che si alzi
   let later = false;
+  let extra = []; // macchine aggiunte da me (nel documento delle schede)
+  let recMap = {}; // recupero scelto da me per esercizio, in secondi
+  let otherSchede = []; // documenti delle schede degli altri, per "Copia una scheda"
 
   async function start(user, test) {
     const k = `${user.name}|${test}`;
@@ -307,7 +317,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         softDraw();
       }, (err) => toast(`Allenamento: ${err.message}`)),
       fs.onSnapshot(fs.doc(db, pfx + 'schede', fbUid(me.name)), (snap) => {
-        schede = snap.exists() ? snap.data().list || [] : SCHEDE_ESEMPIO;
+        const d = snap.exists() ? snap.data() : null;
+        schede = d ? d.list || [] : SCHEDE_ESEMPIO;
+        extra = (d && d.extra) || [];
+        extra.forEach(addEx);
+        recMap = (d && d.rec) || {};
         softDraw();
       }, (err) => toast(`Allenamento: ${err.message}`)),
     );
@@ -341,7 +355,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     serieSig = '';
     altrove = [];
     schede = null;
-    Object.assign(ui, { view: 'list' });
+    extra = [];
+    recMap = {};
+    otherSchede = [];
+    Object.assign(ui, { view: 'list', ed: null, pickFor: '', sel: [], sheet: null });
     pages = {};
   }
 
@@ -403,7 +420,16 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   // Indietro trascinando dal bordo sinistro, come in Safari (dalla Home iOS non lo fa da solo):
   // la pagina segue il dito e sotto compare quella prima; oltre metà schermo o con uno scatto si torna lì.
-  const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : 'list');
+  const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor ? 'edit' : ui.view === 'newex' ? 'pick' : 'list');
+  function goBack() {
+    const v = backView();
+    if (v !== 'pick') Object.assign(ui, { pickFor: v === 'edit' ? '' : ui.pickFor, sel: v === 'edit' ? [] : ui.sel });
+    if (v === 'list') Object.assign(ui, { ed: null, pickFor: '', sheet: null });
+    ui.view = v;
+  }
+  function viewHtml(v) {
+    return v === 'ex' ? exView() : v === 'pick' ? pickView() : v === 'edit' ? editView() : v === 'newex' ? newExView() : v === 'copy' ? copyView() : listView();
+  }
   let edge = null;
   root.addEventListener('pointerdown', (ev) => {
     if (!ev.target.classList.contains('wo-edge')) return;
@@ -417,7 +443,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       edge.els = [...root.children].filter((el) => !el.classList.contains('wo-edge'));
       const v = ui.view;
       ui.view = backView();
-      const html = ui.view === 'pick' ? pickView() : listView();
+      const html = viewHtml(ui.view);
       ui.view = v;
       edge.under = document.createElement('div');
       edge.under.className = 'wo-under';
@@ -455,7 +481,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     setTimeout(() => {
       root.classList.remove('wo-swiping');
       if (go) {
-        ui.view = backView();
+        goBack();
         draw();
         window.scrollTo(0, 0);
       } else {
@@ -474,8 +500,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       root.innerHTML = '<p class="wo-empty">Carico l\'allenamento…</p>';
       return;
     }
-    root.innerHTML = (ui.view === 'ex' ? exView() : ui.view === 'pick' ? pickView() : listView())
-      + (ui.view === 'list' ? '' : '<div class="wo-edge" aria-hidden="true"></div>');
+    root.innerHTML = viewHtml(ui.view) + (ui.view === 'list' ? '' : '<div class="wo-edge" aria-hidden="true"></div>');
     const pager = root.querySelector('#wo-pager');
     if (pager) {
       pager.scrollLeft = ui.i * pageStep(pager);
@@ -488,6 +513,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }
     glide = null;
     setupAll();
+    setupDrag();
     tickRest();
   }
 
@@ -518,7 +544,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const timer = `<button class="wo-row" data-a="timer"><span class="wo-dot"></span><span><b>Timer Addominali</b><small>${timerSeconds()} s</small></span><span class="wo-chev">›</span></button>`;
     const other = (schede || []).map((s) => {
       const d = lastDone(s);
-      return `<button class="wo-row" data-a="sch:${esc(s.id)}"><span><b>${esc(s.name)}</b><small>${s.ex.length} esercizi${d ? ` · ${ago(d)}` : ''}</small></span><span class="wo-chev">›</span></button>`;
+      return `<div class="wo-srow"><button class="wo-row" data-a="sch:${esc(s.id)}"><span><b>${esc(s.name)}</b><small>${s.ex.length} esercizi${d ? ` · ${ago(d)}` : ''}</small></span></button>`
+        + `<button class="wo-pen" data-a="ed:${esc(s.id)}" aria-label="Modifica ${esc(s.name)}"><svg aria-hidden="true"><use href="#i-pencil"/></svg></button></div>`;
     }).join('');
     let hero = '';
     if (p) {
@@ -530,10 +557,14 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const dc = daCopiare();
     const recupera = dc.length ? `<section class="card wo-copy"><b>${dc.length} ${dc.length === 1 ? 'esercizio salvato' : 'esercizi salvati'} ${pfx ? 'fuori dalla prova' : 'in modalità prova'}</b>
       <span class="wo-sub">${esc(dc.map((a) => (EX[a.ex] || { n: a.ex }).n).join(', '))}</span><button class="primary" data-a="copia">Copia qui</button></section>` : '';
-    return `${recupera}${hero}
+    const lib = liberiOggi();
+    const salvaLib = lib.length ? `<section class="card wo-copy"><b>Oggi hai fatto ${lib.length} ${lib.length === 1 ? 'esercizio libero' : 'esercizi liberi'}</b>
+      <span class="wo-sub">${esc(lib.map((a) => nameOf(a.ex)).join(', '))}</span><button class="secondary" data-a="fromlib">Salva come scheda</button></section>` : '';
+    return `${recupera}${salvaLib}${hero}
       <h2 class="section">Le tue schede</h2>
-      <section class="card wo-list">${other}</section>
-      <div class="wo-btns"><button class="secondary" data-a="libero">Allenamento libero</button><button class="secondary" data-a="nuova">+ Nuova scheda</button></div>
+      ${other ? `<section class="card wo-list">${other}</section>` : ''}
+      <div class="wo-btns"><button class="secondary" data-a="nuova">+ Nuova scheda</button><button class="secondary" data-a="copy">Copia una scheda</button></div>
+      <button class="secondary wo-wide" data-a="libero">Allenamento libero</button>
       <section class="card wo-list">${timer}</section>`;
   }
 
@@ -901,13 +932,16 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   const dial = (p, inner = '') => `<span class="wo-dial" style="--p:${p}">${inner}</span>`;
   const mmss = (s) => (s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}` : String(s));
 
-  /** Recupero dell'esercizio: quello del piano della scheda (rec), altrimenti 1:30. */
+  /** Recupero dell'esercizio: quello scelto da me con − +, altrimenti quello del piano della scheda (rec), altrimenti 1:30. */
   const restOf = (ex) => {
     const sch = curSch(), pi = sch && sch.piano ? sch.piano[ex] : null;
-    return (pi && pi.rec) || REST;
+    return recMap[ex] || (pi && pi.rec) || REST;
   };
   function restHtml(ex) {
-    if (!restEnd) return `${dial(1)}<b>Recupero</b><button class="wo-chip" data-a="rest">${mmss(restOf(ex))} ▸</button>`;
+    if (!restEnd) {
+      return `${dial(1)}<b>Recupero</b><span class="wo-recpm"><button class="wo-recb" data-a="rec-:${ex}" aria-label="15 secondi in meno">−</button>`
+        + `<button class="wo-chip" data-a="rest">${mmss(restOf(ex))} ▸</button><button class="wo-recb" data-a="rec+:${ex}" aria-label="15 secondi in più">+</button></span>`;
+    }
     return `${dial(0)}<span><small>Recupero</small><b class="wo-rest-left">${mmss(restTotal)}</b></span><button class="wo-chip" data-a="stop">Stop</button>`;
   }
 
@@ -1012,6 +1046,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const groups = [...new Set(CATALOGO.map((e) => e.g))];
     const q = ui.q.trim().toLowerCase();
     const list = CATALOGO.filter((e) => (!ui.g || e.g === ui.g) && (!q || e.n.toLowerCase().includes(q)));
+    if (ui.pickFor) return pickMultiView(groups, list);
     return `<button class="wo-back" data-a="back">‹ Allenamento libero</button>
       <input id="wo-q" class="plain wo-search" placeholder="Cerca un esercizio" value="${esc(ui.q)}" autocomplete="off">
       <div class="wo-groups"><button class="${ui.g ? '' : 'on'}" data-a="g:">Tutti</button>${groups.map((g) => `<button class="${ui.g === g ? 'on' : ''}" data-a="g:${esc(g)}">${esc(g)}</button>`).join('')}</div>
@@ -1020,6 +1055,335 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         return `<button class="wo-row" data-a="pick:${e.id}"><span><b>${esc(e.n)}</b><small>${esc(e.g)} · ${esc(e.m)}${l ? ` · ${summary(l.sets, unit(e))}` : ''}</small></span><span class="wo-chev">›</span></button>`;
       }).join('') || '<p class="wo-empty">Nessun esercizio</p>'}</section>
       <p class="footnote">Catalogo di esempio: quello vero delle nostre macchine arriverà più avanti.</p>`;
+  }
+
+  // ---------- Schede: crea, modifica, copia (fase 2) ----------
+  // Tutto nel mio documento schede/<uid>: { list, extra (macchine nuove), rec (recuperi) }. La prima volta che si salva
+  // ci finiscono anche le schede di esempio scritte qui sopra; da lì in poi contano solo quelle del documento.
+
+  /** Salva schede, macchine nuove e recuperi nel mio documento. */
+  function writeDoc(list = schede) {
+    const { fs, db } = x;
+    schede = list;
+    const data = JSON.parse(JSON.stringify({ name: me.name, list, extra, rec: recMap })); // via i campi undefined
+    fs.setDoc(fs.doc(db, pfx + 'schede', fbUid(me.name)), { ...data, at: fs.serverTimestamp() })
+      .catch((err) => toast(`Schede non salvate: ${err.message}`));
+  }
+
+  const newId = (p) => p + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  /** "3 × 8-10" → { n: 3, r: '8-10' }; senza "×" una serie sola (come "10 per gamba"). */
+  const splitPlan = (s) => {
+    const m = String(s || '').match(/^(\d+)\s*×\s*(.+)$/);
+    return m ? { n: Number(m[1]), r: m[2].trim() } : { n: s ? 1 : 3, r: s || '' };
+  };
+  const joinPlan = (n, r) => (!r ? '' : n > 1 ? `${n} × ${r}` : r);
+  const liberiOggi = () => serie.filter((a) => a.day === today() && !a.scheda)
+    .sort((a, b) => ((a.at && a.at.toMillis ? a.at.toMillis() : 0) - (b.at && b.at.toMillis ? b.at.toMillis() : 0)));
+
+  function openEditor(sc, isNew) {
+    ui.ed = { id: sc.id || newId('s'), name: sc.name || '', ex: (sc.ex || []).slice(), piano: clone(sc.piano || {}), circuiti: clone(sc.circuiti || {}), di: sc.di || '', isNew };
+    Object.assign(ui, { sheet: null, pickFor: '', sel: [], view: 'edit' });
+  }
+
+  const edCirc = (id) => (id[0] === '@' ? ui.ed.circuiti[id.slice(1)] : null);
+  function planPill(id) {
+    const c = edCirc(id);
+    if (c) return c.lista ? c.durata || 'lista' : `${c.giri} giri`;
+    const pi = ui.ed.piano[id];
+    return pi && pi.s ? pi.s : 'Imposta';
+  }
+
+  function editView() {
+    const ed = ui.ed;
+    const rows = ed.ex.map((id, k) => {
+      const c = edCirc(id), pill = planPill(id);
+      const sub = c ? `${c.lista ? 'da spuntare' : 'circuito'} · ${c.ex.length} esercizi` : esc((EX[id] || {}).m || '');
+      return `<div class="wo-ed-row${c ? ' circ' : ''}" data-k="${k}"><span class="wo-grip" data-grip="${k}" aria-label="Trascina per spostare">≡</span>
+        <span class="wo-ed-n"><b>${esc(c ? c.n : (EX[id] || { n: id }).n)}</b><small>${sub}</small></span>
+        <button class="wo-ed-plan${pill === 'Imposta' ? ' empty' : ''}" data-a="edplan:${k}">${esc(pill)}</button>
+        <button class="wo-ed-x" data-a="edrm:${k}" aria-label="Togli">×</button></div>`;
+    }).join('');
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Annulla</button></div>
+      <h2 class="wo-ed-title">${ed.isNew ? 'Nuova scheda' : 'Modifica la scheda'}</h2>
+      <label class="wo-lbl" for="wo-ed-name">Nome</label>
+      <input id="wo-ed-name" class="plain wo-ed-name" value="${esc(ed.name)}" placeholder="Per esempio Scheda B" maxlength="40" autocomplete="off">
+      <div class="wo-lbl">Esercizi${ed.ex.length > 1 ? ' · trascina ≡ per spostarli' : ''}</div>
+      ${rows ? `<section class="wo-ed-list">${rows}</section>` : '<p class="wo-empty">Ancora nessun esercizio</p>'}
+      <div class="wo-btns"><button class="secondary" data-a="edadd">+ Esercizi</button><button class="secondary" data-a="edcirc">+ Circuito</button></div>
+      <button class="primary" data-a="edsave">Salva</button>
+      ${ed.isNew ? '' : '<button class="link-button wo-danger" data-a="eddel">Elimina scheda</button>'}
+      ${ui.sheet ? sheetHtml() : ''}`;
+  }
+
+  // scelte rapide per serie × ripetizioni, secondo come si segna l'esercizio
+  const REPS = { kg: ['6-8', '8-10', '10-12', '12'], rip: ['6-8', '8-10', '10-12', '15'], sec: ['20"', '30"', '45"', '60"'], m: ["5'", "10'", '1000', '2000'] };
+
+  /** Foglio dal basso: serie e ripetizioni di un esercizio, oppure giri, recupero ed esercizi di un circuito. */
+  function sheetHtml() {
+    const sh = ui.sheet, ed = ui.ed;
+    let body;
+    if (sh.kind === 'plan') {
+      const e = EX[sh.ex] || { n: sh.ex }, t = unit(e), pi = ed.piano[sh.ex] || {}, { n, r } = splitPlan(pi.s);
+      body = `<b class="wo-sh-t">${esc(e.n)}</b>
+        <div class="wo-sh-step"><span class="wo-lbl">Serie</span><span class="wo-pm"><button data-a="pln-" aria-label="Una serie in meno">−</button><b>${n}</b><button data-a="pln+" aria-label="Una serie in più">+</button></span></div>
+        <div class="wo-lbl">${t === 'sec' ? 'Durata' : t === 'm' ? 'Metri o minuti' : 'Ripetizioni'}</div>
+        <div class="wo-sh-seg">${REPS[t].map((v) => `<button class="${v === r ? 'on' : ''}" data-a="plr:${esc(v)}">${esc(v)}</button>`).join('')}</div>
+        <input id="wo-pl-r" class="plain wo-sh-in" value="${REPS[t].includes(r) ? '' : esc(r)}" placeholder="Altro, per esempio 8 per lato" maxlength="30" autocomplete="off">
+        <div class="wo-lbl">Nota (facoltativa)</div>
+        <input id="wo-pl-nota" class="plain wo-sh-in" value="${esc(pi.nota || '')}" placeholder="Per esempio sedile al 4" maxlength="80" autocomplete="off">`;
+    } else {
+      const c = ed.circuiti[sh.cid];
+      body = `<input id="wo-cs-name" class="plain wo-sh-in wo-sh-name" value="${esc(c.n)}" maxlength="40" aria-label="Nome del circuito" autocomplete="off">
+        ${c.lista ? `<div class="wo-lbl">Durata</div><input id="wo-cs-dur" class="plain wo-sh-in" value="${esc(c.durata || '')}" placeholder="Per esempio 5'" maxlength="10" autocomplete="off">`
+          : `<div class="wo-sh-step"><span class="wo-lbl">Giri</span><span class="wo-pm"><button data-a="csg-" aria-label="Un giro in meno">−</button><b>${c.giri}</b><button data-a="csg+" aria-label="Un giro in più">+</button></span></div>
+             <div class="wo-sh-step"><span class="wo-lbl">Recupero tra i giri</span><span class="wo-pm"><button data-a="csr-" aria-label="15 secondi in meno">−</button><b>${mmss(c.rec)}${c.rec < 60 ? '"' : ''}</b><button data-a="csr+" aria-label="15 secondi in più">+</button></span></div>`}
+        <div class="wo-lbl">Esercizi · ${c.lista ? 'ripetizioni' : 'ripetizioni o secondi per giro'}</div>
+        <div class="wo-sh-exs">${c.ex.map((e) => `<div class="wo-sh-ex"><span>${esc((EX[e] || { n: e }).n)}</span><input data-csv="${e}" class="plain" value="${esc((ed.piano[e] || {}).s || '')}" placeholder="${unit(EX[e]) === 'sec' ? '30&quot;' : '10'}" maxlength="20" aria-label="${esc((EX[e] || { n: e }).n)}" autocomplete="off"><button class="wo-ed-x" data-a="csrm:${e}" aria-label="Togli">×</button></div>`).join('')}</div>
+        <button class="link-button" data-a="csadd">+ Aggiungi esercizi al circuito</button>`;
+    }
+    return `<div class="wo-edsheet"><div class="wo-edsheet-dim" data-a="shclose"></div><div class="wo-edsheet-box"><div class="wo-grab"></div>${body}<button class="primary" data-a="shclose">Fatto</button></div></div>`;
+  }
+
+  function openPick(forWhat) {
+    Object.assign(ui, { pickFor: forWhat, sel: [], q: '', g: '', view: 'pick' });
+  }
+
+  /** Catalogo con la spunta multipla: si scelgono più esercizi e si aggiungono insieme. */
+  function pickMultiView(groups, list) {
+    const ed = ui.ed;
+    const had = ui.pickFor === 'edit' ? ed.ex : ui.pickFor.startsWith('circ:') ? ed.circuiti[ui.pickFor.slice(5)].ex : [];
+    const n = ui.sel.length;
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${esc(ed.name || (ed.isNew ? 'Nuova scheda' : 'Scheda'))}</button></div>
+      <input id="wo-q" class="plain wo-search" placeholder="Cerca un esercizio" value="${esc(ui.q)}" autocomplete="off">
+      <div class="wo-groups"><button class="${ui.g ? '' : 'on'}" data-a="g:">Tutti</button>${groups.map((g) => `<button class="${ui.g === g ? 'on' : ''}" data-a="g:${esc(g)}">${esc(g)}</button>`).join('')}</div>
+      <section class="card wo-list">
+        <button class="wo-row wo-prow" data-a="newex"><span class="wo-chk add">+</span><span><b>Nuova macchina</b><small>se non è nell'elenco</small></span></button>
+        ${list.map((e) => {
+          const h = had.includes(e.id), on = ui.sel.includes(e.id);
+          return `<button class="wo-row wo-prow" data-a="${h ? '' : `psel:${e.id}`}"${h ? ' aria-disabled="true"' : ''}><span class="wo-chk${on ? ' on' : ''}${h ? ' had' : ''}">${on || h ? '✓' : ''}</span><span><b>${esc(e.n)}</b><small>${h ? 'già nella scheda' : `${esc(e.g)} · ${esc(e.m)}`}</small></span></button>`;
+        }).join('')}
+      </section>
+      <div class="wo-pickbar"><button class="primary" data-a="padd"${n ? '' : ' disabled'}>${n ? `Aggiungi ${n} ${n === 1 ? 'esercizio' : 'esercizi'}` : 'Scegli gli esercizi'}</button></div>`;
+  }
+
+  function pickDone() {
+    const ed = ui.ed, sel = ui.sel;
+    if (ui.pickFor === 'edit') sel.forEach((e) => { if (!ed.ex.includes(e)) ed.ex.push(e); });
+    else if (ui.pickFor === 'circnew' && sel.length) {
+      const cid = newId('c');
+      ed.circuiti[cid] = { n: 'Circuito', ex: sel.slice(), giri: 3, rec: 60 };
+      ed.ex.push('@' + cid);
+      ui.sheet = { kind: 'circ', cid }; // subito giri e recupero
+    } else if (ui.pickFor.startsWith('circ:')) {
+      const c = ed.circuiti[ui.pickFor.slice(5)];
+      sel.forEach((e) => { if (!c.ex.includes(e)) c.ex.push(e); });
+    }
+    Object.assign(ui, { pickFor: '', sel: [], view: 'edit' });
+  }
+
+  const GRUPPI = ['Petto', 'Schiena', 'Gambe', 'Glutei', 'Polpacci', 'Spalle', 'Bicipiti', 'Tricipiti', 'Addominali', 'Mobilità', 'Cardio'];
+  const TIPI = [['kg', 'Kg e rip'], ['rip', 'Solo rip'], ['sec', 'A tempo'], ['m', 'Metri']];
+
+  function newExView() {
+    const nx = ui.nx;
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Aggiungi esercizi</button></div>
+      <h2 class="wo-ed-title">Nuova macchina</h2>
+      <label class="wo-lbl" for="wo-nx-n">Nome</label>
+      <input id="wo-nx-n" class="plain wo-ed-name" value="${esc(nx.n)}" placeholder="Per esempio Hammer incline press" maxlength="50" autocomplete="off">
+      <div class="wo-lbl">Gruppo</div>
+      <div class="wo-groups wrap">${GRUPPI.map((g) => `<button class="${nx.g === g ? 'on' : ''}" data-a="nxg:${g}">${g}</button>`).join('')}</div>
+      <div class="wo-lbl">Come si segna</div>
+      <div class="wo-sh-seg">${TIPI.map(([t, l]) => `<button class="${nx.t === t ? 'on' : ''}" data-a="nxt:${t}">${l}</button>`).join('')}</div>
+      <label class="wo-lbl" for="wo-nx-m">Dove si trova o attrezzo (facoltativo)</label>
+      <input id="wo-nx-m" class="plain wo-sh-in" value="${esc(nx.m)}" placeholder="Per esempio Macchina 12, Manubri" maxlength="40" autocomplete="off">
+      <button class="primary" data-a="nxsave">Aggiungi</button>`;
+  }
+
+  function saveNewEx() {
+    const nx = ui.nx, n = nx.n.trim();
+    if (!n) return toast('Scrivi il nome della macchina');
+    if (!nx.g) return toast('Scegli il gruppo');
+    const slug = n.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28);
+    const e = { id: `x-${slug || 'es'}-${Math.random().toString(36).slice(2, 6)}`, n, g: nx.g, m: nx.m.trim() };
+    if (nx.t !== 'kg') e.t = nx.t;
+    extra.push(e);
+    addEx(e);
+    writeDoc();
+    ui.sel.push(e.id);
+    Object.assign(ui, { view: 'pick', q: '', g: e.g, nx: null });
+  }
+
+  function saveEditor() {
+    const ed = ui.ed, name = ed.name.trim();
+    if (!name) return toast('Scrivi il nome della scheda');
+    const ex = ed.ex.filter((id) => id[0] !== '@' || (ed.circuiti[id.slice(1)] || { ex: [] }).ex.length); // via i circuiti vuoti
+    if (!ex.length) return toast('Aggiungi almeno un esercizio');
+    const circuiti = {};
+    ex.forEach((id) => { if (id[0] === '@') circuiti[id.slice(1)] = ed.circuiti[id.slice(1)]; });
+    const piano = {};
+    ex.flatMap((id) => (id[0] === '@' ? circuiti[id.slice(1)].ex : [id])).forEach((e) => {
+      const pi = { ...ed.piano[e] };
+      if (!pi.nota) delete pi.nota;
+      if (!pi.s) delete pi.s;
+      if (Object.keys(pi).length) piano[e] = pi;
+    });
+    const sc = { id: ed.id, name, ex, piano, circuiti };
+    if (ed.di) sc.di = ed.di;
+    const list = clone(schede || []), k = list.findIndex((y) => y.id === ed.id);
+    if (k >= 0) list[k] = sc;
+    else if (list.length >= 30) return toast('Si possono avere al massimo 30 schede');
+    else list.push(sc);
+    writeDoc(list);
+    Object.assign(ui, { ed: null, sheet: null, view: 'list' });
+    toast('Scheda salvata');
+  }
+
+  function deleteEditor() {
+    const ed = ui.ed;
+    if (!confirm(`Eliminare la scheda "${ed.name || 'senza nome'}"? Le serie già fatte restano.`)) return;
+    writeDoc(clone(schede).filter((y) => y.id !== ed.id));
+    Object.assign(ui, { ed: null, sheet: null, view: 'list' });
+    toast('Scheda eliminata');
+  }
+
+  /** Comandi della modifica; false se il comando non è suo. */
+  function editCmd(cmd, arg) {
+    const ed = ui.ed, sh = ui.sheet;
+    const pi = () => (ed.piano[sh.ex] ||= {});
+    const circ = () => ed.circuiti[sh.cid];
+    if (cmd === 'edrm') ed.ex.splice(Number(arg), 1);
+    else if (cmd === 'edplan') {
+      const id = ed.ex[Number(arg)];
+      ui.sheet = id[0] === '@' ? { kind: 'circ', cid: id.slice(1) } : { kind: 'plan', ex: id };
+    } else if (cmd === 'shclose') ui.sheet = null;
+    else if (cmd === 'pln-' || cmd === 'pln+') {
+      const p = splitPlan(pi().s);
+      pi().s = joinPlan(Math.max(1, Math.min(10, p.n + (cmd === 'pln+' ? 1 : -1))), p.r || (unit(EX[sh.ex]) === 'sec' ? '30"' : '10'));
+    } else if (cmd === 'plr') pi().s = joinPlan(splitPlan(pi().s).n, arg);
+    else if (cmd === 'csg-' || cmd === 'csg+') circ().giri = Math.max(1, Math.min(8, circ().giri + (cmd === 'csg+' ? 1 : -1)));
+    else if (cmd === 'csr-' || cmd === 'csr+') circ().rec = Math.max(15, Math.min(300, circ().rec + (cmd === 'csr+' ? 15 : -15)));
+    else if (cmd === 'csrm') circ().ex = circ().ex.filter((e) => e !== arg);
+    else if (cmd === 'csadd') openPick('circ:' + sh.cid);
+    else if (cmd === 'edadd') openPick('edit');
+    else if (cmd === 'edcirc') openPick('circnew');
+    else if (cmd === 'psel') ui.sel = ui.sel.includes(arg) ? ui.sel.filter((e) => e !== arg) : [...ui.sel, arg];
+    else if (cmd === 'padd') pickDone();
+    else if (cmd === 'newex') Object.assign(ui, { nx: { n: ui.q.trim(), g: ui.g || '', t: 'kg', m: '' }, view: 'newex' });
+    else if (cmd === 'nxg') ui.nx.g = arg;
+    else if (cmd === 'nxt') ui.nx.t = arg;
+    else if (cmd === 'nxsave') saveNewEx();
+    else if (cmd === 'edsave') saveEditor();
+    else if (cmd === 'eddel') deleteEditor();
+    else return false;
+    return true;
+  }
+
+  /** Testi scritti nella modifica: si salvano a ogni lettera, senza ridisegnare (resta la tastiera). */
+  function editInput(el) {
+    const ed = ui.ed, sh = ui.sheet, v = el.value;
+    if (!ed) return false;
+    if (el.id === 'wo-ed-name') ed.name = v;
+    else if (el.id === 'wo-pl-nota') (ed.piano[sh.ex] ||= {}).nota = v;
+    else if (el.id === 'wo-pl-r') {
+      const pi = (ed.piano[sh.ex] ||= {});
+      pi.s = joinPlan(splitPlan(pi.s).n, v.trim());
+    } else if (el.id === 'wo-cs-name') ed.circuiti[sh.cid].n = v;
+    else if (el.id === 'wo-cs-dur') ed.circuiti[sh.cid].durata = v.trim();
+    else if (el.dataset.csv) (ed.piano[el.dataset.csv] ||= {}).s = v.trim();
+    else if (el.id === 'wo-nx-n' && ui.nx) ui.nx.n = v;
+    else if (el.id === 'wo-nx-m' && ui.nx) ui.nx.m = v;
+    else return false;
+    return true;
+  }
+
+  /** Esercizi della modifica: si spostano trascinando ≡ su o giù; le altre righe si fanno da parte. */
+  function setupDrag() {
+    const list = root.querySelector('.wo-ed-list');
+    if (!list) return;
+    list.addEventListener('pointerdown', (ev) => {
+      const grip = ev.target.closest('[data-grip]');
+      if (!grip) return;
+      ev.preventDefault();
+      const rows = [...list.querySelectorAll('.wo-ed-row')], k = Number(grip.dataset.grip), row = rows[k];
+      const rects = rows.map((r) => r.getBoundingClientRect());
+      const step = rows.length > 1 ? rects[1].top - rects[0].top : rects[k].height;
+      const mids = rects.map((r) => r.top + r.height / 2), y0 = ev.clientY;
+      let to = k;
+      grip.setPointerCapture(ev.pointerId);
+      row.classList.add('drag');
+      const move = (e) => {
+        const dy = e.clientY - y0, mid = mids[k] + dy;
+        row.style.transform = `translateY(${dy}px)`;
+        let t = k;
+        mids.forEach((m, j) => {
+          if (j < k && mid < m) t = Math.min(t, j);
+          if (j > k && mid > m) t = Math.max(t, j);
+        });
+        if (t !== to && navigator.vibrate) navigator.vibrate(6);
+        to = t;
+        rows.forEach((r, j) => {
+          if (j === k) return;
+          const sh = k < to && j > k && j <= to ? -step : k > to && j < k && j >= to ? step : 0;
+          r.style.transform = sh ? `translateY(${sh}px)` : '';
+        });
+      };
+      const up = () => {
+        grip.removeEventListener('pointermove', move);
+        grip.removeEventListener('pointerup', up);
+        grip.removeEventListener('pointercancel', up);
+        ui.ed.ex.splice(to, 0, ui.ed.ex.splice(k, 1)[0]);
+        draw();
+      };
+      grip.addEventListener('pointermove', move);
+      grip.addEventListener('pointerup', up);
+      grip.addEventListener('pointercancel', up);
+    });
+  }
+
+  function loadOthers() {
+    const { fs, db } = x;
+    fs.getDocs(fs.collection(db, pfx + 'schede')).then((snap) => {
+      otherSchede = snap.docs.map((d) => d.data()).filter((d) => d.name !== me.name);
+      if (ui.view === 'copy') softDraw();
+    }).catch(() => {});
+  }
+
+  /** "Copia una scheda": le schede per persona (quelle inserite per gli altri e quelle di chi ha già le sue), poi le mie. */
+  function copyView() {
+    const by = {};
+    (schede || []).filter((y) => y.di).forEach((y) => (by[y.di] ||= []).push({ sc: y, key: `m:${y.id}` }));
+    otherSchede.forEach((d, i) => (d.list || []).forEach((y, j) => (by[d.name] ||= []).push({ sc: y, key: `o:${i}:${j}` })));
+    const row = ({ sc, key }) => `<div class="wo-row wo-cprow"><span><b>${esc(sc.name)}</b><small>${esc(sc.ex.slice(0, 4).map((id) => nameOf(id, sc)).join(', '))}${sc.ex.length > 4 ? '…' : ''}</small></span><button class="wo-cpbtn" data-a="cp:${key}">Copia</button></div>`;
+    const sec = (title, items) => (items.length ? `<div class="wo-who"><span class="wo-av">${esc(title[0])}</span><b>${esc(title)}</b></div><section class="card wo-list">${items.map(row).join('')}</section>` : '');
+    const mine = (schede || []).filter((y) => !y.di).map((y) => ({ sc: y, key: `m:${y.id}` }));
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Allenamento</button></div>
+      <h2 class="wo-ed-title">Copia una scheda</h2>
+      <p class="wo-sub">Diventa tua: la cambi senza toccare l'originale.</p>
+      ${Object.keys(by).map((n) => sec(n, by[n])).join('')}${sec('Le tue', mine)}`;
+  }
+
+  function copyScheda(key) {
+    let src = null, ext = [];
+    if (key.startsWith('m:')) src = (schede || []).find((y) => y.id === key.slice(2));
+    else {
+      const [, i, j] = key.split(':'), d = otherSchede[Number(i)];
+      src = d && d.list ? d.list[Number(j)] : null;
+      ext = (d && d.extra) || [];
+    }
+    if (!src) return;
+    const txt = JSON.stringify(src);
+    ext.forEach((e) => { // le macchine nuove dell'altro che servono alla scheda
+      if (!EX[e.id] && txt.includes(`"${e.id}"`)) {
+        extra.push(e);
+        addEx(e);
+      }
+    });
+    const c = clone(src);
+    delete c.id;
+    delete c.di;
+    c.name = key.startsWith('m:') && !src.di ? `${src.name} (copia)` : src.name;
+    openEditor(c, true);
   }
 
   // ---------- Tocchi ----------
@@ -1050,7 +1414,34 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       copia();
       return toast('Serie copiate');
     }
-    if (cmd === 'nuova') return toast('Creare le schede arriva nella prossima fase. Per ora c\'è la tua scheda A.');
+    if (cmd === 'nuova') {
+      openEditor({}, true);
+      return draw();
+    }
+    if (cmd === 'ed') {
+      const sc = schede.find((y) => y.id === arg);
+      if (sc) openEditor(sc, false);
+      return draw();
+    }
+    if (cmd === 'copy') {
+      ui.view = 'copy';
+      loadOthers();
+      return draw();
+    }
+    if (cmd === 'cp') {
+      copyScheda(arg);
+      return draw();
+    }
+    if (cmd === 'fromlib') {
+      const lib = liberiOggi(), piano = {};
+      lib.forEach((a) => {
+        const r = a.sets[0].reps, t = unit(EX[a.ex]);
+        piano[a.ex] = { s: joinPlan(a.sets.length, t === 'sec' ? `${r}"` : String(r)) };
+      });
+      openEditor({ name: '', ex: lib.map((a) => a.ex), piano }, true);
+      return draw();
+    }
+    if (ui.ed && editCmd(cmd, arg)) return draw();
     if (cmd === 'go' || cmd === 'sch') {
       const s = schede.find((y) => y.id === arg);
       if (!s) return;
@@ -1069,7 +1460,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'g') {
       ui.g = arg;
     } else if (cmd === 'back') {
-      ui.view = ui.view === 'ex' && !ui.scheda ? 'pick' : 'list';
+      goBack();
     } else if (cmd === 'end' || cmd === 'home') {
       ui.view = 'list';
     } else if (cmd === 'j') {
@@ -1135,6 +1526,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       tmr = { ex, j, go, end: go + sec * 1000, total: sec };
     } else if (cmd === 'tstop') {
       tmr.end = 0;
+    } else if (cmd === 'rec-' || cmd === 'rec+') { // si ricorda per l'esercizio, in tutte le schede
+      recMap[arg] = Math.max(15, Math.min(600, restOf(arg) + (cmd === 'rec+' ? 15 : -15)));
+      writeDoc();
     } else if (cmd === 'rest') {
       restTotal = restOf(ui.list[ui.i]);
       restEnd = Date.now() + restTotal * 1000;
@@ -1157,7 +1551,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (pg.open < 0 || !pg.sets) return;
     const v = Number(ev.target.value.replace(',', '.'));
     if (f === 'k') setKg(pg.open, v);
-    else if (v >= 1 && v <= 600) pg.sets[pg.open].reps = Math.round(v);
+    else if (v >= 1 && v <= (unit(EX[ui.list[ui.i]]) === 'm' ? 20000 : 600)) pg.sets[pg.open].reps = Math.round(v);
     else return;
     draw();
   });
@@ -1166,6 +1560,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (ev.key === 'Enter' && ev.target.dataset.f) ev.target.blur();
   });
   root.addEventListener('input', (ev) => {
+    if (editInput(ev.target)) return;
     if (ev.target.id !== 'wo-q') return;
     ui.q = ev.target.value;
     const pos = ev.target.selectionStart;

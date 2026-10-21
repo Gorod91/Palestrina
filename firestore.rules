@@ -75,14 +75,16 @@ service cloud.firestore {
         && coll in ['serie', 'prova_serie']
         && resource.data.name == request.auth.token.name;
 
-      // Le proprie schede (id = uid)
+      // Le proprie schede (id = uid), con le macchine aggiunte (extra) e i recuperi scelti per esercizio (rec)
       allow create, update: if pal() && allenamento()
         && coll in ['schede', 'prova_schede']
         && id == request.auth.uid
-        && request.resource.data.keys().hasOnly(['name', 'list', 'at'])
+        && request.resource.data.keys().hasOnly(['name', 'list', 'extra', 'rec', 'at'])
         && request.resource.data.name == request.auth.token.name
         && request.resource.data.list is list
         && request.resource.data.list.size() <= 30
+        && (!('extra' in request.resource.data) || (request.resource.data.extra is list && request.resource.data.extra.size() <= 200))
+        && (!('rec' in request.resource.data) || request.resource.data.rec is map)
         && request.resource.data.at == request.time;
     }
 
