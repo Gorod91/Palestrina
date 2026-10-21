@@ -57,7 +57,7 @@ const SCHEDE_ESEMPIO = [
       'pulley-medio': { s: '3 × 8-10', nota: '1" fermo al petto' },
       'chest-press-sdraiato': { s: '3 × 8-10', nota: '2° piano' },
       curl: { s: '3 × 6-8' },
-      'rot-anca': { s: '8' },
+      'rot-anca': { s: '8 per lato' },
       slanci: { s: '8 per lato' },
       'cane-gatto': { s: '12' },
       'aperture-bastone': { s: '10' },
