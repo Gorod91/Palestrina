@@ -1519,7 +1519,7 @@ function chatDelete(user, id) {
 // Quando almeno due persone fanno check-in a meno di un'ora l'una dall'altra si apre una sfida a caso.
 // Chi ha fatto check-in può dire "Ci sto" o "Passo" entro un'ora dall'apertura.
 // - Plank e Barchetta (a durata): un partecipante dichiara chi ha vinto, un altro conferma.
-// - Addominali, Affondi (a ripetizioni): ognuno scrive le sue, un altro conferma; vince chi supera di più
+// - Addominali, Burpees (a ripetizioni): ognuno scrive le sue, un altro conferma; vince chi supera di più
 //   il proprio record degli ultimi 60 giorni (la prima volta è calibrazione: solo partecipazione).
 // Basta una conferma; un risultato contestato si corregge una volta, alla seconda contestazione vale solo la
 // partecipazione. Si chiude quando tutto è confermato o a mezzanotte (il non confermato vale come partecipazione).
@@ -1528,9 +1528,10 @@ const SFIDE = {
   plank: { label: 'Plank', kind: 'durata', desc: 'Fino allo sfinimento: vince chi resiste di più' },
   barchetta: { label: 'Barchetta', kind: 'durata', desc: 'Seduti, solo il sedere a terra, gambe e braccia sollevate: vince chi resiste di più' },
   addominali: { label: 'Addominali', kind: 'ripetizioni', desc: 'Fino allo sfinimento: vince chi supera di più il proprio record' },
-  // off: non esce più (troppo lunga); resta solo per leggere le sfide già fatte
+  // off: non escono più (troppo lunghe); restano solo per leggere le sfide già fatte
   squat: { label: 'Squat', kind: 'ripetizioni', desc: 'Fino allo sfinimento: vince chi supera di più il proprio record', off: true },
-  affondi: { label: 'Affondi', kind: 'ripetizioni', desc: 'Fino allo sfinimento, gambe alternate (conta ogni gamba): vince chi supera di più il proprio record' },
+  affondi: { label: 'Affondi', kind: 'ripetizioni', desc: 'Fino allo sfinimento, gambe alternate (conta ogni gamba): vince chi supera di più il proprio record', off: true },
+  burpees: { label: 'Burpees', kind: 'ripetizioni', desc: 'Fino allo sfinimento: vince chi supera di più il proprio record' },
 };
 const SFIDA_WINDOW_MIN = 60; // per unirsi, e distanza minima tra due sfide
 const SFIDA_RECORD_DAYS = 60;
