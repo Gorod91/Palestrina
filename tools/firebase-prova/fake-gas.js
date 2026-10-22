@@ -158,7 +158,7 @@ http
           const tableOf = (n) => {
             const test = n.startsWith('Prova · ');
             const key = ctx.__run('(function (n) { return Object.keys(SHEETS).find((k) => SHEETS[k].name === n); })', test ? n.slice(8) : n);
-            return key && (test || process.env.TABELLE === 'firebase') ? { key, test } : null;
+            return key && !['utenti', 'debug'].includes(key) && (test || P.TABELLE === 'firebase') ? { key, test } : null;
           };
           if (name === 'sheet') {
             const t = tableOf(JSON.parse(body).name);

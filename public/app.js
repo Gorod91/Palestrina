@@ -799,7 +799,7 @@ function renderSudometro() {
   if (!me.reference) {
     el.innerHTML = `
       <p>Il Sudometro confronta un selfie da ${sudato()} con una <b>foto di riferimento</b> da ${riposato()}, che si fa <b>una volta sola</b>.</p>
-      <p class="muted">Meglio farla in palestra prima di allenarti, nel punto e con la luce dove farai i selfie da ${sudato()}. Le foto vengono salvate nel Google Drive di Palestrina; i selfie da sudato li vede tutto il gruppo nella classifica della settimana.</p>
+      <p class="muted">Meglio farla in palestra prima di allenarti, nel punto e con la luce dove farai i selfie da ${sudato()}. Le foto vengono salvate nell'archivio di Palestrina; i selfie da sudato li vede tutto il gruppo nella classifica della settimana.</p>
       <button id="btn-ref" class="primary">Foto di riferimento</button>`;
     el.querySelector('#btn-ref').onclick = takeReference;
     return;

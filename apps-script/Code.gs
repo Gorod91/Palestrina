@@ -3506,6 +3506,7 @@ const PASSAGGIO_AT = '2026-10-22 23:30';
 
 function passaggioTick() {
   TEST = false;
+  PROPS_SNAP = null;
   if (realProps.getProperty('FIREBASE_TUTTO') === 'si') return;
   const at = realProps.getProperty('PASSAGGIO_ORA') || PASSAGGIO_AT;
   if (!/^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(at) || new Date() < Utilities.parseDate(at, TZ, 'yyyy-MM-dd HH:mm')) return;
@@ -3530,7 +3531,7 @@ function passaggioTick() {
     }
     realProps.setProperty('TABELLE', 'firebase');
     realProps.setProperty('FIREBASE_TUTTO', 'si');
-    log(`fatto: foto ${foto.copied + more.copied} copiate (${foto.failed + more.failed} non riuscite), tabelle ${tabelle.join(', ')}, chat ${chat}`);
+    log(`fatto: foto ${foto.copied + more.copied} copiate (${more.failed} non trovate su Drive), tabelle ${tabelle.join(', ')}, chat ${chat}`);
   } finally {
     lock.releaseLock();
   }
