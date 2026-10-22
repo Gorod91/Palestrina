@@ -3502,7 +3502,7 @@ function runQueued(name, action, data) {
 // un minuto alla volta (codaTick): prima copia le foto di Drive (anche in più giri), poi, con il lock, copia fogli e
 // chat su Firestore e accende TABELLE = "firebase" e FIREBASE_TUTTO = "si". Le richieste dopo usano Firebase.
 // Ogni passo scrive una riga nel foglio Debug. Per non farlo: PASSAGGIO_ORA = "no".
-const PASSAGGIO_AT = '2026-10-22 23:30';
+const PASSAGGIO_AT = '2026-10-22 23:04';
 
 function passaggioTick() {
   TEST = false;
