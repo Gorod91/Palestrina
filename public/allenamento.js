@@ -602,7 +602,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const timer = `<button class="wo-row" data-a="timer"><span class="wo-dot"></span><span><b>Timer Addominali</b><small>${timerSeconds()} s</small></span><span class="wo-chev">›</span></button>`;
     const other = (schede || []).map((s) => {
       const d = lastDone(s);
-      return `<div class="wo-srow"><button class="wo-row" data-a="sch:${esc(s.id)}"><span><b>${esc(s.name)}</b><small>${s.ex.length} esercizi${d ? ` · ${ago(d)}` : ''}</small></span></button>`
+      return `<div class="wo-srow"><button class="wo-row" data-a="sch:${esc(s.id)}"><span><b>${esc(s.name)}${diBadge(s)}</b><small>${s.ex.length} esercizi${d ? ` · ${ago(d)}` : ''}</small></span></button>`
         + `<button class="wo-pen" data-a="ed:${esc(s.id)}" aria-label="Modifica ${esc(s.name)}"><svg aria-hidden="true"><use href="#i-pencil"/></svg></button></div>`;
     }).join('');
     let hero = '';
@@ -610,7 +610,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const n = doneToday(p), d = lastDone(p);
       const all = n === p.ex.length;
       const sub = all ? 'Fatta oggi ✓' : n ? `${n} di ${p.ex.length} esercizi fatti` : `${p.ex.length} esercizi${d ? ` · l'hai fatta ${ago(d)}` : ' · mai fatta'}`;
-      hero = `<section class="wo-hero"><div class="wo-hero-name">${esc(p.name)}</div><div class="wo-sub">${sub}</div><button class="primary" data-a="go:${esc(p.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'}</button></section>`;
+      hero = `<section class="wo-hero"><div class="wo-hero-name">${esc(p.name)}${diBadge(p)}</div><div class="wo-sub">${sub}</div><button class="primary" data-a="go:${esc(p.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'}</button></section>`;
     }
     const dc = daCopiare();
     const recupera = dc.length ? `<section class="card wo-copy"><b>${dc.length} ${dc.length === 1 ? 'esercizio salvato' : 'esercizi salvati'} ${pfx ? 'fuori dalla prova' : 'in modalità prova'}</b>
@@ -626,6 +626,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <div class="wo-btns"><button class="secondary" data-a="nuova">+ Nuova scheda</button><button class="secondary" data-a="libero">Allenamento libero</button></div>
       <section class="card wo-list">${timer}</section>`;
   }
+
+  /** Bollino con la persona da cui viene una scheda copiata: resta anche se la scheda cambia nome. */
+  const diBadge = (sc) => (sc.di ? `<span class="wo-di"><i>${esc(sc.di[0])}</i>${esc(sc.di)}</span>` : '');
 
   function ago(d) {
     const n = daysAgo(d);
@@ -1418,7 +1421,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function altri() {
     const by = {};
     SCHEDE_ESEMPIO.filter((y) => y.di).forEach((y) => (by[y.di] ||= []).push({ sc: y, key: `e:${y.id}` }));
-    otherSchede.forEach((d, i) => (d.list || []).forEach((y, j) => (by[d.name] ||= []).push({ sc: y, key: `o:${i}:${j}` })));
+    // di ognuno solo le schede sue, non quelle che ha copiato da altri
+    otherSchede.forEach((d, i) => (d.list || []).forEach((y, j) => { if (!y.di) (by[d.name] ||= []).push({ sc: y, key: `o:${i}:${j}` }); }));
     const names = Object.keys(by);
     return { by, names, n: names.reduce((t, k) => t + by[k].length, 0) };
   }
@@ -1455,7 +1459,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <div class="wo-prev-t"><h2 class="wo-ed-title">${esc(sc.name)}</h2><span class="wo-prev-di">di ${esc(chi)}</span></div>
       <section class="card wo-prev">${rows}</section>
       <button class="primary" data-a="cpsave">Copia tra le mie</button>
-      <p class="wo-sub wo-center">${giaMia(sc) ? `Ce l'hai già: la copia si chiamerà "${esc(sc.name)} (copia)".` : 'Per usarla la copi tra le tue; poi la puoi anche modificare.'}</p>`;
+      <p class="wo-sub wo-center">${giaMia(sc) ? 'Ne hai già una con questo nome: la copia avrà il bollino con la persona.' : 'Per usarla la copi tra le tue; poi la puoi anche modificare.'}</p>`;
   }
 
   /** Copia la scheda in anteprima tra le mie (resta "di" chi l'ha fatta, quindi non viene proposta come da fare). */
@@ -1471,8 +1475,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     });
     const c = clone(a.sc);
     c.id = newId('s');
-    c.di = a.chi;
-    if (giaMia(a.sc)) c.name = `${a.sc.name} (copia)`;
+    c.di = a.chi; // il bollino con la persona distingue anche due schede con lo stesso nome
     const list = clone(schede || []);
     if (list.length >= 30) return toast('Si possono avere al massimo 30 schede');
     list.push(c);
