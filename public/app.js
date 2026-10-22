@@ -102,8 +102,10 @@ let fbRetryAt = 0;
 // Stato arrivato da Firebase mentre un'azione era in corso: è più vecchio dell'azione, quindi si scarta
 // (quello che la contiene arriva subito dopo l'esito)
 let pendingState = null;
-// Check-in o annullamento salvati su Firebase ma non ancora nello stato: si vedono già, finché lo stato non li ha
-const localDone = { checkin: false, undo: false };
+// Ultimo check-in (true) o annullamento (false) chiesto e salvato su Firebase: si vede sullo schermo finché il
+// server non ha eseguito quell'azione e non è arrivato lo stato dopo. Gli stati arrivati nel frattempo (per
+// esempio quello di un annullamento precedente, eseguito in ritardo) non lo cancellano.
+let wantCheckin = null; // { value, done }
 const fbdata = createFbData({
   getToken: () => realApi('fbToken'),
   ping: () => realApi('coda').catch(() => {}),
@@ -114,6 +116,7 @@ const fbdata = createFbData({
       pendingState = st;
       return;
     }
+    if (wantCheckin && wantCheckin.done) wantCheckin = null; // eseguito dal server: questo stato lo contiene
     applyState(st);
   },
   onError(err) {
@@ -146,8 +149,7 @@ function fbdataFail(err) {
   fbRetryAt = Date.now() + 5 * 60000;
 }
 function fbDataStop() {
-  localDone.checkin = false;
-  localDone.undo = false;
+  wantCheckin = null;
   if (!fbStarted) return;
   fbdata.stop();
   fbStarted = '';
@@ -155,11 +157,8 @@ function fbDataStop() {
 }
 /** Lo stato con sopra il check-in (o l'annullamento) appena fatto e non ancora arrivato dal server. */
 function withLocal(st) {
-  if (!st || !st.me) return st;
-  if (localDone.checkin && st.me.checkedInToday) localDone.checkin = false;
-  if (localDone.undo && !st.me.checkedInToday) localDone.undo = false;
-  const delta = localDone.checkin ? 1 : localDone.undo ? -1 : 0;
-  if (!delta) return st;
+  if (!st || !st.me || !wantCheckin || !!st.me.checkedInToday === wantCheckin.value) return st;
+  const delta = wantCheckin.value ? 1 : -1;
   return {
     ...st,
     me: { ...st.me, checkedInToday: delta > 0 },
@@ -202,29 +201,29 @@ function fbCall(action, data) {
   if (!FAST_ACTIONS.has(action)) return fbdata.call(action, d);
   // Fatta quando Firebase conferma di averla salvata; se poi il server la rifiuta o non risponde, errore e si torna
   // all'ultimo stato del server
-  const key = action === 'checkin' ? 'checkin' : action === 'checkinUndo' ? 'undo' : '';
-  if (key) {
-    localDone.checkin = key === 'checkin';
-    localDone.undo = key === 'undo';
-  }
+  const isCheckin = action === 'checkin' || action === 'checkinUndo';
+  const want = isCheckin ? { value: action === 'checkin', done: false } : null;
+  if (want) wantCheckin = want;
+  const mine = () => wantCheckin === want; // nel frattempo può essere arrivata un'altra richiesta
   return fbdata
     .call(action, d, {
       onResult(r) {
+        if (want && mine()) want.done = true; // il prossimo stato dal server lo contiene
         if (action === 'checkin' && r.alreadyToday) toast('Avevi già fatto check-in oggi');
       },
       onError(err) {
-        if (key) localDone[key] = false;
+        if (want && mine()) wantCheckin = null;
         toast(`Errore: ${err.message}`);
         if (serverState) applyState(serverState);
       },
     })
     .then(
       (r) => {
-        if (key && serverState) applyState(serverState); // check-in o annullamento visibili subito sullo schermo
+        if (want && serverState) applyState(serverState); // check-in o annullamento visibili subito sullo schermo
         return r;
       },
       (err) => {
-        if (key) localDone[key] = false; // non è nemmeno arrivata a Firebase
+        if (want && mine()) wantCheckin = null; // non è nemmeno arrivata a Firebase
         throw err;
       },
     );

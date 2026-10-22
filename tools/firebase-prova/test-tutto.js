@@ -130,6 +130,22 @@ async function waitCount(P, name, n, ms = 15000) {
   await F.page.$eval('#btn-checkin', (b) => b.click()); // si rifà, per i passi dopo
   ok((await waitCount(M, 'Francesco', before + 1, 15000)) >= 0, 'F di nuovo dentro');
 
+  console.log('2c. Come nel video: annullo e rifaccio subito il check-in con il server lento');
+  await post('/delay', { ms: 6000 }); // il server esegue l'annullamento ma pubblica lo stato 6 s dopo
+  await F.page.$eval('#btn-checkin-undo', (b) => b.click());
+  ok((await waitCount(F, 'Francesco', before, 3000)) >= 0, 'F: annullato subito');
+  await sleep(2500);
+  await F.page.$eval('#btn-checkin', (b) => b.click());
+  ok((await waitCount(F, 'Francesco', before + 1, 3000)) >= 0, 'F: di nuovo dentro subito');
+  const seen = [];
+  for (let i = 0; i < 40; i++) {
+    seen.push(await countOf(F, 'Francesco'));
+    await sleep(500);
+  }
+  ok(seen.every((n) => n === before + 1), `F: il check-in non sparisce mai nei 20 s dopo (${[...new Set(seen)].join(', ')})`);
+  await post('/delay', { ms: 0 });
+  ok((await waitCount(M, 'Francesco', before + 1, 15000)) >= 0, 'M lo vede');
+
   console.log('2b. Server che non risponde: errore dopo 75 s e il check-in non viene più eseguito');
   M.slow.ms = 0;
   await M.ctx.route('https://finto.apps/**', (r) => r.abort()); // Apps Script irraggiungibile per Michy

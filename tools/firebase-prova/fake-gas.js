@@ -114,7 +114,11 @@ const UrlFetchApp = {
     return { getResponseCode: () => code, getContentText: () => body };
   },
 };
-UrlFetchApp.fetchAll = (list) => list.map((r) => UrlFetchApp.fetch(r.url, r));
+let stateDelayMs = 0; // per le prove: ritardo prima di pubblicare lo stato (server lento a finire)
+UrlFetchApp.fetchAll = (list) => {
+  if (stateDelayMs && list.some((r) => String(r.payload || '').includes('stato/'))) execFileSync('sleep', [String(stateDelayMs / 1000)]);
+  return list.map((r) => UrlFetchApp.fetch(r.url, r));
+};
 const lock = { waitLock() {}, tryLock: () => true, hasLock: () => true, releaseLock() {} };
 const ctx = {
   console,
@@ -142,7 +146,10 @@ http
     req.on('end', () => {
       let out;
       try {
-        if (req.url === '/eval') out = JSON.stringify({ result: ctx.__run(body) }); // solo per le prove: una funzione da eseguire dentro Code.gs
+        if (req.url === '/delay') {
+          stateDelayMs = Number(JSON.parse(body).ms) || 0;
+          out = '{"ok":true}';
+        } else if (req.url === '/eval') out = JSON.stringify({ result: ctx.__run(body) }); // solo per le prove: una funzione da eseguire dentro Code.gs
         else if (req.url.startsWith('/run/')) {
           // Funzioni dell'editor (es. copiaChatSuFirebase) e accesso ai fogli per le prove
           const name = req.url.slice(5);
@@ -172,4 +179,5 @@ http
       res.writeHead(200, { ...cors, 'Content-Type': 'application/json' }).end(out);
     });
   })
-  .listen(+port, () => console.log('finto Apps Script su', port));
+  .listen(+port, '127.0.0.1', () => console.log('finto Apps Script su', port)) // solo da questo computer
+  .keepAliveTimeout = 120000; // con i ritardi di prova il server resta fermo: le connessioni aperte non devono chiudersi
