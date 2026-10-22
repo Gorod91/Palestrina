@@ -1410,14 +1410,15 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }).catch(() => {});
   }
 
-  /** "Copia una scheda": le schede per persona (quelle inserite per gli altri e quelle di chi ha già le sue), poi le mie. */
+  /** "Copia una scheda": le schede per persona (gli originali inseriti per gli altri, anche se li ho cambiati o eliminati
+   *  dai miei, e quelle di chi ha già le sue), poi le mie. */
   function copyView() {
     const by = {};
-    (schede || []).filter((y) => y.di).forEach((y) => (by[y.di] ||= []).push({ sc: y, key: `m:${y.id}` }));
+    SCHEDE_ESEMPIO.filter((y) => y.di).forEach((y) => (by[y.di] ||= []).push({ sc: y, key: `e:${y.id}` }));
     otherSchede.forEach((d, i) => (d.list || []).forEach((y, j) => (by[d.name] ||= []).push({ sc: y, key: `o:${i}:${j}` })));
     const row = ({ sc, key }) => `<div class="wo-row wo-cprow"><span><b>${esc(sc.name)}</b><small>${esc(sc.ex.slice(0, 4).map((id) => nameOf(id, sc)).join(', '))}${sc.ex.length > 4 ? '…' : ''}</small></span><button class="wo-cpbtn" data-a="cp:${key}">Copia</button></div>`;
     const sec = (title, items) => (items.length ? `<div class="wo-who"><span class="wo-av">${esc(title[0])}</span><b>${esc(title)}</b></div><section class="card wo-list">${items.map(row).join('')}</section>` : '');
-    const mine = (schede || []).filter((y) => !y.di).map((y) => ({ sc: y, key: `m:${y.id}` }));
+    const mine = (schede || []).map((y) => ({ sc: y, key: `m:${y.id}` }));
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Allenamento</button></div>
       <h2 class="wo-ed-title">Copia una scheda</h2>
       <p class="wo-sub">Diventa tua: la cambi senza toccare l'originale.</p>
@@ -1427,6 +1428,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function copyScheda(key) {
     let src = null, ext = [];
     if (key.startsWith('m:')) src = (schede || []).find((y) => y.id === key.slice(2));
+    else if (key.startsWith('e:')) src = SCHEDE_ESEMPIO.find((y) => y.id === key.slice(2));
     else {
       const [, i, j] = key.split(':'), d = otherSchede[Number(i)];
       src = d && d.list ? d.list[Number(j)] : null;
@@ -1442,8 +1444,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     });
     const c = clone(src);
     delete c.id;
-    delete c.di;
-    c.name = key.startsWith('m:') && !src.di ? `${src.name} (copia)` : src.name;
+    if (!key.startsWith('e:')) delete c.di; // gli originali inseriti per gli altri restano "di Rizzo" (non proposti come da fare)
+    c.name = (schede || []).some((y) => y.name === src.name) ? `${src.name} (copia)` : src.name;
     openEditor(c, true);
   }
 
