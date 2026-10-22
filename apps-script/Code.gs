@@ -167,6 +167,7 @@ function generaCodiciMancanti() {
     if (values[i][0] && !values[i][1]) sh.getRange(i + 1, 2).setValue(randomCode(values[i][0]));
     if (values[i][0] && !values[i][2]) sh.getRange(i + 1, 3).setValue(DEFAULT_GOAL);
   }
+  CacheService.getScriptCache().remove(USERS_CACHE);
 }
 
 /** Da eseguire una volta dall'editor: concede l'accesso a Drive e crea la cartella delle foto. */
@@ -2312,6 +2313,7 @@ function setAlias(user, value) {
   const row = values.findIndex((r, i) => i > 0 && String(r[1]).trim() === user.code);
   if (row < 1) return { error: 'Utente non trovato' };
   sh.getRange(row + 1, 5).setValue(alias);
+  CacheService.getScriptCache().remove(USERS_CACHE);
   bumpChat(); // il nome compare anche in chat
   return { ok: true, display: alias || user.name };
 }
@@ -2663,7 +2665,10 @@ function readTableDoc(path) {
 function openTable(key) {
   const path = tablePath(key, TEST && TEST_SHEETS.includes(key));
   const had = TABLES[path];
-  if (had && had.ops.length) return had; // modifiche non ancora scritte: si continua su quelle
+  // Modifiche non ancora scritte: si continua su quelle. Mentre si svuota la coda (una sola esecuzione alla
+  // volta) la tabella già letta non si riscarica a ogni azione: se un'altra richiesta l'ha cambiata, al
+  // salvataggio si rilegge e si rifanno le modifiche.
+  if (had && (had.ops.length || AFTER)) return had;
   let doc = PRELOADED[path] !== undefined ? PRELOADED[path] : readTableDoc(path);
   delete PRELOADED[path];
   let ops = [];
@@ -2929,7 +2934,23 @@ function allUsers() {
   return memo('utenti:users', readUsers);
 }
 
+// Utenti tenuti in cache per un minuto: leggere il foglio costa ~0,5 s a ogni richiesta
+const USERS_CACHE = 'utenti_v1';
+
 function readUsers() {
+  const cache = CacheService.getScriptCache();
+  const hit = cache.get(USERS_CACHE);
+  if (hit) return JSON.parse(hit);
+  const list = readUsersSheet();
+  try {
+    cache.put(USERS_CACHE, JSON.stringify(list), 60);
+  } catch (err) {
+    console.error('Utenti non in cache', err);
+  }
+  return list;
+}
+
+function readUsersSheet() {
   return rows('utenti')
     .filter((r) => r[0] && r[1])
     .map((r) => ({
@@ -3210,7 +3231,7 @@ function processQueue(test) {
     // ricontrolla finché è vuota: prende anche le azioni arrivate mentre eseguiva le altre;
     // poi i lavori rimandati (eventi in chat, traguardi, sfide) e di nuovo la coda
     for (let round = 0; round < 10; round++) {
-      const n = processQueueRound(coll);
+      const n = processQueueRound(coll, !!qlock);
       done += n;
       if (n) continue;
       if (!AFTER.length) break;
@@ -3236,7 +3257,7 @@ function processQueue(test) {
 }
 
 /** Un giro sulla coda: esegue le azioni nuove in ordine di arrivo e restituisce quante ne ha trovate. */
-function processQueueRound(coll) {
+function processQueueRound(coll, locked) {
   let done = 0;
   const res = firestoreCall('post', ':runQuery', {
     structuredQuery: {
@@ -3250,11 +3271,14 @@ function processQueueRound(coll) {
   if (!docs.length) return 0;
   docs.sort((a, b) => (a.fields.at.timestampValue < b.fields.at.timestampValue ? -1 : 1));
   docs.forEach((d) => {
-    // Prenotata da questa esecuzione (se un'altra l'ha già presa, il documento è cambiato e si salta)
-    const claim = firestoreFetch('post', ':commit', {
-      writes: [{ update: { name: d.name, fields: { ...d.fields, stato: { stringValue: 'in corso' } } }, currentDocument: { updateTime: d.updateTime } }],
-    });
-    if (claim.code >= 300) return;
+    // Senza il lock della coda si prenota (se un'altra esecuzione l'ha già presa, il documento è cambiato e si
+    // salta); con il lock la coda la svuota solo questa esecuzione e la prenotazione non serve
+    if (!locked) {
+      const claim = firestoreFetch('post', ':commit', {
+        writes: [{ update: { name: d.name, fields: { ...d.fields, stato: { stringValue: 'in corso' } } }, currentDocument: { updateTime: d.updateTime } }],
+      });
+      if (claim.code >= 300) return;
+    }
     tmark('prenotata');
     let out;
     try {
