@@ -114,13 +114,12 @@ export function createFbData({ getToken, ping, onState, onError }) {
   /**
    * Carica una mia foto (JPEG in base64) e restituisce subito l'id da mandare con l'azione: anche senza rete,
    * Firebase la invia prima dell'azione messa in coda dopo (le scritture partono in ordine).
-   * Con `id` si sceglie l'id (es. la copia HD, che si ritrova dall'id della foto normale); una foto `optional`
-   * che non si salva non ferma Firebase.
    */
-  function putPhoto(base64, label, id = newId(), optional = false) {
+  function putPhoto(base64, label) {
     if (!x) throw new Error('Firebase non collegato');
     const { fs, db } = x;
-    fs.setDoc(fs.doc(db, 'foto', id), { name: me.name, label: String(label || ''), mime: 'image/jpeg', data: fs.Bytes.fromBase64String(base64), at: fs.serverTimestamp() }).catch((err) => (optional ? console.warn('Foto non salvata', id, err) : onError(err)));
+    const id = newId();
+    fs.setDoc(fs.doc(db, 'foto', id), { name: me.name, label: String(label || ''), mime: 'image/jpeg', data: fs.Bytes.fromBase64String(base64), at: fs.serverTimestamp() }).catch((err) => onError(err));
     return id;
   }
 

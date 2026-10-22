@@ -193,22 +193,11 @@ function applyState(st) {
  */
 function fbCall(action, data) {
   if (!navigator.onLine) return Promise.reject(new Error('sei offline: riprova quando c\'è rete'));
-  const { hd, ...d } = { ...data, tapAt: Date.now(), ...(testOn() && store.get('actAs') ? { actAs: store.get('actAs') } : {}) };
-  let putHd = () => {};
+  const d = { ...data, tapAt: Date.now(), ...(testOn() && store.get('actAs') ? { actAs: store.get('actAs') } : {}) };
   if (d.photo && (action === 'sudometro' || action === 'setReference')) {
-    const label = action === 'setReference' ? 'riferimento' : 'sudato';
-    d.photoId = fbdata.putPhoto(d.photo, label);
+    d.photoId = fbdata.putPhoto(d.photo, action === 'setReference' ? 'riferimento' : 'sudato');
     delete d.photo;
-    // Copia HD per lo zip dell'admin (id = id della foto + "-hd"), caricata dopo l'azione per non rallentarla.
-    // Le foto su Firestore devono stare sotto i 900 KB.
-    if (hd && hd.length * 0.75 < 870000) putHd = () => fbdata.putPhoto(hd, `${label}-hd`, `${d.photoId}-hd`, true);
   }
-  const out = fbQueue(action, d);
-  putHd();
-  return out;
-}
-
-function fbQueue(action, d) {
   if (!FAST_ACTIONS.has(action)) return fbdata.call(action, d);
   // Fatta quando Firebase conferma di averla salvata; se poi il server la rifiuta o non risponde, errore e si torna
   // all'ultimo stato del server
@@ -244,10 +233,6 @@ async function api(action, data = {}) {
     if (action === 'state') return state;
     if (action === 'photos') return fbPhotos(data.ids || []);
     if (QUEUE_ACTIONS.has(action)) return fbCall(action, data);
-  }
-  if (data.hd) {
-    data = { ...data };
-    delete data.hd; // la copia HD va solo su Firebase: ad Apps Script non serve
   }
   if (store.get('fakeData') === true && action !== 'login') {
     if (action === 'state') {
@@ -922,7 +907,7 @@ async function takeReference() {
     sudoBusy('Analizzo la foto…');
     const features = await sudometro.analyze(canvas);
     sudoBusy('Salvo la foto di riferimento…');
-    const r = await api('setReference', { features, photo: sudometro.toJpegBase64(canvas), hd: sudometro.toJpegHD(canvas) });
+    const r = await api('setReference', { features, photo: sudometro.toJpegBase64(canvas) });
     toast(photoWarning(r) || 'Foto di riferimento salvata. Da ora basta il selfie da sudato.', 5000);
     await refresh();
   } catch (err) {
@@ -944,7 +929,6 @@ async function takeSweat(debug, overwrite = false) {
     sudoBusy('Analizzo il selfie…');
     let result = sudometro.score(reference, await sudometro.analyze(canvas));
     let photo = sudometro.toJpegBase64(canvas);
-    let hd = sudometro.toJpegHD(canvas);
     let v2 = null;
     if (v2live) {
       v2 = await sudometroV2(photo);
@@ -966,7 +950,6 @@ async function takeSweat(debug, overwrite = false) {
             canvas = again;
             result = result2;
             photo = photo2;
-            hd = sudometro.toJpegHD(again);
           }
           reduced = !second.res || !!second.res.retake;
         }
@@ -996,7 +979,6 @@ async function takeSweat(debug, overwrite = false) {
       debug,
       overwrite,
       photo,
-      hd,
     }).catch((err) => {
       if (before) {
         state = before; // non è andato: torna com'era
@@ -1352,29 +1334,16 @@ async function photosZip() {
       const { photos } = await realApi('adminPhotos', { ids: ids.slice(i, i + 8) });
       Object.entries(photos || {}).forEach(([id, p]) => files.push({ name: names.get(id), data: Uint8Array.from(atob(p.data), (c) => c.charCodeAt(0)) }));
     }
-    // Copie HD (salvate dal 22/10/2026, solo su Firebase): stesso nome nelle cartelle sudato-hd e riferimenti-hd
-    const hdNames = new Map();
-    if (fbdata.ready()) {
-      const fbIds = ids.filter((id) => id.length <= 20); // gli id lunghi sono foto vecchie di Drive
-      for (let i = 0; i < fbIds.length; i += 8) {
-        label(`Scarico le foto HD… ${i}/${fbIds.length}`);
-        await Promise.all(fbIds.slice(i, i + 8).map((id) => fbdata.photo(`${id}-hd`).then((p) => {
-          const name = names.get(id).replace(/^(\w+)\//, '$1-hd/');
-          hdNames.set(id, name);
-          files.push({ name, data: Uint8Array.from(atob(p.data), (c) => c.charCodeAt(0)) });
-        }).catch(() => {})));
-      }
-    }
     const data = {
       esportato: new Date().toISOString(),
-      sudometro: rows.map((r) => ({ ...r, file: names.get(r.photoId) || '', fileRiferimento: names.get(r.refId) || '', fileHD: hdNames.get(r.photoId) || '', fileRiferimentoHD: hdNames.get(r.refId) || '' })),
-      riferimentiAttuali: refs.map((r) => ({ name: r.name, features: r.features, file: names.get(r.photoId) || '', fileHD: hdNames.get(r.photoId) || '' })),
+      sudometro: rows.map((r) => ({ ...r, file: names.get(r.photoId) || '', fileRiferimento: names.get(r.refId) || '' })),
+      riferimentiAttuali: refs.map((r) => ({ name: r.name, features: r.features, file: names.get(r.photoId) || '' })),
     };
     files.push({ name: 'dati.json', data: new TextEncoder().encode(JSON.stringify(data, null, 2)) });
     const day = new Date().toLocaleDateString('en-CA');
-    zipReady = { blob: makeZip(files), name: `sudometro-${day}${testOn() ? '-prova' : ''}.zip`, count: files.length - 1 - hdNames.size };
+    zipReady = { blob: makeZip(files), name: `sudometro-${day}${testOn() ? '-prova' : ''}.zip`, count: files.length - 1 };
     const missing = ids.length - zipReady.count;
-    btn.textContent = `Zip pronto (${zipReady.count} foto${hdNames.size ? `, ${hdNames.size} in HD` : ''}): tocca per salvarlo o inviarlo`;
+    btn.textContent = `Zip pronto (${zipReady.count} foto): tocca per salvarlo o inviarlo`;
     if (missing) toast(`${missing} foto non trovate: sono nello zip le altre`);
   } catch (err) {
     btn.textContent = ZIP_LABEL;
