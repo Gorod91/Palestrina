@@ -157,7 +157,8 @@ function memo(key, fn) {
 }
 function forget(key) {
   Object.keys(MEMO).forEach((k) => {
-    if (k === key || k.indexOf(key + ':') === 0) delete MEMO[k];
+    // anche i calcoli che dipendono da più tabelle (calc:, state:) si rifanno
+    if (k === key || k.indexOf(key + ':') === 0 || k.indexOf('calc:') === 0 || k.indexOf('state:') === 0) delete MEMO[k];
   });
 }
 
@@ -547,15 +548,21 @@ function finishRequest() {
     console.error('Tabelle non salvate', err);
   }
   tmark('tabelle salvate');
+  MEMO = {}; // dopo le scritture si rilegge tutto; stato della chat e di tutti poi condividono i calcoli
   const list = [];
-  const st = chatStateRequest();
-  if (st) list.push(st);
-  tmark('stato chat');
+  PUBLISHING = true;
   try {
-    const pub = statesRequest();
-    if (pub) list.push(pub);
-  } catch (err) {
-    console.error('Stato non pubblicato su Firebase', err);
+    const st = chatStateRequest();
+    if (st) list.push(st);
+    tmark('stato chat');
+    try {
+      const pub = statesRequest();
+      if (pub) list.push(pub);
+    } catch (err) {
+      console.error('Stato non pubblicato su Firebase', err);
+    }
+  } finally {
+    PUBLISHING = false;
   }
   tmark('stato di tutti');
   if (LATER) list.push(...LATER);
@@ -1324,6 +1331,10 @@ function planDays() {
 
 /** Chi va in palestra nei prossimi 7 giorni: per ogni giorno tutte le persone con risposta e orario. */
 function plansSummary(presenze) {
+  return memo('calc:plans', () => plansSummaryRaw(presenze));
+}
+
+function plansSummaryRaw(presenze) {
   const days = planDays();
   const today = days[0];
   const answers = {};
@@ -2673,6 +2684,7 @@ function tablesOn(key) {
 }
 
 let TABLES = {}; // tabelle caricate in questa esecuzione: percorso → VTable
+let PUBLISHING = false; // si sta calcolando lo stato da pubblicare: le tabelle già lette non si riscaricano
 
 const tablePath = (key, test) => `${test ? 'prova_db' : 'db'}/${key}`;
 
@@ -2702,7 +2714,8 @@ function openTable(key) {
   // Modifiche non ancora scritte: si continua su quelle. Mentre si svuota la coda (una sola esecuzione alla
   // volta) la tabella già letta non si riscarica a ogni azione: se un'altra richiesta l'ha cambiata, al
   // salvataggio si rilegge e si rifanno le modifiche.
-  if (had && (had.ops.length || AFTER)) return had;
+  // Lo stesso mentre si calcola lo stato da pubblicare (le tabelle sono appena state lette o salvate).
+  if (had && (had.ops.length || AFTER || PUBLISHING)) return had;
   let doc = PRELOADED[path] !== undefined ? PRELOADED[path] : readTableDoc(path);
   delete PRELOADED[path];
   let ops = [];
@@ -3207,7 +3220,6 @@ const fbPfx = () => (TEST ? 'prova_' : '');
 function statesRequest() {
   if (!STATE_DIRTY || !fbAllOn()) return null;
   STATE_DIRTY = false;
-  MEMO = {};
   const cache = CacheService.getScriptCache();
   const writes = [];
   const marks = {};
@@ -3563,6 +3575,7 @@ function firestoreDelete(coll, id) {
 /** Stato della chat su Firestore (documento state/chat o prova_state/chat), se in questa richiesta è cambiato. */
 function pushChatIfChanged() {
   flushTables();
+  MEMO = {};
   [chatStateRequest, statesRequest].forEach((make) => {
     try {
       const r = make();
@@ -3580,7 +3593,6 @@ function chatStateRequest() {
   if (!CHAT_DIRTY || !fbChatOn()) return null;
   CHAT_DIRTY = false;
   try {
-    MEMO = {}; // dopo le scritture si rilegge tutto
     const st = chatState(null, -1);
     return {
       url: `${firestoreBase()}/${TEST ? 'prova_' : ''}state/chat`,
