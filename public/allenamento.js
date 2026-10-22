@@ -1026,7 +1026,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   /** Ridisegna i riquadri dei timer (all'avvio, allo stop, alla fine); il conto lo aggiorna frame(). */
   function tickRest() {
-    big.hidden = !(restEnd || tmr.end);
+    big.hidden = !tmr.end; // a tutto schermo solo gli esercizi a tempo: il recupero resta nella sua barra
     if (!big.hidden) {
       const e = EX[tmr.ex] || {};
       big.querySelector('.wo-big-head b').textContent = tmr.end ? e.n || '' : 'Recupero';
