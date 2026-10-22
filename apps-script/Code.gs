@@ -302,9 +302,9 @@ const NEWS = [
     id: '2026-11',
     month: '2026-10',
     from: '2026-11-01',
-    features: ['apripista', 'oltre', 'sfide'],
+    features: ['apripista', 'sfide'],
     title: 'Novità di novembre',
-    body: 'Apripista, Oltre l\'obiettivo… e una sorpresa. Tocca per vedere.',
+    body: 'Apripista… e una sorpresa. Tocca per vedere.',
   },
 ];
 
@@ -963,7 +963,7 @@ function buildState(user) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
-    features: { apripista: featureOn('apripista'), oltre: featureOn('oltre'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn(), firebaseTutto: !TEST && fbAllOn(), provaTutto: TEST && fbAllOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
+    features: { apripista: featureOn('apripista'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn(), firebaseTutto: !TEST && fbAllOn(), provaTutto: TEST && fbAllOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
@@ -2286,7 +2286,6 @@ const POINTS = {
   branco: 10,
   pomodoro: 10,
   apripista: 3, // novità di novembre 2026: primo a chiedere "chi va in palestra?" per un giorno e poi check-in
-  oltre: 3, // novità di novembre 2026: ogni ingresso della settimana oltre l'obiettivo
   sfidaVinta: 5, // novità di novembre 2026: sfida vinta
   sfida: 2, // novità di novembre 2026: partecipazione a una sfida
   // Penalità
@@ -2386,15 +2385,6 @@ function computePointsRaw(month) {
         if (pts === P.sfidaVinta) add('sfidaVinta', 'Sfide vinte', pts);
         else if (pts) add('sfida', 'Sfide', pts);
       });
-    }
-    // Oltre l'obiettivo: ogni ingresso della settimana dopo quelli dell'obiettivo
-    if (featureOn('oltre')) {
-      const from = featureFrom('oltre');
-      for (let w = weekKey(monthStart); w <= addDays(monthStart, 31); w = addDays(w, 7)) {
-        mine.filter((r) => weekKey(r.day) === w).map((r) => r.day).slice(u.goal).forEach((day) => {
-          if (inMonth(day) && day >= from) add('oltre', 'Oltre l\'obiettivo', P.oltre);
-        });
-      }
     }
     // Penalità (da quando esistono)
     const today = dayString(new Date());

@@ -45,13 +45,6 @@
   .cmp span { font-size: 15px; color: #d1d1d6; line-height: 1.35; }
   .cmp .new { border: 1px solid #a6ff0066; background: linear-gradient(160deg, #1d2a06, #1c1c1e 70%); }
   .cmp .new b { color: var(--lime); }
-  /* Slide 3: la settimana, con la linea dell'obiettivo dopo il secondo ingresso */
-  .week { display: flex; align-items: center; gap: 6px; margin: 40px 0 34px; }
-  .week span { position: relative; flex: 1; aspect-ratio: 1; display: grid; place-items: center; border-radius: 50%; background: #1c1c1e; color: var(--muted); font-size: 15px; font-weight: 700; }
-  .week span.in { background: var(--cyan); color: #000; }
-  .week span.extra { background: var(--lime); box-shadow: 0 0 30px #a6ff00aa; }
-  .week span b { position: absolute; top: -34px; left: 50%; transform: translateX(-50%); font-size: 22px; font-weight: 900; color: var(--lime); }
-  .week i { flex: none; width: 3px; height: 56px; border-radius: 2px; background: var(--fg); }
   .cmp { row-gap: 10px; }
   .cmp b { font-size: 38px; }
   /* Cosa cambia: prima → ora */
@@ -75,14 +68,14 @@
 </style>
 </head>
 <body>
-  <div class="bars"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
+  <div class="bars"><i><b></b></i><i><b></b></i><i><b></b></i><i><b></b></i></div>
   <button class="close" aria-label="Chiudi">×</button>
 
   <section class="slide">
     <div class="glow"></div>
     <p class="eyebrow" data-a style="--d:.2">Novità</p>
     <h1 data-a style="--d:.5;--anim:pop">Novembre.</h1>
-    <p class="lead" data-a style="--d:1.1">Nuovi modi di fare punti.<br>E una sorpresa.</p>
+    <p class="lead" data-a style="--d:1.1">Un nuovo modo di fare punti.<br>E una sorpresa.</p>
     <p class="hint" data-a style="--d:2">Tocca per continuare</p>
   </section>
 
@@ -98,22 +91,6 @@
   </section>
 
   <section class="slide">
-    <p class="eyebrow" data-a style="--d:0">Oltre l'obiettivo</p>
-    <h2 data-a style="--d:.1">L'obiettivo è il minimo.<br>Il resto vale di più.</h2>
-    <div class="week">
-      <span data-a style="--d:.6;--anim:pop" class="in">L</span>
-      <span data-a style="--d:.75;--anim:pop">M</span>
-      <span data-a style="--d:.9;--anim:pop" class="in">M</span>
-      <i data-a style="--d:1.3"></i>
-      <span data-a style="--d:1.05;--anim:pop">G</span>
-      <span data-a style="--d:1.9;--anim:pop" class="in extra">V<b>+3</b></span>
-      <span data-a style="--d:1.2;--anim:pop">S</span>
-      <span data-a style="--d:1.25;--anim:pop">D</span>
-    </div>
-    <p class="lead" data-a style="--d:2.6">Obiettivo 2 a settimana: dal terzo ingresso, ognuno vale 3 punti in più.</p>
-  </section>
-
-  <section class="slide">
     <div class="glow"></div>
     <p class="eyebrow orange" data-a style="--d:0">E poi…</p>
     <h2 data-a style="--d:.2">C'è anche<br>una sorpresa.</h2>
@@ -126,7 +103,6 @@
     <div class="rows">
       <p class="rh" data-a style="--d:.3"><span></span><span>Prima</span><span>Ora</span></p>
       <p data-a style="--d:.6;--anim:left"><span>Fare la domanda e poi andare</span><b>0</b><em>+3</em></p>
-      <p data-a style="--d:.9;--anim:left"><span>Ingresso oltre l'obiettivo</span><b>10</b><em>13</em></p>
     </div>
     <ul class="rules">
       <li data-a style="--d:1.7">Apripista: solo il primo che chiede, una volta per giorno</li>
