@@ -2747,40 +2747,46 @@ let PRELOADED = {};
 function preloadTables(keys) {
   const paths = keys.filter(tablesOn).map((k) => tablePath(k, TEST && TEST_SHEETS.includes(k))).filter((p) => !TABLES[p] && PRELOADED[p] === undefined);
   if (!paths.length) return;
-  const token = firestoreToken();
-  tmark('accesso firestore');
-  const res = UrlFetchApp.fetchAll(paths.map((p) => ({ url: `${firestoreBase()}/${p}`, headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true })));
+  // Una sola lettura per tutte (sempre aggiornate: le decisioni, come "c'è un check-in da annullare?", si prendono su
+  // queste righe)
+  const r = firestoreFetch('post', ':batchGet', { documents: paths.map((p) => `${fbDocRoot()}/${p}`) });
   tmark('tabelle scaricate');
-  const sizes = [];
-  res.forEach((r, i) => {
-    const code = r.getResponseCode();
-    if (code === 404) PRELOADED[paths[i]] = null;
-    else if (code < 300) {
-      const d = JSON.parse(r.getContentText());
-      PRELOADED[paths[i]] = { rows: unpackRows(d.fields.rows.bytesValue), time: d.updateTime };
-      if (TIMES) sizes.push(`${paths[i].split('/')[1]} ${Math.round(d.fields.rows.bytesValue.length / 1024)}k/${PRELOADED[paths[i]].rows.length}r`);
-    }
+  if (r.code >= 300 || !Array.isArray(r.json)) return; // si leggeranno una per volta
+  r.json.forEach((x) => {
+    if (x.missing) PRELOADED[x.missing.split('/documents/')[1]] = null;
+    else if (x.found) PRELOADED[x.found.name.split('/documents/')[1]] = { rows: unpackRows(x.found.fields.rows.bytesValue), time: x.found.updateTime };
   });
-  tmark(`tabelle aperte (${sizes.join(', ')})`);
+  tmark('tabelle aperte');
 }
 
 /** Scrive su Firestore le tabelle modificate. */
 function flushTables() {
+  const tableWrite = (path, b64) => ({
+    update: { name: `${fbDocRoot()}/${path}`, fields: { rows: { bytesValue: b64 }, at: { timestampValue: new Date().toISOString() } } },
+    currentDocument: TABLES[path].time ? { updateTime: TABLES[path].time } : { exists: false },
+  });
+  const saved = (path, r, i) => {
+    const t = TABLES[path];
+    t.time = (r.json.writeResults && r.json.writeResults[i] && r.json.writeResults[i].updateTime) || t.time;
+    t.ops = [];
+    STATE_DIRTY = true;
+  };
+  // Più tabelle cambiate (es. annullare il check-in: presenze e chat): una sola scrittura per tutte
+  const dirty = Object.keys(TABLES).filter((path) => TABLES[path].ops.length);
+  if (dirty.length > 1) {
+    const packed = dirty.map((path) => packRows(TABLES[path].rows));
+    const r = firestoreFetch('post', ':commit', { writes: dirty.map((path, i) => tableWrite(path, packed[i])) });
+    if (r.code < 300) return dirty.forEach((path, i) => saved(path, r, i));
+    // una è cambiata nel frattempo: si salvano una per volta, rileggendo quella cambiata
+  }
   Object.keys(TABLES).forEach((path) => {
     const t = TABLES[path];
     if (!t.ops.length) return;
     for (let attempt = 0; ; attempt++) {
-      const body = {
-        writes: [{
-          update: { name: `${fbDocRoot()}/${path}`, fields: { rows: { bytesValue: packRows(t.rows) }, at: { timestampValue: new Date().toISOString() } } },
-          currentDocument: t.time ? { updateTime: t.time } : { exists: false },
-        }],
-      };
-      const r = firestoreFetch('post', ':commit', body);
+      const b64 = packRows(t.rows);
+      const r = firestoreFetch('post', ':commit', { writes: [tableWrite(path, b64)] });
       if (r.code < 300) {
-        t.time = (r.json.writeResults && r.json.writeResults[0] && r.json.writeResults[0].updateTime) || t.time;
-        t.ops = [];
-        STATE_DIRTY = true;
+        saved(path, r, 0);
         break;
       }
       // Un'altra richiesta ha scritto la tabella: si rilegge e si rifanno le modifiche
