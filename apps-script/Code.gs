@@ -43,7 +43,30 @@ const PROVA_USERS = ['Michy'];
 // Allenamento (schede e serie su Firebase), in prova e con i dati veri: per ora solo Francesco (anche in firestore.rules)
 const WORKOUT_USERS = ['Francesco'];
 const TZ = Session.getScriptTimeZone();
-const realProps = PropertiesService.getScriptProperties();
+// Proprietà dello script lette tutte insieme una volta (ogni lettura singola costa 50-100 ms) e rilette quando
+// si prende il lock, così dentro il lock sono sempre aggiornate. Le scritture vanno subito alle proprietà vere.
+const scriptProps = PropertiesService.getScriptProperties();
+let PROPS_SNAP = null;
+const realProps = {
+  getProperty(k) {
+    if (!PROPS_SNAP) PROPS_SNAP = scriptProps.getProperties();
+    return Object.prototype.hasOwnProperty.call(PROPS_SNAP, k) ? PROPS_SNAP[k] : null;
+  },
+  setProperty(k, v) {
+    scriptProps.setProperty(k, v);
+    if (PROPS_SNAP) PROPS_SNAP[k] = String(v);
+    return realProps;
+  },
+  deleteProperty(k) {
+    scriptProps.deleteProperty(k);
+    if (PROPS_SNAP) delete PROPS_SNAP[k];
+    return realProps;
+  },
+  getProperties() {
+    if (!PROPS_SNAP) PROPS_SNAP = scriptProps.getProperties();
+    return { ...PROPS_SNAP };
+  },
+};
 
 // ---------- Modalità prova (solo admin) ----------
 // Le richieste con { test: true } fanno girare tutto il server, ma su fogli "Prova · …" (copiati da quelli veri
@@ -434,6 +457,7 @@ function doPost(e) {
   TABLES = {};
   PRELOADED = {};
   STATE_DIRTY = false;
+  PROPS_SNAP = null;
   TIMES = null;
   try {
     const req = JSON.parse(e.postData.contents);
@@ -2882,8 +2906,15 @@ class VRange {
 function scriptLock() {
   const l = LockService.getScriptLock();
   return {
-    waitLock: (ms) => l.waitLock(ms),
-    tryLock: (ms) => l.tryLock(ms),
+    waitLock: (ms) => {
+      l.waitLock(ms);
+      PROPS_SNAP = null; // dentro il lock le proprietà si rileggono
+    },
+    tryLock: (ms) => {
+      const ok = l.tryLock(ms);
+      if (ok) PROPS_SNAP = null;
+      return ok;
+    },
     hasLock: () => l.hasLock(),
     releaseLock() {
       try {
@@ -3180,11 +3211,15 @@ function statesRequest() {
   const cache = CacheService.getScriptCache();
   const writes = [];
   const marks = {};
-  allUsers().forEach((u) => {
-    const json = JSON.stringify(buildState(u));
-    const path = `${fbPfx()}stato/${fbUid(u.name)}`;
+  const users = allUsers();
+  memo('state:shared', sharedState);
+  tmark('stato comune');
+  const states = users.map((u) => ({ u, json: JSON.stringify(buildState(u)), path: `${fbPfx()}stato/${fbUid(u.name)}` }));
+  tmark('stato di ognuno');
+  const old = cache.getAll(states.map((x) => 'h_' + x.path));
+  states.forEach(({ json, path }) => {
     const hash = Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, json));
-    if (cache.get('h_' + path) === hash) return; // uguale all'ultima volta
+    if (old['h_' + path] === hash) return; // uguale all'ultima volta
     marks['h_' + path] = hash;
     writes.push({
       update: {
@@ -3193,7 +3228,8 @@ function statesRequest() {
       },
     });
   });
-  realProps.setProperty(fbPfx() + 'STATO_GIORNO', dayString(new Date()));
+  if (realProps.getProperty(fbPfx() + 'STATO_GIORNO') !== dayString(new Date())) realProps.setProperty(fbPfx() + 'STATO_GIORNO', dayString(new Date()));
+  tmark('confronto');
   if (!writes.length) return null;
   cache.putAll(marks, 21600);
   return {
@@ -3335,6 +3371,7 @@ function runQueued(name, action, data) {
 function codaTick() {
   [false, true].forEach((test) => {
     TEST = test;
+    PROPS_SNAP = null;
     try {
       if (!fbAllOn()) return;
       MEMO = {};

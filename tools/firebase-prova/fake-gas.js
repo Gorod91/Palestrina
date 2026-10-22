@@ -63,6 +63,7 @@ const props = {
 const cacheData = {};
 const cache = {
   putAll: (o, sec) => Object.entries(o).forEach(([k, v]) => cache.put(k, v, sec)),
+  getAll: (keys) => Object.fromEntries(keys.map((k) => [k, cache.get(k)]).filter(([, v]) => v !== null)),
   get: (k) => (cacheData[k] && cacheData[k].exp > Date.now() ? cacheData[k].v : null),
   put: (k, v, s = 600) => { cacheData[k] = { v, exp: Date.now() + s * 1000 }; },
   remove: (k) => delete cacheData[k],
