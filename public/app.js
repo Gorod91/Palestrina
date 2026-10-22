@@ -958,11 +958,11 @@ async function takeSweat(debug, overwrite = false) {
         v2.retaken = true;
       }
     }
-    // Dal 19/10 il punteggio ufficiale è il Sudometro 3 (senza annunci): si calcola prima di mostrare il risultato.
-    // Se non riesce (riferimento non scaricabile, viso non trovato) resta il punteggio della versione 1.
+    // Dal 22/10 il punteggio ufficiale è il Sudometro 4 (senza annunci; dal 19/10 era il 3): si calcola prima di
+    // mostrare il risultato. Se non riesce (riferimento non scaricabile, viso non trovato) resta la versione 1.
     if (!v2) v2 = await sudometroV2(photo);
-    const shown = v2.res3
-      ? { score: v2.res3.score, title: v2.res3.title, warnings: [] }
+    const shown = v2.res4
+      ? { score: v2.res4.score, title: v2.res4.title, warnings: [] }
       : v2live && v2.res ? { score: v2.res.score, title: v2.res.title, warnings: [] } : result;
     let before = null;
     if (!debug) {
@@ -975,7 +975,7 @@ async function takeSweat(debug, overwrite = false) {
     const r = await api('sudometro', {
       score: shown.score,
       title: shown.title,
-      details: { ...result.details, v2: compactV2(v2), v3: compactV3(v2) },
+      details: { ...result.details, v2: compactV2(v2), v3: compactV3(v2), v4: v2.res4 ? { score: v2.res4.score, ...v2.res4.details } : { err: v2.error || 'non calcolato' } },
       debug,
       overwrite,
       photo,
@@ -992,6 +992,7 @@ async function takeSweat(debug, overwrite = false) {
       lastDebug = [
         `${result.score}: ${result.title}`,
         `rossore +${result.details.red} · lucidità +${result.details.shine} · luce ${result.details.light}`,
+        v2.res4 ? `Sudometro 4: ${v2.res4.score} (riflessi ${v2.res4.details.shine} · luce ${v2.res4.details.light})` : '',
         v2.res3 ? `Sudometro 3: ${v2.res3.score} (riflessi ${v2.res3.details.shine} · bordo ${v2.res3.details.edge} · tinta ${v2.res3.details.red} · luce ×${v2.res3.details.lf})` : '',
         v2.res ? `Sudometro 2: ${v2.res.score} (tinta ${v2.res.details.red} · riflessi ${v2.res.details.shine} · luce ${v2.res.details.light} · nitidezza ×${v2.res.details.sharp}${v2.res.retake ? ` · da rifare: ${v2.res.retake}` : ''})` : `Sudometro 2: ${v2.error}`,
         ...result.warnings,
@@ -1038,7 +1039,7 @@ async function sudometroV2(photo, rest = null) {
   try {
     rest = rest || (await within(refV2(), 20000));
     const sweat = await within(imageFrom(`data:image/jpeg;base64,${photo}`).then((img) => sudometro.analyzeV2(img)), 15000);
-    return { rest, sweat, res: sudometro.scoreV2(rest, sweat), res3: rest.zones3 && sweat.zones3 ? sudometro.scoreV3(rest, sweat) : null };
+    return { rest, sweat, res: sudometro.scoreV2(rest, sweat), res3: rest.zones3 && sweat.zones3 ? sudometro.scoreV3(rest, sweat) : null, res4: rest.zones3 && sweat.zones3 ? sudometro.scoreV4(rest, sweat) : null };
   } catch (err) {
     return { error: String((err && err.message) || err) };
   }
