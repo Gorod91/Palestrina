@@ -106,9 +106,17 @@ let pendingState = null;
 // server non ha eseguito quell'azione e non è arrivato lo stato dopo. Gli stati arrivati nel frattempo (per
 // esempio quello di un annullamento precedente, eseguito in ritardo) non lo cancellano.
 let wantCheckin = null; // { value, done }
+// Avviso al server dopo un'azione in coda; con il giro dopo gli dice quanto ha aspettato (misura dei tempi, in prova)
+let lastPingMs = 0;
+function pingCoda() {
+  const t = Date.now();
+  return realApi('coda', lastPingMs ? { last: lastPingMs } : {})
+    .then(() => (lastPingMs = Date.now() - t))
+    .catch(() => {});
+}
 const fbdata = createFbData({
   getToken: () => realApi('fbToken'),
-  ping: () => realApi('coda').catch(() => {}),
+  ping: pingCoda,
   onState(st, meta) {
     if (!meta.fromCache) fbLiveState = true;
     trace.log('firebase', `stato${meta.fromCache ? ' (dal telefono)' : ''}`);

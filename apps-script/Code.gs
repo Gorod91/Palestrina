@@ -433,8 +433,10 @@ function doPost(e) {
   TABLES = {};
   PRELOADED = {};
   STATE_DIRTY = false;
+  TIMES = null;
   try {
     const req = JSON.parse(e.postData.contents);
+    if (req.action === 'coda' && req.test === true) TIMES = { t0, last: t0, marks: [], phone: Number(req.last) || 0 };
     try {
       ensureTriggers(false);
     } catch (err) {
@@ -453,7 +455,9 @@ function doPost(e) {
       if (!u) return json({ error: 'Link scaduto: chiedine uno nuovo dalle Impostazioni' });
       return json({ code: String(code), name: u.name, display: u.display });
     }
+    tmark('avvio');
     let user = findUserByCode(req.code);
+    tmark('utente');
     if (!user) return json({ error: 'Codice non valido' });
     if (req.test === true && (user.admin || PROVA_USERS.includes(user.name))) {
       TEST = true;
@@ -472,11 +476,13 @@ function doPost(e) {
     } catch (err) {
       console.error('Tabelle non precaricate', err);
     }
+    tmark('tabelle');
     try {
       closeOldSfide();
     } catch (err) {
       console.error('Sfide non chiuse', err);
     }
+    tmark('sfide vecchie');
     if (!TRACE_USERS.includes(user.name) || TEST) {
       const res = handle(req, user);
       finishRequest();
@@ -515,22 +521,53 @@ function finishRequest() {
   } catch (err) {
     console.error('Tabelle non salvate', err);
   }
+  tmark('tabelle salvate');
   const list = [];
   const st = chatStateRequest();
   if (st) list.push(st);
+  tmark('stato chat');
   try {
     const pub = statesRequest();
     if (pub) list.push(pub);
   } catch (err) {
     console.error('Stato non pubblicato su Firebase', err);
   }
+  tmark('stato di tutti');
   if (LATER) list.push(...LATER);
   LATER = null;
-  if (!list.length) return;
+  if (list.length) {
+    try {
+      UrlFetchApp.fetchAll(list.map((r) => ({ muteHttpExceptions: true, ...r })));
+    } catch (err) {
+      console.error('Chiamate di fine richiesta non riuscite', err);
+    }
+  }
+  tmark('invii');
+  saveTimes();
+}
+
+// ---------- Tempi del server (modalità prova, richieste "coda") ----------
+// Per capire dove va il tempo: ogni giro della coda in prova scrive nel foglio Debug quanto è durato ogni
+// passaggio (ms). "telefono" è quanto ha aspettato il telefono il giro precedente (avvio di Apps Script compreso).
+let TIMES = null;
+
+function tmark(label) {
+  if (!TIMES) return;
+  const now = Date.now();
+  TIMES.marks.push(`${label} ${now - TIMES.last}`);
+  TIMES.last = now;
+}
+
+function saveTimes() {
+  if (!TIMES || !TIMES.done) return;
+  const t = TIMES;
+  TIMES = null;
   try {
-    UrlFetchApp.fetchAll(list.map((r) => ({ muteHttpExceptions: true, ...r })));
+    const when = Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss');
+    const text = `totale ${Date.now() - t.t0} · ${t.marks.join(' · ')}${t.phone ? ` · telefono (giro prima) ${t.phone}` : ''}`;
+    sheet('debug').appendRow([when, TESTER, 'server', 'tempi coda', text.slice(0, 1000)]);
   } catch (err) {
-    console.error('Chiamate di fine richiesta non riuscite', err);
+    console.error('Tempi non salvati', err);
   }
 }
 
@@ -749,15 +786,19 @@ function checkin(user, source) {
   } finally {
     lock.releaseLock();
   }
+  tmark('presenza');
   const count = countInWeek(rows('presenze'), user.name, weekKey(dayString(new Date())));
   addChatEvent(user.name, { kind: 'checkin', count, goal: user.goal, auto: source === 'automatico' });
+  tmark('evento chat');
   announceAchievements(user);
+  tmark('traguardi');
   dispatch('checkin', user.name);
   try {
     maybeOpenSfida(user);
   } catch (err) {
     console.error('Sfida non aperta', err);
   }
+  tmark('sfide');
   return { ok: true, alreadyToday: false };
 }
 
@@ -3172,6 +3213,7 @@ function processQueueRound(coll) {
     },
   });
   const docs = (Array.isArray(res) ? res : []).map((x) => x.document).filter(Boolean);
+  tmark('coda letta');
   if (!docs.length) return 0;
   docs.sort((a, b) => (a.fields.at.timestampValue < b.fields.at.timestampValue ? -1 : 1));
   docs.forEach((d) => {
@@ -3180,6 +3222,7 @@ function processQueueRound(coll) {
       writes: [{ update: { name: d.name, fields: { ...d.fields, stato: { stringValue: 'in corso' } } }, currentDocument: { updateTime: d.updateTime } }],
     });
     if (claim.code >= 300) return;
+    tmark('prenotata');
     let out;
     try {
       const data = safeJson(d.fields.data.stringValue) || {};
@@ -3194,6 +3237,8 @@ function processQueueRound(coll) {
     firestoreCall('patch', `${d.name.split('/documents/')[1]}?updateMask.fieldPaths=stato&updateMask.fieldPaths=esito&updateMask.fieldPaths=fatta`, {
       fields: { stato: { stringValue: 'fatta' }, esito: { stringValue: JSON.stringify(out).slice(0, 200000) }, fatta: { timestampValue: new Date().toISOString() } },
     });
+    tmark(`esito ${d.fields.action.stringValue}`);
+    if (TIMES) TIMES.done = true;
     done++;
   });
   return done;
