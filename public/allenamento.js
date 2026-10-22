@@ -1,7 +1,8 @@
 // Allenamento (fase 1, solo in modalità prova): schede, serie e "l'ultima volta" per ogni esercizio.
 // Tutto su Firebase: le serie si salvano sul telefono anche senza campo e partono appena torna la rete.
-// Raccolte (in prova con prefisso prova_): serie/<giorno>_<uid>_<esercizio> = { name, ex, sets: [{ kg, reps }], day, scheda, at },
-// schede/<uid> = { name, list: [{ id, name, ex: [id esercizio] }], at }.
+// Raccolte (in prova con prefisso prova_): serie/<giorno>_<uid>_<esercizio> = { name, ex, sets: [{ kg, reps }], day, scheda, nome, at }
+// (nome: della scheda in quel momento, per i grafici anche se poi la scheda cambia nome o viene eliminata),
+// schede/<uid> = { name, list: [{ id, name, ex: [id esercizio] }], extra, rec, agg, at }.
 import { fbSignIn, fbUid } from './fbchat.js';
 import { figSvg } from './figure.js';
 import { popCount } from './timer.js';
@@ -396,7 +397,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function copia() {
     const { fs, db } = x;
     daCopiare().forEach((a) => {
-      fs.setDoc(fs.doc(db, pfx + 'serie', a.id), { name: me.name, ex: a.ex, sets: copy(a.sets), day: a.day, scheda: a.scheda || '', at: fs.serverTimestamp() })
+      fs.setDoc(fs.doc(db, pfx + 'serie', a.id), { name: me.name, ex: a.ex, sets: copy(a.sets), day: a.day, scheda: a.scheda || '', nome: a.nome || '', at: fs.serverTimestamp() })
         .catch((err) => toast(`Serie non copiate: ${err.message}`));
     });
   }
@@ -450,7 +451,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const { fs, db } = x;
     const day = today();
     // Non si aspetta Firebase: senza campo resta sul telefono e parte da solo appena torna la rete
-    fs.setDoc(fs.doc(db, pfx + 'serie', `${day}_${fbUid(me.name)}_${ex}`), { name: me.name, ex, sets: copy(sets), day, scheda: ui.scheda, at: fs.serverTimestamp() })
+    fs.setDoc(fs.doc(db, pfx + 'serie', `${day}_${fbUid(me.name)}_${ex}`), { name: me.name, ex, sets: copy(sets), day, scheda: ui.scheda, nome: curSch() ? curSch().name.slice(0, 60) : '', at: fs.serverTimestamp() })
       .catch((err) => toast(`Serie non salvate: ${err.message}`));
   }
 
