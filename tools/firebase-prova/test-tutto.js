@@ -119,6 +119,17 @@ async function waitCount(P, name, n, ms = 15000) {
   const pres = await post('/run/sheet', { name: SH('Presenze') });
   ok((pres || []).some((r) => r[2] === 'Francesco' && r[0] === today), 'nella tabella di prova (su Firestore)');
 
+  console.log('2a. Annullare il check-in: si vede appena Firebase conferma, anche con il server lento');
+  F.slow.ms = 4000;
+  const tU = Date.now();
+  await F.page.$eval('#btn-checkin-undo', (b) => b.click());
+  const dU = await waitCount(F, 'Francesco', before, 3000);
+  ok(dU >= 0, `F: check-in tolto dopo ${Date.now() - tU} ms`);
+  F.slow.ms = 0;
+  ok((await waitCount(M, 'Francesco', before, 15000)) >= 0, 'M vede il check-in tolto');
+  await F.page.$eval('#btn-checkin', (b) => b.click()); // si rifà, per i passi dopo
+  ok((await waitCount(M, 'Francesco', before + 1, 15000)) >= 0, 'F di nuovo dentro');
+
   console.log('2b. Server che non risponde: errore dopo 75 s e il check-in non viene più eseguito');
   M.slow.ms = 0;
   await M.ctx.route('https://finto.apps/**', (r) => r.abort()); // Apps Script irraggiungibile per Michy
@@ -138,6 +149,8 @@ async function waitCount(P, name, n, ms = 15000) {
   await M.page.$eval('#btn-checkin', (b) => b.click());
   const toast = await M.page.waitForFunction(() => !document.getElementById('toast').hidden && /offline/.test(document.getElementById('toast').textContent), null, { timeout: 5000 }).then(() => true).catch(() => false);
   ok(toast, 'M: messaggio "sei offline"');
+  ok(await M.page.$eval('#toast', (t) => t.classList.contains('error')), 'M: errore in rosso');
+  await M.page.screenshot({ path: path.join(require('os').tmpdir(), 'errore-offline.png') });
   ok((await waitCount(M, 'Michy', 0, 1500)) >= 0, 'M: il check-in non resta sullo schermo');
   await M.ctx.setOffline(false);
   await sleep(5000);

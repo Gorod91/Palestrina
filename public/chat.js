@@ -427,7 +427,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       pending.splice(pending.indexOf(item), 1);
       showPending();
       $('chat-input').value = t;
-      toast(err.message);
+      toast(`Errore: ${err.message}`);
     }
   }
 
@@ -445,7 +445,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       apply(r);
       toast('Cancellato');
     } catch (err) {
-      toast(err.message);
+      toast(`Errore: ${err.message}`);
     }
   }
 
@@ -517,7 +517,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       toast('Domanda mandata a tutti');
     } catch (err) {
       asking--;
-      toast(err.message);
+      toast(`Errore: ${err.message}`);
       v = -1;
       load(true);
     }
@@ -553,7 +553,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       try {
         last = await api('planSet', job);
       } catch (err) {
-        toast(err.message);
+        toast(`Errore: ${err.message}`);
         outbox.length = 0;
         sending = false;
         sendingDay = '';
@@ -1014,7 +1014,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       sfidaSending--;
       data.sfide = JSON.parse(before); // torna com'era
       renderList();
-      toast(err.message);
+      toast(`Errore: ${err.message}`);
     }
   }
 

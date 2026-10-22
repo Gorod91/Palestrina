@@ -207,16 +207,27 @@ function fbCall(action, data) {
     localDone.checkin = key === 'checkin';
     localDone.undo = key === 'undo';
   }
-  return fbdata.call(action, d, {
-    onResult(r) {
-      if (action === 'checkin' && r.alreadyToday) toast('Avevi già fatto check-in oggi');
-    },
-    onError(err) {
-      if (key) localDone[key] = false;
-      toast(`Errore: ${err.message}`);
-      if (serverState) applyState(serverState);
-    },
-  });
+  return fbdata
+    .call(action, d, {
+      onResult(r) {
+        if (action === 'checkin' && r.alreadyToday) toast('Avevi già fatto check-in oggi');
+      },
+      onError(err) {
+        if (key) localDone[key] = false;
+        toast(`Errore: ${err.message}`);
+        if (serverState) applyState(serverState);
+      },
+    })
+    .then(
+      (r) => {
+        if (key && serverState) applyState(serverState); // check-in o annullamento visibili subito sullo schermo
+        return r;
+      },
+      (err) => {
+        if (key) localDone[key] = false; // non è nemmeno arrivata a Firebase
+        throw err;
+      },
+    );
 }
 // Azioni date per fatte appena salvate su Firebase (le altre aspettano la risposta del server: punteggio, sfide…)
 const FAST_ACTIONS = new Set(['checkin', 'checkinUndo', 'setTimer', 'chatMute', 'setAlias', 'subscribe']);
@@ -313,11 +324,16 @@ function sudoBusy(text) {
   $('sudo-body').querySelector('p').textContent = text;
 }
 
+// Errori (connessione, server, azioni non riuscite): in rosso e un po' più a lungo, per non confonderli
+const TOAST_ERROR = /^errore|offline|connessione|non risponde|non ha risposto|non disponibile|non inviat|non salvat|non caricat|non riesco|troppo tardi/i;
+
 function toast(msg, ms = 3500) {
-  $('toast').textContent = msg;
+  const error = TOAST_ERROR.test(msg);
+  $('toast').textContent = error ? `⚠️ ${msg}` : msg;
+  $('toast').classList.toggle('error', error);
   $('toast').hidden = false;
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => ($('toast').hidden = true), ms);
+  toastTimer = setTimeout(() => ($('toast').hidden = true), error ? Math.max(ms, 6000) : ms);
 }
 
 const TAB_TITLES = { oggi: 'Home', classifica: 'Classifica', chat: 'Chat', timer: 'Timer', allenamento: 'Allenamento', altro: 'Impostazioni' };
