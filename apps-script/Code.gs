@@ -2310,16 +2310,17 @@ function fotoOwned(user, id) {
  * Da lanciare dall'editor (ripetibile): copia su Firebase le foto di Drive usate dall'app (Sudometro e riferimenti),
  * con lo stesso id. Salta quelle già copiate; se finisce il tempo basta rilanciarla.
  */
-function copiaFotoSuFirebase() {
+function copiaFotoSuFirebase(maxMs) {
   TEST = false;
   MEMO = {};
   const ids = new Set(rows('sudometro').flatMap((r) => [r.photoId, r.refId]).concat(Object.values(readRefPhotoIds())).filter((x) => x && isDriveId(x)));
   const t0 = Date.now();
   let copied = 0;
   let skipped = 0;
+  let failed = 0;
   for (const id of ids) {
-    if (Date.now() - t0 > 5 * 60000) break; // Apps Script si ferma a 6 minuti
-    if (firestoreGet(`foto/${id}`)) {
+    if (Date.now() - t0 > (maxMs || 5 * 60000)) break; // Apps Script si ferma a 6 minuti
+    if (firestoreGet(`foto/${id}?mask.fieldPaths=name`)) {
       skipped++;
       continue;
     }
@@ -2329,11 +2330,12 @@ function copiaFotoSuFirebase() {
       firestoreCall('patch', `foto/${id}`, fotoDoc(name, Utilities.base64Encode(f.getBlob().getBytes()), 'da Drive'));
       copied++;
     } catch (err) {
+      failed++; // file non più su Drive: la foto mancherà, come già oggi
       console.error('Foto non copiata', id, err);
     }
   }
-  Logger.log(`Foto copiate: ${copied}, già presenti: ${skipped}, totali: ${ids.size}`);
-  return { copied, skipped, total: ids.size };
+  Logger.log(`Foto copiate: ${copied}, già presenti: ${skipped}, non riuscite: ${failed}, totali: ${ids.size}`);
+  return { copied, skipped, failed, total: ids.size };
 }
 
 function photosRoot() {
@@ -2684,9 +2686,13 @@ function openSheet(key) {
 
 /** Tabella su Firestore invece che nel foglio. In prova si può tornare ai fogli con PROVA_TABELLE = "fogli". */
 function tablesOn(key) {
+  if (SHEET_ONLY.includes(key)) return false;
   if (TEST && TEST_SHEETS.includes(key)) return realProps.getProperty('PROVA_TABELLE') !== 'fogli';
   return realProps.getProperty('TABELLE') === 'firebase';
 }
+
+// Restano fogli anche con le tabelle su Firebase: gli utenti si modificano a mano, il Debug si legge dal foglio
+const SHEET_ONLY = ['utenti', 'debug'];
 
 let TABLES = {}; // tabelle caricate in questa esecuzione: percorso → VTable
 let PUBLISHING = false; // si sta calcolando lo stato da pubblicare: le tabelle già lette non si riscaricano
@@ -2966,7 +2972,7 @@ function copiaFogliSuFirebase() {
   const done = [];
   Object.keys(SHEETS).forEach((key) => {
     const sh = ss.getSheetByName(SHEETS[key].name);
-    if (!sh) return;
+    if (!sh || SHEET_ONLY.includes(key)) return;
     const rows = sh.getDataRange().getValues();
     firestoreCall('patch', tablePath(key, false), { fields: { rows: { bytesValue: packRows(rows) }, at: { timestampValue: new Date().toISOString() } } });
     done.push(`${key} (${rows.length - 1})`);
@@ -3491,8 +3497,55 @@ function runQueued(name, action, data) {
   return JSON.parse(out.getContent());
 }
 
+// ---------- Passaggio a Firebase per tutti ----------
+// All'ora indicata (proprietà PASSAGGIO_ORA "aaaa-mm-gg HH:mm", altrimenti PASSAGGIO_AT) lo fa il server da solo,
+// un minuto alla volta (codaTick): prima copia le foto di Drive (anche in più giri), poi, con il lock, copia fogli e
+// chat su Firestore e accende TABELLE = "firebase" e FIREBASE_TUTTO = "si". Le richieste dopo usano Firebase.
+// Ogni passo scrive una riga nel foglio Debug. Per non farlo: PASSAGGIO_ORA = "no".
+const PASSAGGIO_AT = '2026-10-22 23:30';
+
+function passaggioTick() {
+  TEST = false;
+  if (realProps.getProperty('FIREBASE_TUTTO') === 'si') return;
+  const at = realProps.getProperty('PASSAGGIO_ORA') || PASSAGGIO_AT;
+  if (!/^\d{4}-\d\d-\d\d \d\d:\d\d$/.test(at) || new Date() < Utilities.parseDate(at, TZ, 'yyyy-MM-dd HH:mm')) return;
+  const log = (text) => sheetRaw('debug').appendRow([Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss'), 'server', 'server', 'passaggio', text]);
+  MEMO = {};
+  // 1) Foto (le più lunghe, senza lock: non cambiano). Se il tempo non basta si continua al giro dopo.
+  const foto = copiaFotoSuFirebase(3 * 60000);
+  if (foto.copied + foto.skipped + foto.failed < foto.total) return log(`foto copiate ${foto.copied}, già presenti ${foto.skipped} su ${foto.total}: continuo`);
+  // 2) Tabelle e chat, senza richieste che scrivono nel frattempo
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) return log('lock occupato: riprovo tra un minuto');
+  try {
+    PROPS_SNAP = null;
+    if (realProps.getProperty('FIREBASE_TUTTO') === 'si') return;
+    MEMO = {};
+    const more = copiaFotoSuFirebase(60000); // quelle fatte nel frattempo
+    const tabelle = copiaFogliSuFirebase();
+    let chat = 'già su Firebase';
+    if (realProps.getProperty('FIREBASE_CHAT') !== 'tutti') {
+      chat = `${copiaChatSuFirebase()} messaggi copiati`;
+      realProps.setProperty('FIREBASE_CHAT', 'tutti');
+    }
+    realProps.setProperty('TABELLE', 'firebase');
+    realProps.setProperty('FIREBASE_TUTTO', 'si');
+    log(`fatto: foto ${foto.copied + more.copied} copiate (${foto.failed + more.failed} non riuscite), tabelle ${tabelle.join(', ')}, chat ${chat}`);
+  } finally {
+    lock.releaseLock();
+  }
+  PROPS_SNAP = null;
+  MEMO = {};
+  TABLES = {};
+}
+
 /** Ogni minuto: azioni rimaste in coda (avviso perso) e stato del nuovo giorno. */
 function codaTick() {
+  try {
+    passaggioTick();
+  } catch (err) {
+    console.error('Passaggio a Firebase non riuscito', err);
+  }
   [false, true].forEach((test) => {
     TEST = test;
     PROPS_SNAP = null;
