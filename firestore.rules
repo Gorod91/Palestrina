@@ -57,13 +57,14 @@ service cloud.firestore {
       // Serie di un esercizio in un giorno (id = giorno_uid_esercizio): si possono correggere
       allow create, update: if pal() && allenamento()
         && coll in ['serie', 'prova_serie']
-        && request.resource.data.keys().hasOnly(['name', 'ex', 'sets', 'day', 'scheda', 'at'])
+        && request.resource.data.keys().hasOnly(['name', 'ex', 'sets', 'day', 'scheda', 'nome', 'at'])
         && id == request.resource.data.day + '_' + request.auth.uid + '_' + request.resource.data.ex
         && request.resource.data.name == request.auth.token.name
         && request.resource.data.ex is string
         && request.resource.data.ex.matches('^[a-z0-9-]{1,40}$')
         && request.resource.data.scheda is string
         && request.resource.data.scheda.size() <= 40
+        && (!('nome' in request.resource.data) || (request.resource.data.nome is string && request.resource.data.nome.size() <= 60))
         && request.resource.data.sets is list
         && request.resource.data.sets.size() >= 1
         && request.resource.data.sets.size() <= 20
