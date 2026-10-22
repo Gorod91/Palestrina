@@ -64,7 +64,8 @@ export function preload() {
 export async function takeSelfie(hint, { live = false, reference = null } = {}) {
   const $ = (id) => document.getElementById(id);
   const stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } },
+    // Risoluzione alta per la copia HD (zip dell'admin); le foto normali restano a 480 px
+    video: { facingMode: 'user', width: { ideal: 1440 }, height: { ideal: 1920 } },
     audio: false,
   });
   const video = $('video');
@@ -79,7 +80,7 @@ export async function takeSelfie(hint, { live = false, reference = null } = {}) 
   if (live) liveLoop(video, reference, () => open);
 
   const result = await new Promise((resolve) => {
-    $('btn-shoot').onclick = () => resolve(capture(video, 960)); // più grande: dopo il ritaglio sul viso resta nitida
+    $('btn-shoot').onclick = () => resolve(capture(video, 1920)); // più grande: dopo il ritaglio sul viso resta nitida
     $('btn-cancel').onclick = () => resolve(null);
   });
 
@@ -114,6 +115,17 @@ export function toJpegBase64(canvas, quality = 0.72, max = 480) {
     out.getContext('2d').drawImage(canvas, 0, 0, out.width, out.height);
   }
   return out.toDataURL('image/jpeg', quality).split(',')[1];
+}
+
+/** Copia ad alta qualità dello stesso ritaglio: serve solo a tarare il Sudometro (zip dell'admin).
+ *  Lato lungo al massimo 1600 px; qualità più bassa se supera 850 KB (limite delle foto su Firebase: 900 KB). */
+export function toJpegHD(canvas) {
+  let out = '';
+  for (const q of [0.92, 0.85, 0.75]) {
+    out = toJpegBase64(canvas, q, 1600);
+    if (out.length * 0.75 < 850000) break;
+  }
+  return out;
 }
 
 // Riquadro del viso trovato dall'ultima analisi di ogni scatto
