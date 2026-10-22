@@ -329,7 +329,7 @@ const TOAST_ERROR = /^errore|offline|connessione|non risponde|non ha risposto|no
 
 function toast(msg, ms = 3500) {
   const error = TOAST_ERROR.test(msg);
-  $('toast').textContent = error ? `⚠️ ${msg}` : msg;
+  $('toast').textContent = msg;
   $('toast').classList.toggle('error', error);
   $('toast').hidden = false;
   clearTimeout(toastTimer);
