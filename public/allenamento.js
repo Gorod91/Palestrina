@@ -136,14 +136,14 @@ const rizzo = (id, name, piano) => ({
   piano: { ...piano, ...PIANO_ADDOME_R },
 });
 SCHEDE_ESEMPIO.push(
-  rizzo('r-upper', 'Rizzo Upper', {
+  rizzo('r-upper', 'Upper', {
     panca: { s: '5 × 5' },
     'croci-alto': { s: '3 × 12' },
     lat: { s: '3 × 8-10' },
     pulley: { s: '3 × 8-10' },
     alzate: { s: '3 × 10-12' },
   }),
-  rizzo('r-lower', 'Rizzo Lower', {
+  rizzo('r-lower', 'Lower', {
     'leg-press-or': { s: '4 × 8-10' },
     'leg-ext': { s: '3 × 8-10' },
     'leg-curl': { s: '3 × 8-10' },
@@ -151,14 +151,14 @@ SCHEDE_ESEMPIO.push(
     'affondi-indietro': { s: '3 × 8-10' },
     abductor: { s: '3 × 10-12' },
   }),
-  rizzo('r-davanti', 'Rizzo Davanti', {
+  rizzo('r-davanti', 'Davanti', {
     panca: { s: '4 × 10' },
     'spinte-multipower': { s: '3 × 8-10' },
     'step-ups': { s: '3 × 8-10' },
     'curl-ez': { s: '3 × 8-10' },
     'hammer-curl': { s: '3 × 8-10' },
   }),
-  rizzo('r-dietro', 'Rizzo Dietro', {
+  rizzo('r-dietro', 'Dietro', {
     'trazioni-elastico': { s: '4 × 6', nota: 'più diventi forte, più aumenti le ripetizioni' },
     pulley: { s: '3 × 8-10' },
     'pushdown-corda': { s: '3 × 10-12' },
@@ -169,7 +169,7 @@ SCHEDE_ESEMPIO.push(
 
 // Scheda di Ceppo (una sola, dell'istruttore Simone); kg: peso da cui partire, rec: recupero in secondi
 SCHEDE_ESEMPIO.push({
-  id: 'c-ceppo', name: 'Ceppo', di: 'Ceppo',
+  id: 'c-ceppo', name: 'Total body', di: 'Ceppo',
   ex: ['@mob-c', '@colonna-c', 'ercolina-rot', 'leg-press', 'goblet-box', 'pekdek-or', 'rematore-armstrong', 'eps-trazioni', 'pekdek-vert'],
   circuiti: {
     'mob-c': { n: 'Riscaldamento e mobilità', lista: true, durata: "10'", ex: ['riscaldamento', 'capo', 'spalle-mob', 'circ-braccia', 'rot-busto', 'circ-anca', 'caviglia-rialzo', 'tappetino-mob'] },
@@ -196,7 +196,7 @@ const MOB_G = { n: 'Mobilità', lista: true, durata: "5'", ex: ['circ-braccia', 
 const PIANO_MOB_G = { 'circ-braccia': { s: '10 avanti, 10 indietro' }, 'circ-anca': { s: '10 orario, 10 antiorario' }, plank: { s: '30"' } };
 SCHEDE_ESEMPIO.push(
   {
-    id: 'g-a', name: 'Gualo A', di: 'Gualo',
+    id: 'g-a', name: 'Scheda A', di: 'Gualo',
     ex: ['@mob-g', 'leg-press-mono', 'shoulder-bil', 'leg-ext', 'chest-press', 'curl-alt', '@addome-g'],
     circuiti: {
       'mob-g': MOB_G,
@@ -217,7 +217,7 @@ SCHEDE_ESEMPIO.push(
     },
   },
   {
-    id: 'g-b', name: 'Gualo B', di: 'Gualo',
+    id: 'g-b', name: 'Scheda B', di: 'Gualo',
     ex: ['@mob-g', 'lat', 'low-row', 'leg-curl-sdraiato', 'hyper-ext', 'piegamenti', 'vogatore', 'pushdown-corda'],
     circuiti: { 'mob-g': MOB_G },
     piano: {
@@ -242,13 +242,27 @@ SCHEDE_ESEMPIO.push(
 //   { id, op: 'togli', scheda, ex }                                  toglie un esercizio
 //   { id, op: 'circuito', scheda, c, set: { n, giri, rec, ex } }     cambia un circuito (c senza @)
 //   { id, op: 'nome', scheda, name }                                 rinomina una scheda
+//   { id, op: 'nome', di, da, name }                                 rinomina le copie "di" qualcuno che si chiamano ancora `da`
 //   { id, op: 'scheda', scheda: { id, name, ex, piano, circuiti } }  scheda intera nuova (se non c'è già)
-const AGGIORNAMENTI = [];
+const AGGIORNAMENTI = [
+  // 23/10: via i nomi delle persone dai nomi delle schede (c'è il bollino con la persona)
+  { id: 1, op: 'nome', di: 'Rizzo', da: 'Rizzo Upper', name: 'Upper' },
+  { id: 2, op: 'nome', di: 'Rizzo', da: 'Rizzo Lower', name: 'Lower' },
+  { id: 3, op: 'nome', di: 'Rizzo', da: 'Rizzo Davanti', name: 'Davanti' },
+  { id: 4, op: 'nome', di: 'Rizzo', da: 'Rizzo Dietro', name: 'Dietro' },
+  { id: 5, op: 'nome', di: 'Ceppo', da: 'Ceppo', name: 'Total body' },
+  { id: 6, op: 'nome', di: 'Gualo', da: 'Gualo A', name: 'Scheda A' },
+  { id: 7, op: 'nome', di: 'Gualo', da: 'Gualo B', name: 'Scheda B' },
+];
 
 /** Applica un aggiornamento all'elenco di schede (già copiato); quello che non trova lo salta. */
 function applyAgg(list, a) {
   if (a.op === 'scheda') {
     if (!list.some((y) => y.id === a.scheda.id)) list.push(JSON.parse(JSON.stringify(a.scheda)));
+    return;
+  }
+  if (a.op === 'nome' && a.da) { // tutte le copie con quel nome (non quelle già rinominate da chi le usa)
+    list.forEach((y) => { if (y.di === a.di && y.name === a.da) y.name = a.name; });
     return;
   }
   const sc = list.find((y) => y.id === a.scheda);
@@ -1148,7 +1162,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     .sort((a, b) => ((a.at && a.at.toMillis ? a.at.toMillis() : 0) - (b.at && b.at.toMillis ? b.at.toMillis() : 0)));
 
   function openEditor(sc, isNew) {
-    ui.ed = { id: sc.id || newId('s'), name: sc.name || '', ex: (sc.ex || []).slice(), piano: clone(sc.piano || {}), circuiti: clone(sc.circuiti || {}), di: sc.di || '', isNew };
+    ui.ed = { id: sc.id || newId('s'), name: sc.name || '', ex: (sc.ex || []).slice(), piano: clone(sc.piano || {}), circuiti: clone(sc.circuiti || {}), di: sc.di || '', mod: !!sc.mod, isNew };
     Object.assign(ui, { sheet: null, pickFor: '', sel: [], view: 'edit' });
   }
 
@@ -1297,6 +1311,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     });
     const sc = { id: ed.id, name, ex, piano, circuiti };
     if (ed.di) sc.di = ed.di;
+    if (ed.di && (!ed.isNew || ed.mod)) sc.mod = true; // copia modificata: la vedono anche gli altri ("da …, modificata")
     const list = clone(schede || []), k = list.findIndex((y) => y.id === ed.id);
     if (k >= 0) list[k] = sc;
     else if (list.length >= 30) return toast('Si possono avere al massimo 30 schede');
@@ -1420,9 +1435,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
    *  dai miei) e quelle di chi ha già le sue. key: e:<id> (inserite qui) oppure o:<documento>:<n>. */
   function altri() {
     const by = {};
-    SCHEDE_ESEMPIO.filter((y) => y.di).forEach((y) => (by[y.di] ||= []).push({ sc: y, key: `e:${y.id}` }));
-    // di ognuno solo le schede sue, non quelle che ha copiato da altri
-    otherSchede.forEach((d, i) => (d.list || []).forEach((y, j) => { if (!y.di) (by[d.name] ||= []).push({ sc: y, key: `o:${i}:${j}` }); }));
+    SCHEDE_ESEMPIO.filter((y) => y.di).forEach((y) => (by[y.di] ||= []).push({ sc: y, key: `e:${y.id}`, chi: y.di }));
+    // di ognuno le schede sue e le copie che ha modificato (quelle copiate e lasciate uguali no: sarebbero doppioni)
+    otherSchede.forEach((d, i) => (d.list || []).forEach((y, j) => { if (!y.di || y.mod) (by[d.name] ||= []).push({ sc: y, key: `o:${i}:${j}`, chi: d.name }); }));
     const names = Object.keys(by);
     return { by, names, n: names.reduce((t, k) => t + by[k].length, 0) };
   }
@@ -1434,12 +1449,13 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const [, i, j] = key.split(':'), d = otherSchede[Number(i)];
     return d && d.list && d.list[Number(j)] ? { sc: d.list[Number(j)], chi: d.name, ext: d.extra || [] } : null;
   };
-  const giaMia = (sc) => (schede || []).some((y) => y.name === sc.name);
+  /** Ce l'ho già: stesso nome e copiata dalla stessa persona. */
+  const giaMia = (sc, chi) => (schede || []).some((y) => y.name === sc.name && y.di === chi);
 
   /** "Schede degli altri": l'elenco per persona; un tocco apre l'anteprima. */
   function copyView() {
     const { by, names } = altri();
-    const row = ({ sc, key }) => `<button class="wo-row" data-a="prev:${key}"><span><b>${esc(sc.name)}</b><small>${sc.ex.length} esercizi${giaMia(sc) ? ' · già tra le tue' : ''}</small></span><span class="wo-chev">›</span></button>`;
+    const row = ({ sc, key, chi }) => `<button class="wo-row" data-a="prev:${key}"><span><b>${esc(sc.name)}</b><small>${sc.ex.length} ${sc.ex.length === 1 ? 'esercizio' : 'esercizi'}${key.startsWith('o:') && sc.di ? ` · da ${esc(sc.di)}, modificata` : ''}${giaMia(sc, chi) ? ' · già tra le tue' : ''}</small></span><span class="wo-chev">›</span></button>`;
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Allenamento</button></div>
       <h2 class="wo-ed-title">Schede degli altri</h2>
       ${names.map((n) => `<div class="wo-who"><span class="wo-av">${esc(n[0])}</span><b>${esc(n)}</b></div><section class="card wo-list">${by[n].map(row).join('')}</section>`).join('') || '<p class="wo-empty">Nessuna scheda</p>'}`;
@@ -1459,7 +1475,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <div class="wo-prev-t"><h2 class="wo-ed-title">${esc(sc.name)}</h2><span class="wo-prev-di">di ${esc(chi)}</span></div>
       <section class="card wo-prev">${rows}</section>
       <button class="primary" data-a="cpsave">Copia tra le mie</button>
-      <p class="wo-sub wo-center">${giaMia(sc) ? 'Ne hai già una con questo nome: la copia avrà il bollino con la persona.' : 'Per usarla la copi tra le tue; poi la puoi anche modificare.'}</p>`;
+      <p class="wo-sub wo-center">${giaMia(sc, chi) ? 'Ne hai già una con questo nome: la copia avrà il bollino con la persona.' : 'Per usarla la copi tra le tue; poi la puoi anche modificare.'}</p>`;
   }
 
   /** Copia la scheda in anteprima tra le mie (resta "di" chi l'ha fatta, quindi non viene proposta come da fare). */
@@ -1476,6 +1492,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const c = clone(a.sc);
     c.id = newId('s');
     c.di = a.chi; // il bollino con la persona distingue anche due schede con lo stesso nome
+    delete c.mod; // per me è una copia nuova
     const list = clone(schede || []);
     if (list.length >= 30) return toast('Si possono avere al massimo 30 schede');
     list.push(c);
