@@ -982,7 +982,34 @@ function removeSubscription(endpoint) {
 }
 
 /** Stato per la schermata principale: classifica della settimana, streak, Sudometro. */
+/** Stato dell'app per `user`: la parte comune (uguale per tutti) si calcola una volta sola per richiesta. */
 function buildState(user) {
+  const today = dayString(new Date());
+  const presenze = rows('presenze');
+  const mySudoToday = rows('sudometro').filter((r) => r.name === user.name && r.day === today).pop();
+  return {
+    me: {
+      name: user.name,
+      display: user.display,
+      alias: user.alias,
+      goal: user.goal,
+      debug: user.debug,
+      admin: user.admin,
+      tester: user.admin || PROVA_USERS.includes(user.name),
+      allenamento: WORKOUT_USERS.includes(user.name),
+      actingAs: !!user.actingAs,
+      checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
+      sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title, photoId: mySudoToday.photoId, refId: mySudoToday.refId } : null,
+      reference: getReference(user),
+      timerSeconds: Number(props.getProperty('timer_' + user.name)) || null,
+      chatMuted: !!props.getProperty('mute_' + user.name),
+    },
+    ...memo('state:shared', sharedState),
+  };
+}
+
+/** La parte dello stato uguale per tutti: classifiche, piani, punti, Sudometro, chat. */
+function sharedState() {
   const users = allUsers();
   const presenze = rows('presenze');
   const today = dayString(new Date());
@@ -1001,25 +1028,8 @@ function buildState(user) {
 
   const sudo = rows('sudometro').filter((r) => weekKey(r.day) === week);
   const pomodoro = sudo.reduce((best, r) => (!best || r.score > best.score ? r : best), null);
-  const mySudoToday = sudo.filter((r) => r.name === user.name && r.day === today).pop();
 
   return {
-    me: {
-      name: user.name,
-      display: user.display,
-      alias: user.alias,
-      goal: user.goal,
-      debug: user.debug,
-      admin: user.admin,
-      tester: user.admin || PROVA_USERS.includes(user.name),
-      allenamento: WORKOUT_USERS.includes(user.name),
-      actingAs: !!user.actingAs,
-      checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
-      sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title, photoId: mySudoToday.photoId, refId: mySudoToday.refId } : null,
-      reference: getReference(user),
-      timerSeconds: Number(props.getProperty('timer_' + user.name)) || null,
-      chatMuted: !!props.getProperty('mute_' + user.name),
-    },
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
