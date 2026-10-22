@@ -1011,7 +1011,13 @@ async function takeSweat(debug, overwrite = false) {
       }
       throw err;
     });
-    if (before) optimistic--;
+    if (before) {
+      optimistic--;
+      // Con Firebase la foto si vede appena il server la accetta, senza aspettare il nuovo stato
+      if (r.photoId && state.me.sudometroToday && state.me.sudometroToday.saving) {
+        state = { ...state, me: { ...state.me, sudometroToday: { score: shown.score, title: shown.title, photoId: r.photoId, refId: r.refId || '' } } };
+      }
+    }
     if (debug) {
       lastDebug = [
         `${result.score}: ${result.title}`,

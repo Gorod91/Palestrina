@@ -939,7 +939,7 @@ function saveSudometro(user, req) {
     addChatEvent(user.name, { kind: 'sudometro', score, title: String(req.title || '').slice(0, 60), photoId: saved.id || '', ref: refId });
     dispatch('sudometro', user.name);
   }
-  return { ok: true, score, debug, photoError: saved.error };
+  return { ok: true, score, debug, photoId: saved.id || '', refId, photoError: saved.error };
 }
 
 /**
@@ -2297,8 +2297,8 @@ function fotoDoc(name, base64, label) {
 /** Foto caricata dal telefono su Firebase: valida solo se è sua. */
 function fotoOwned(user, id) {
   if (!/^[A-Za-z0-9_-]{6,60}$/.test(id)) return { error: 'Foto non valida' };
-  const d = firestoreGet(`foto/${id}`);
-  if (!d || d.fields.name.stringValue !== user.name) return { error: 'Foto non trovata' };
+  const d = firestoreGet(`foto/${id}?mask.fieldPaths=name`); // solo il nome, senza scaricare la foto
+  if (!d || !d.fields || !d.fields.name || d.fields.name.stringValue !== user.name) return { error: 'Foto non trovata' };
   return { id };
 }
 
