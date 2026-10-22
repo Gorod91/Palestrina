@@ -2,6 +2,7 @@
 // (check-in, Sudometro, premiazioni). Si aggiorna ogni 5 secondi solo mentre è aperta.
 
 import { createFbChat } from './fbchat.js';
+import { alF, kingTitle } from './genere.js';
 
 const $ = (id) => document.getElementById(id);
 const POLL_EVERY = 5000;
@@ -23,7 +24,7 @@ const CHOICES = [
   ['no', 'No'],
 ];
 
-export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown, openNews, trace, useFirebase, fbOnly }) {
+export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown, isF: isFApp, openNews, trace, useFirebase, fbOnly }) {
   const tlog = trace || (() => {});
   let me = null; // { name, display }
   let v = 0; // versione dei dati in Apps Script
@@ -61,6 +62,8 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     } catch { /* storage non disponibile */ }
   };
   const who = (name) => (data && data.names && data.names[name]) || name;
+  // ragazze (colonna Sesso di Utenti): dallo stato della chat, altrimenti da quello dell'app
+  const isF = (name) => (data && data.fem ? data.fem.includes(name) : isFApp(name));
 
   // ---------- Messaggi e sondaggio su Firebase ----------
   // Messaggi, domande ("Chiedi a tutti") e risposte si scrivono su Firestore e arrivano agli altri in tempo reale;
@@ -931,7 +934,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         const row = el('div', `msg ${mine ? 'mine' : 'theirs'}`);
         if (!mine && lastSender !== m.name) {
           const sender = el('div', 'sender', m.display);
-          if (isKing(m.name)) sender.insertAdjacentHTML('beforeend', crown);
+          if (isKing(m.name)) sender.insertAdjacentHTML('beforeend', crown(m.name));
           row.append(sender);
         }
         const bubble = el('div', 'bubble', m.text);
@@ -1085,13 +1088,13 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     };
 
     if (s.kind === 'durata') {
-      if (s.noWinner) row.append(el('p', 'event-text', 'Vincitore contestato due volte: vale solo la partecipazione.'));
+      if (s.noWinner) row.append(el('p', 'event-text', `${isF(s.contestato) ? 'Vincitrice contestata' : 'Vincitore contestato'} due volte: vale solo la partecipazione.`));
       else if (s.winner) {
         const conf = s.winner.conf ? ` · confermato da ${s.winner.conf}` : ' · da confermare';
         row.append(el('p', 'sfida-res', `Ha vinto ${s.winner.display} (dice ${s.winner.byDisplay})${conf}`));
         if (amIn && !s.winner.conf && s.winner.by !== me.name) row.append(confirmBtns('__winner'));
       } else if (amIn && ins.length >= 2) {
-        row.append(el('p', 'event-text', s.winnerContests ? 'Vincitore contestato: dichiaratelo di nuovo. Chi ha vinto?' : 'Finita? Chi ha vinto?'));
+        row.append(el('p', 'event-text', s.winnerContests ? `${isF(s.contestato) ? 'Vincitrice contestata' : 'Vincitore contestato'}: dichiaratelo di nuovo. Chi ha vinto?` : 'Finita? Chi ha vinto?'));
         const b = el('div', 'sfida-btns wrap');
         ins.forEach((p) => {
           const btn = el('button', 'choice', p.display);
@@ -1178,14 +1181,15 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       const box = el('div', 'event-sudo');
       const text = el('div');
       text.append(el('p', 'event-text', `${name} ha fatto il Sudometro`));
-      text.append(el('p', 'event-score', `${d.score} · ${clean(d.title)}`));
-      if (d.photoId) box.append(photoPair(d.photoId, d.ref || (data.refPhotos || {})[m.name], `${name} · ${d.score} · ${clean(d.title)}`));
+      const title = alF(clean(d.title), isF(m.name));
+      text.append(el('p', 'event-score', `${d.score} · ${title}`));
+      if (d.photoId) box.append(photoPair(d.photoId, d.ref || (data.refPhotos || {})[m.name], `${name} · ${d.score} · ${title}`, false, isF(m.name)));
       box.append(text);
       row.append(box);
     } else if (d.kind === 'achievement') {
       row.classList.add('award');
       row.append(el('p', 'event-title', 'Medaglia vinta'));
-      row.append(el('p', 'event-text', `${name}: ${d.title} (+${d.pts} punti)`));
+      row.append(el('p', 'event-text', `${name}: ${alF(d.title, isF(m.name))} (+${d.pts} punti)`));
     } else if (d.kind === 'news') {
       // Novità sbloccate: le slide si aprono a tutto schermo
       row.classList.add('award', 'news');
@@ -1199,7 +1203,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       row.append(el('p', 'event-title', d.kind === 'weekly' ? 'Premiazioni della settimana' : `Premiazioni di ${d.month}`));
       const period = d.kind === 'weekly' ? 'della settimana' : 'del mese';
       const lines = [];
-      if (d.king) lines.push(`Re del mese: ${d.king.names.map(who).join(', ')} (${d.king.total} punti)`);
+      if (d.king) lines.push(`${kingTitle(d.king.names, isF)}: ${d.king.names.map(who).join(', ')} (${d.king.total} punti)`);
       if (d.mvp) lines.push(`MVP: ${d.mvp.names.map(who).join(', ')} (${d.mvp.count})`);
       if (d.divano) lines.push(`Divano d'oro: ${d.divano.names.map(who).join(', ')} (${d.divano.count})`);
       if (d.pomodoro) lines.push(`Pomodoro ${period}: ${who(d.pomodoro.name)} (${d.pomodoro.score})`);

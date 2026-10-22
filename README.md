@@ -128,6 +128,9 @@ Pesi e soglie in `WEIGHTS2` e `QUALITY2` di `public/sudometro.js`. Diventa il pu
 È il punteggio che si vede e che va nel foglio; se non si riesce a calcolare (riferimento non scaricabile, viso non trovato) resta quello della versione 1. I punteggi di versione 1 e 2 restano in *Dettagli*.
 Calcolato dalle stesse analisi del 2 e salvato accanto (`v3` in *Dettagli*: punteggio, dettagli, riflessi per zona `rif`/`sud` con le tempie `t`, lucentezza `glr`/`gls`). Tarato il 19/10 sulla classifica a occhio di 9 coppie: media dell'aumento dei riflessi su fronte, tempie, naso e zigomi (senza capelli e sopracciglia; ogni zona conta al massimo 15), più il doppio dell'aumento di nitidezza del bordo dei riflessi (pelle bagnata = riflesso netto); il rossore aggiunge 3 punti grezzi per grado (massimo 6) solo se c'è anche lucido; con la luce diversa dal riferimento il punteggio cala in proporzione e a 10 di differenza vale 0. Lucentezza per zona: `w`, `e` (bordo netto), `nb`/`sz` (quanti riflessi e quanto grandi). Pesi e soglie in `WEIGHTS3` e `QUALITY3`.
 
+### Sesso
+Colonna **F "Sesso"** del foglio Utenti: `m` o `f` (la prima volta il server la crea da solo, con `f` per Michy). Con `f` i testi che parlano di quella persona sono al femminile: Regina del mese (o "Re e Regina" a pari merito), Mattiniera, titoli del Sudometro (Appena tiepida, Fresca come una rosa), "selfie da sudata", didascalie Fresca/Sudata, vincitrice contestata. Regole e testi generici restano al maschile. Parole in `public/genere.js` (e `AL_F` in `Code.gs`).
+
 ### Alias
 Nel tab **Impostazioni → Profilo** ognuno può scegliere un **nome visualizzato** (colonna **E "Alias"** del foglio Utenti), usato in classifica e nelle notifiche. Il nome della colonna A resta quello originale e collega tutti i dati (presenze, foto, cartelle su Drive, debug), quindi non va cambiato. Alias vuoto = si vede il nome originale.
 

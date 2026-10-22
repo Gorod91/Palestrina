@@ -12,7 +12,7 @@
  */
 
 const SHEETS = {
-  utenti: { name: 'Utenti', header: ['Nome', 'Codice', 'Obiettivo settimanale', 'Debug', 'Alias'] },
+  utenti: { name: 'Utenti', header: ['Nome', 'Codice', 'Obiettivo settimanale', 'Debug', 'Alias', 'Sesso'] },
   presenze: { name: 'Presenze', header: ['Data', 'Ora', 'Nome', 'Fonte'] },
   sudometro: { name: 'Sudometro', header: ['Data', 'Ora', 'Nome', 'Punteggio', 'Titolo', 'Dettagli', 'Debug', 'Foto', 'Riferimento'] },
   iscrizioni: { name: 'Iscrizioni', header: ['Nome', 'Endpoint', 'Sottoscrizione', 'Aggiornata'] },
@@ -1065,6 +1065,7 @@ function sharedState() {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
+    fem: femmine(),
     features: { apripista: featureOn('apripista'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn(), firebaseTutto: !TEST && fbAllOn(), provaTutto: TEST && fbAllOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
@@ -1159,7 +1160,7 @@ function buildNotifications(event, name) {
   if (event === 'sudometro') {
     const r = rows('sudometro').filter((x) => x.name === name).pop();
     if (!r) return [];
-    return toAllBut(name, `Sudometro di ${dn(name)}: ${r.score}`, `"${clean(r.title)}"`);
+    return toAllBut(name, `Sudometro di ${dn(name)}: ${r.score}`, `"${alF(clean(r.title), name)}"`);
   }
 
   if (event === 'chat') {
@@ -1236,7 +1237,7 @@ function buildNotifications(event, name) {
     if (points.length) {
       const dn = displayNames();
       const kings = points.filter((t) => t.total === points[0].total).map((t) => dn(t.name)).join(', ');
-      body = `Re del mese: ${kings} (${points[0].total} punti)\n${body}`;
+      body = `${kingTitle(points.filter((t) => t.total === points[0].total).map((t) => t.name))}: ${kings} (${points[0].total} punti)\n${body}`;
     }
     return subs.map((s) => ({ subscription: s.sub, title: `Premiazioni di ${m.label}`, body, tab: 'chat' }));
   }
@@ -1411,6 +1412,7 @@ function buildChatState(version, today) {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     names: Object.fromEntries(allUsers().map((u) => [u.name, u.display])),
+    fem: femmine(),
     refPhotos: refPhotoIds(),
     sfide: sfideForChat(today),
   };
@@ -1750,8 +1752,8 @@ function sfidaAction(user, req) {
       if (def.kind !== 'durata' || !isPart) return { error: 'Non puoi dichiarare il vincitore' };
       const w = String(req.target || '');
       if (!(d.people[w] && d.people[w].in)) return { error: 'Il vincitore deve essere un partecipante' };
-      if (d.noWinner) return { error: 'Vincitore contestato due volte: vale la partecipazione' };
-      if (d.winner) return { error: 'Il vincitore è già stato dichiarato' };
+      if (d.noWinner) return { error: isF(d.contestato) ? 'Vincitrice contestata due volte: vale la partecipazione' : 'Vincitore contestato due volte: vale la partecipazione' };
+      if (d.winner) return { error: isF(d.winner.name) ? 'La vincitrice è già stata dichiarata' : 'Il vincitore è già stato dichiarato' };
       d.winner = { name: w, by: user.name, conf: null };
       notify = 'result';
     } else if (op === 'confirm' || op === 'contest') {
@@ -1763,6 +1765,7 @@ function sfidaAction(user, req) {
         if (op === 'confirm') d.winner.conf = user.name;
         else {
           d.winnerContests = (d.winnerContests || 0) + 1;
+          d.contestato = d.winner.name; // per dire "vincitrice contestata" se è una ragazza
           d.winner = null;
           if (d.winnerContests >= 2) d.noWinner = true;
         }
@@ -1941,6 +1944,7 @@ function sfideForChat(today) {
         people,
         winner: w ? { name: w.name, display: dn(w.name), by: w.by, byDisplay: dn(w.by), conf: w.conf ? dn(w.conf) : '' } : null,
         winnerContests: s.data.winnerContests || 0,
+        contestato: s.data.contestato || '',
         noWinner: !!s.data.noWinner,
         result: r
           ? { winners: r.winners.map(dn), points: Object.keys(r.points).map((n) => ({ display: dn(n), pts: r.points[n] })), records: r.records.map((x) => ({ display: dn(x.name), value: x.value, first: !!x.first })), pct: Object.keys(r.pct || {}).map((n) => ({ display: dn(n), pct: r.pct[n] })) }
@@ -2531,7 +2535,7 @@ function computePointsRaw(month) {
       if (!inMonth(sunday) || sunday >= today || w < penFrom || !firstEver || firstEver >= w) continue;
       if (countInWeek(pres, u.name, w) === 0) pen('vuota', 'Settimana a vuoto', P.settimanaVuota, w);
     }
-    if (early >= P.mattinieroVolte) add('mattiniero', 'Mattiniero', P.mattiniero, true);
+    if (early >= P.mattinieroVolte) add('mattiniero', u.f ? 'Mattiniera' : 'Mattiniero', P.mattiniero, true);
     if (friends >= P.brancoVolte) add('branco', 'Branco', P.branco, true);
     if (mondays.length && mondays.every((w) => countInWeek(pres, u.name, w) >= u.goal)) add('maiSaltato', 'Mai saltato', P.maiSaltato, true);
     return { name: u.name, display: u.display, items, penalties };
@@ -3016,7 +3020,24 @@ function readUsers() {
   return list;
 }
 
+/** Una volta sola: colonna F "Sesso" (m/f) nel foglio Utenti, con f per Michy e m per gli altri. */
+function ensureSesso() {
+  if (realProps.getProperty('UTENTI_SESSO')) return;
+  const sh = sheet('utenti');
+  const values = sh.getDataRange().getValues();
+  sh.getRange(1, 6).setValue('Sesso');
+  values.forEach((r, i) => {
+    if (i && r[0] && !String(r[5] || '').trim()) sh.getRange(i + 1, 6).setValue(String(r[0]).trim() === 'Michy' ? 'f' : 'm');
+  });
+  realProps.setProperty('UTENTI_SESSO', '1');
+}
+
 function readUsersSheet() {
+  try {
+    ensureSesso();
+  } catch (err) {
+    console.error('Colonna Sesso non aggiunta', err);
+  }
   return rows('utenti')
     .filter((r) => r[0] && r[1])
     .map((r) => ({
@@ -3027,9 +3048,24 @@ function readUsersSheet() {
       debug: DEBUG_USERS.includes(String(r[0]).trim()) || r[3] === true || /^(s[iì]|x|true|1)$/i.test(String(r[3]).trim()),
       // Colonna E: alias scelto dall'utente. Il nome in colonna A resta la chiave di tutti i dati.
       alias: String(r[4] || '').trim(),
+      // Colonna F: sesso, "f" per i testi al femminile (Regina del mese, Mattiniera…)
+      f: /^f/i.test(String(r[5] || '').trim()),
       admin: ADMIN_USERS.includes(String(r[0]).trim()),
     }))
     .map((u) => ({ ...u, display: u.alias || u.name }));
+}
+
+/** Nomi di chi ha "f" nel foglio Utenti: l'app li usa per i testi al femminile. */
+function femmine() {
+  return allUsers().filter((u) => u.f).map((u) => u.name);
+}
+const isF = (name) => femmine().includes(name);
+/** Come in public/genere.js: titoli al femminile per una ragazza. */
+const AL_F = { Mattiniero: 'Mattiniera', 'Appena tiepido': 'Appena tiepida', 'Fresco come una rosa': 'Fresca come una rosa' };
+const alF = (txt, name) => (isF(name) && AL_F[txt]) || txt;
+function kingTitle(names) {
+  const n = names.filter(isF).length;
+  return n === 0 ? 'Re del mese' : n === names.length ? 'Regina del mese' : 'Re e Regina del mese';
 }
 
 function findUserByCode(code) {

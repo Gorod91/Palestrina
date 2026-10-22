@@ -5,6 +5,7 @@ import { fakeState, fakeChat, fakePhoto } from './fake.js';
 import { createFbData } from './fbdata.js';
 import { makeZip } from './zip.js';
 import { createWorkout } from './allenamento.js';
+import { alF } from './genere.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -428,6 +429,7 @@ function render() {
   $('admin-card-title').textContent = me.admin ? 'Admin' : 'Prova';
   $('btn-admin').hidden = !me.admin;
   $('btn-photos-zip').hidden = !me.admin;
+  $('reinstall-g').textContent = isF(me.name) ? 'collegata' : 'collegato';
   $('admin-foot').innerHTML = me.admin ? ADMIN_FOOT : 'Modalità prova: tutto funziona davvero ma su una copia dei dati, e la chat usa Firebase (i messaggi li vede solo chi è in prova). Le notifiche arrivano solo a te.';
   $('debug-mode').checked = debugOn();
   $('fake-mode').checked = fakeOn();
@@ -484,7 +486,12 @@ function isKing(name) {
   return albo.length > 0 && albo[albo.length - 1].names.includes(name);
 }
 
-const CROWN = '<svg class="crown" aria-label="Re del mese"><use href="#i-crown"/></svg>';
+/** Chi ha "f" nella colonna Sesso di Utenti: i testi che parlano di lei sono al femminile. */
+const isF = (name) => !!(state && state.fem && state.fem.includes(name));
+const crownFor = (name) => `<svg class="crown" aria-label="${isF(name) ? 'Regina' : 'Re'} del mese"><use href="#i-crown"/></svg>`;
+/** Testi del Sudometro rivolti a me: "da sudato" o "da sudata". */
+const sudato = () => (state && state.me && isF(state.me.name) ? 'sudata' : 'sudato');
+const riposato = () => (state && state.me && isF(state.me.name) ? 'riposata' : 'riposato');
 
 const openPoints = new Set(); // dettagli aperti nella classifica a punti
 
@@ -503,7 +510,7 @@ function renderPoints() {
       <span class="total">${r.total}<small> pt</small></span>
       <div class="detail"></div>`;
     li.querySelector('.name').textContent = r.display || r.name;
-    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', CROWN);
+    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(r.name));
     li.querySelector('.sub').textContent = ach.length ? ach.map((g) => g.label).join(' · ') : 'Nessuna medaglia';
     const detail = li.querySelector('.detail');
     if (!r.detail.length) detail.textContent = 'Ancora nessun punto questo mese.';
@@ -621,7 +628,7 @@ function renderPresence() {
       <div><div class="name"></div><div class="sub">${r.streak ? `${r.streak} ${r.streak === 1 ? 'settimana' : 'settimane'} di fila` : 'Obiettivo ' + r.goal}</div></div>
       <span class="count">${r.count}<small>/${r.goal}</small></span>`;
     li.querySelector('.name').textContent = r.display || r.name;
-    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', CROWN);
+    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(r.name));
     $('ranking').append(li);
   });
 }
@@ -666,7 +673,7 @@ function renderPresenceMonth(pm, me) {
     li.className = 'month' + (p.name === me.name ? ' me' : '');
     li.innerHTML = `<span class="pos">${i + 1}</span><div class="name"></div><span class="count">${p.total}</span><div class="strip">${strip}</div>`;
     li.querySelector('.name').textContent = p.display || p.name;
-    if (isKing(p.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', CROWN);
+    if (isKing(p.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(p.name));
     $('ranking').append(li);
   });
 }
@@ -698,7 +705,7 @@ function renderGallery() {
   list.forEach((r, i) => {
     const li = document.createElement('li');
     const day = new Date(r.day + 'T12:00:00').toLocaleDateString('it-IT', month ? { weekday: 'short', day: 'numeric' } : { weekday: 'long' });
-    const title = clean(r.title);
+    const title = alF(clean(r.title), isF(r.name));
     li.innerHTML = `
       <span class="pos">${i + 1}</span>
       <div class="photo"></div>
@@ -708,7 +715,7 @@ function renderGallery() {
     li.querySelector('.name').textContent = who;
     li.querySelector('.sub').textContent = `${title} · ${day}`;
     el.append(li);
-    li.querySelector('.photo').replaceWith(photoPair(r.photoId, r.refId || (state.refPhotos || {})[r.name], `${who} · ${r.score} · ${title}`));
+    li.querySelector('.photo').replaceWith(photoPair(r.photoId, r.refId || (state.refPhotos || {})[r.name], `${who} · ${r.score} · ${title}`, false, isF(r.name)));
   });
 }
 
@@ -719,7 +726,7 @@ function renderRefCard(ref) {
   $('btn-reref').textContent = ref ? 'Rifai la foto di riferimento' : 'Fai la foto di riferimento';
   $('ref-when').textContent = !ref
     ? 'Non l\'hai ancora fatta: serve per il Sudometro.'
-    : ref.at ? `Da riposato, fatta il ${new Date(ref.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}.` : 'Da riposato.';
+    : ref.at ? `Da ${riposato()}, fatta il ${new Date(ref.at).toLocaleDateString('it-IT', { day: 'numeric', month: 'long', year: 'numeric' })}.` : `Da ${riposato()}.`;
   if (id === refShown) return; // non ricaricare la foto a ogni aggiornamento
   refShown = id;
   const box = $('ref-photo');
@@ -741,8 +748,8 @@ function renderRefCard(ref) {
     .catch(() => (box.innerHTML = '<svg><use href="#i-camera"/></svg>'));
 }
 
-/** Foto da fresco e da sudato una accanto all'altra; un tocco le apre in grande. */
-function photoPair(sweatyId, freshId, caption, big = false) {
+/** Foto da fresco e da sudato una accanto all'altra; un tocco le apre in grande. f: le foto sono di una ragazza. */
+function photoPair(sweatyId, freshId, caption, big = false, f = false) {
   const box = document.createElement('div');
   box.className = `pair${big ? ' big' : ''}`;
   const slot = (id, kind, label) => {
@@ -762,13 +769,15 @@ function photoPair(sweatyId, freshId, caption, big = false) {
     }
     return d;
   };
-  if (freshId) box.append(slot(freshId, 'fresh', 'Fresco'));
-  box.append(slot(sweatyId, 'sweaty', 'Sudato'));
-  if (sweatyId) box.onclick = () => openPhoto(sweatyId, freshId, caption);
+  if (freshId) box.append(slot(freshId, 'fresh', f ? 'Fresca' : 'Fresco'));
+  box.append(slot(sweatyId, 'sweaty', f ? 'Sudata' : 'Sudato'));
+  if (sweatyId) box.onclick = () => openPhoto(sweatyId, freshId, caption, f);
   return box;
 }
 
-function openPhoto(sweatyId, freshId, caption) {
+function openPhoto(sweatyId, freshId, caption, f = false) {
+  document.querySelector('#viewer-fresh-fig figcaption').textContent = f ? 'Fresca' : 'Fresco';
+  $('viewer-img').nextElementSibling.textContent = f ? 'Sudata' : 'Sudato';
   $('viewer-img').removeAttribute('src');
   $('viewer-fresh').removeAttribute('src');
   document.querySelectorAll('.viewer-pair figure').forEach((f) => {
@@ -789,8 +798,8 @@ function renderSudometro() {
   // 1) Prima volta: foto di riferimento
   if (!me.reference) {
     el.innerHTML = `
-      <p>Il Sudometro confronta un selfie da sudato con una <b>foto di riferimento</b> da riposato, che si fa <b>una volta sola</b>.</p>
-      <p class="muted">Meglio farla in palestra prima di allenarti, nel punto e con la luce dove farai i selfie da sudato. Le foto vengono salvate nel Google Drive di Palestrina; i selfie da sudato li vede tutto il gruppo nella classifica della settimana.</p>
+      <p>Il Sudometro confronta un selfie da ${sudato()} con una <b>foto di riferimento</b> da ${riposato()}, che si fa <b>una volta sola</b>.</p>
+      <p class="muted">Meglio farla in palestra prima di allenarti, nel punto e con la luce dove farai i selfie da ${sudato()}. Le foto vengono salvate nel Google Drive di Palestrina; i selfie da sudato li vede tutto il gruppo nella classifica della settimana.</p>
       <button id="btn-ref" class="primary">Foto di riferimento</button>`;
     el.querySelector('#btn-ref').onclick = takeReference;
     return;
@@ -807,11 +816,11 @@ function renderSudometro() {
           <p class="sudo-text">Il Sudometro di oggi è fatto. Domani si replica.</p>
         </div>
       </div>`;
-    el.querySelector('.sudo-title').textContent = clean(me.sudometroToday.title);
+    el.querySelector('.sudo-title').textContent = alF(clean(me.sudometroToday.title), isF(me.name));
     if (me.sudometroToday.saving) el.insertAdjacentHTML('beforeend', `<p class="saving-line">${bicep()}<span>Pubblico la foto…</span></p>`);
     if (me.sudometroToday.photoId) {
       const t = me.sudometroToday;
-      el.append(photoPair(t.photoId, t.refId || (me.reference && me.reference.photoId), `${me.display} · ${t.score} · ${clean(t.title)}`, true));
+      el.append(photoPair(t.photoId, t.refId || (me.reference && me.reference.photoId), `${me.display} · ${t.score} · ${alF(clean(t.title), isF(me.name))}`, true, isF(me.name)));
     }
     if (debugOn()) {
       el.insertAdjacentHTML('beforeend', '<button id="btn-redo" class="secondary" style="margin-top:14px">Rifai e sovrascrivi (debug)</button>');
@@ -820,8 +829,8 @@ function renderSudometro() {
   } else {
     // 3) Selfie da sudato: uno al giorno
     el.innerHTML = `
-      <p class="muted">Al momento peggiore dell'allenamento fatti un selfie da sudato, nello stesso punto della foto di riferimento. Uno al giorno: scegli bene il momento. Lo vedrà tutto il gruppo.</p>
-      <button id="btn-sweat" class="primary">Selfie da sudato</button>`;
+      <p class="muted">Al momento peggiore dell'allenamento fatti un selfie da ${sudato()}, nello stesso punto della foto di riferimento. Uno al giorno: scegli bene il momento. Lo vedrà tutto il gruppo.</p>
+      <button id="btn-sweat" class="primary">Selfie da ${sudato()}</button>`;
     el.querySelector('#btn-sweat').onclick = () => takeSweat(false);
   }
 
@@ -924,7 +933,7 @@ async function checkinUndo() {
 
 async function takeReference() {
   try {
-    const canvas = await sudometro.takeSelfie('Foto di riferimento: viso al centro, da riposato, buona luce', {
+    const canvas = await sudometro.takeSelfie(`Foto di riferimento: viso al centro, da ${riposato()}, buona luce`, {
       live: debugOn(),
     });
     if (!canvas) return;
@@ -932,7 +941,7 @@ async function takeReference() {
     const features = await sudometro.analyze(canvas);
     sudoBusy('Salvo la foto di riferimento…');
     const r = await api('setReference', { features, photo: sudometro.toJpegBase64(canvas) });
-    toast(photoWarning(r) || 'Foto di riferimento salvata. Da ora basta il selfie da sudato.', 5000);
+    toast(photoWarning(r) || `Foto di riferimento salvata. Da ora basta il selfie da ${sudato()}.`, 5000);
     await refresh();
   } catch (err) {
     toast(cameraError(err));
@@ -945,7 +954,7 @@ async function takeSweat(debug, overwrite = false) {
     const reference = state.me.reference.features;
     // Sudometro 2 ufficiale solo quando la novità è rilasciata; prima si calcola in silenzio (solo nel foglio).
     const v2live = !debug && !!(state.features && state.features.sudometro2);
-    let canvas = await sudometro.takeSelfie('Selfie da sudato: stesso punto della foto di riferimento', {
+    let canvas = await sudometro.takeSelfie(`Selfie da ${sudato()}: stesso punto della foto di riferimento`, {
       live: debugOn(),
       reference,
     });
@@ -1020,7 +1029,7 @@ async function takeSweat(debug, overwrite = false) {
     }
     if (debug) {
       lastDebug = [
-        `${result.score}: ${result.title}`,
+        `${result.score}: ${alF(result.title, isF(state.me.name))}`,
         `rossore +${result.details.red} · lucidità +${result.details.shine} · luce ${result.details.light}`,
         v2.res4 ? `Sudometro 4: ${v2.res4.score} (riflessi ${v2.res4.details.shine} · luce ${v2.res4.details.light})` : '',
         v2.res3 ? `Sudometro 3: ${v2.res3.score} (riflessi ${v2.res3.details.shine} · bordo ${v2.res3.details.edge} · tinta ${v2.res3.details.red} · luce ×${v2.res3.details.lf})` : '',
@@ -1030,7 +1039,7 @@ async function takeSweat(debug, overwrite = false) {
       ].filter(Boolean).join('\n');
       toast('Prova di debug salvata');
     } else {
-      toast(shown.warnings.length ? shown.warnings.join(' ') : `${shown.score}: ${shown.title}`, 6000);
+      toast(shown.warnings.length ? shown.warnings.join(' ') : `${shown.score}: ${alF(shown.title, isF(state.me.name))}`, 6000);
     }
     await refresh();
   } catch (err) {
@@ -1100,7 +1109,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
-const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: CROWN, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => (testOn() ? 'prova' : state && state.features && state.features.firebase ? 'tutti' : ''), fbOnly: () => fbOk() });
+const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: crownFor, isF, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => (testOn() ? 'prova' : state && state.features && state.features.firebase ? 'tutti' : ''), fbOnly: () => fbOk() });
 
 // ---------- Allenamento (fase 1, solo in prova) ----------
 
