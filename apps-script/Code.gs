@@ -802,6 +802,7 @@ function doGet(e) {
     removeSubscription(p.endpoint);
     return json({ ok: true });
   }
+  if (p.action === 'misuraTempi') return json(misuraTempi(String(p.azioni || '')));
   return json({ error: 'Azione sconosciuta' });
 }
 
@@ -3352,11 +3353,74 @@ function processQueueRound(coll, locked) {
     firestoreCall('patch', `${d.name.split('/documents/')[1]}?updateMask.fieldPaths=stato&updateMask.fieldPaths=esito&updateMask.fieldPaths=fatta`, {
       fields: { stato: { stringValue: 'fatta' }, esito: { stringValue: JSON.stringify(out).slice(0, 200000) }, fatta: { timestampValue: new Date().toISOString() } },
     });
-    tmark(`esito ${d.fields.action.stringValue}`);
+    tmark(`esito ${d.fields.action.stringValue}${out && out.error ? ` (errore: ${out.error})` : ''}`);
     if (TIMES) TIMES.done = true;
     done++;
   });
   return done;
+}
+
+// ---------- Misura dei tempi (Action "Misura tempi") ----------
+// Mette nella coda di prova, a nome dell'admin, alcune azioni (di base check-in e annulla, due volte, tornando come
+// prima), le esegue come farebbe la richiesta "coda" del telefono e scrive i tempi nel foglio Debug. Niente notifiche.
+let MUTED = false;
+const MISURA_ACTIONS = ['checkin', 'checkinUndo', 'sudometro'];
+
+function misuraTempi(list) {
+  const t0 = Date.now();
+  CHAT_DIRTY = false;
+  LATER = [];
+  TABLES = {};
+  PRELOADED = {};
+  STATE_DIRTY = false;
+  PROPS_SNAP = null;
+  MEMO = {};
+  TEST = true;
+  MUTED = true;
+  TIMES = { t0, last: t0, marks: [], phone: 0 };
+  if (!fbAllOn()) return { error: 'In prova le tabelle non sono su Firebase' };
+  const user = allUsers().find((u) => u.name === ADMIN_USERS[0]);
+  if (!user) return { error: 'Admin non trovato' };
+  TESTER = user.name;
+  preloadTables(['presenze', 'chat', 'piani', 'sudometro', 'sfide', 'cambi']);
+  tmark('tabelle');
+  let actions = list.split(',').map((a) => a.trim()).filter((a) => MISURA_ACTIONS.indexOf(a) >= 0).slice(0, 10);
+  if (!actions.length) {
+    const today = dayString(new Date());
+    const inside = rows('presenze').some((r) => r.day === today && r.name === user.name);
+    actions = inside ? ['checkinUndo', 'checkin', 'checkinUndo', 'checkin'] : ['checkin', 'checkinUndo', 'checkin', 'checkinUndo'];
+  }
+  const ref = getReference(user) || {};
+  const now = Date.now();
+  const writes = actions.map((action, i) => {
+    const data = { tapAt: now };
+    // Sudometro di debug (ripetibile, senza evento in chat), con la foto di riferimento come foto
+    if (action === 'sudometro') Object.assign(data, { debug: true, score: 50, title: 'Misura tempi', details: {}, photoId: ref.photoId || '' });
+    return {
+      update: {
+        name: `${fbDocRoot()}/prova_azioni/${newId()}`,
+        fields: {
+          name: { stringValue: user.name },
+          action: { stringValue: action },
+          data: { stringValue: JSON.stringify(data) },
+          stato: { stringValue: 'nuova' },
+          at: { timestampValue: new Date(now + i).toISOString() }, // in ordine
+        },
+      },
+    };
+  });
+  firestoreCall('post', ':commit', { writes });
+  tmark('in coda');
+  if (stateStale()) {
+    STATE_DIRTY = true;
+    CHAT_DIRTY = true;
+  }
+  const done = processQueue(true);
+  TEST = true;
+  TESTER = user.name;
+  const marks = TIMES.marks;
+  finishRequest();
+  return { ok: true, azioni: actions, eseguite: done, totale: Date.now() - t0, tempi: marks };
 }
 
 /** Un'azione della coda, come se fosse arrivata a doPost da `name`. */
@@ -3609,6 +3673,7 @@ function chatStateRequest() {
 
 /** Chiede a GitHub di avviare la Action che invia le notifiche. */
 function dispatch(event, name) {
+  if (MUTED) return; // misura dei tempi: nessuna notifica
   const token = props.getProperty('GITHUB_TOKEN');
   const repo = props.getProperty('GITHUB_REPO');
   if (!token || !repo) return; // notifiche non ancora configurate

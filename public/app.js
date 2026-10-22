@@ -204,6 +204,7 @@ function fbCall(action, data) {
   const d = { ...data, tapAt: Date.now(), ...(testOn() && store.get('actAs') ? { actAs: store.get('actAs') } : {}) };
   if (d.photo && (action === 'sudometro' || action === 'setReference')) {
     d.photoId = fbdata.putPhoto(d.photo, action === 'setReference' ? 'riferimento' : 'sudato');
+    photoCache.set(d.photoId, Promise.resolve(`data:image/jpeg;base64,${d.photo}`)); // già sul telefono: non si riscarica
     delete d.photo;
   }
   if (!FAST_ACTIONS.has(action)) return fbdata.call(action, d);

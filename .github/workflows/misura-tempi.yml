@@ -1,0 +1,38 @@
+name: Misura tempi
+
+# Misura i tempi del server in modalità prova: mette in coda azioni a nome dell'admin (di base check-in e annulla,
+# due volte, tornando come prima), le esegue e scrive i tempi nel foglio Debug. Nessuna notifica.
+on:
+  workflow_dispatch:
+    inputs:
+      azioni:
+        description: Azioni separate da virgola (checkin, checkinUndo, sudometro); vuoto = check-in e annulla ×2
+        required: false
+        default: ''
+      volte:
+        description: Quante misure di fila
+        required: false
+        default: '2'
+
+permissions:
+  contents: read
+
+jobs:
+  misura:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Misura
+        env:
+          APPS_SCRIPT_URL: ${{ secrets.APPS_SCRIPT_URL }}
+          APPS_SCRIPT_SECRET: ${{ secrets.APPS_SCRIPT_SECRET }}
+          AZIONI: ${{ inputs.azioni }}
+          VOLTE: ${{ inputs.volte }}
+        run: |
+          n=$(printf '%s' "$VOLTE" | tr -cd 0-9 | cut -c1-1); n=${n:-1}; [ "$n" -gt 5 ] && n=5
+          for i in $(seq 1 "$n"); do
+            echo "Misura $i"
+            curl -sS -L -G --max-time 300 -o out.json -w 'tempo visto da fuori (avvio di Apps Script compreso): %{time_total} s\n' \
+              --data-urlencode "action=misuraTempi" --data-urlencode "secret=$APPS_SCRIPT_SECRET" --data-urlencode "azioni=$AZIONI" \
+              "$APPS_SCRIPT_URL"
+            node -e 'const r=JSON.parse(require("fs").readFileSync("out.json","utf8")); if(r.error){console.log("::error::"+r.error);process.exit(1)} console.log(`azioni ${r.azioni.join(", ")} · eseguite ${r.eseguite} · totale server ${r.totale} ms`); r.tempi.forEach(t=>console.log("  "+t))'
+          done
