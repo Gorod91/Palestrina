@@ -146,6 +146,19 @@ async function waitCount(P, name, n, ms = 15000) {
   await post('/delay', { ms: 0 });
   ok((await waitCount(M, 'Francesco', before + 1, 15000)) >= 0, 'M lo vede');
 
+  console.log('2d. Annulla → check-in → annulla in fretta: alla fine fuori');
+  for (const sel of ['#btn-checkin-undo', '#btn-checkin', '#btn-checkin-undo']) {
+    await F.page.waitForSelector(sel, { state: 'visible', timeout: 5000 }).catch(() => {});
+    await F.page.$eval(sel, (b) => b.click());
+    await sleep(700);
+  }
+  await sleep(8000);
+  ok((await countOf(F, 'Francesco')) === before, 'F: alla fine senza check-in');
+  ok((await waitCount(M, 'Francesco', before, 10000)) >= 0, 'M: Francesco senza check-in');
+  ok(!((await post('/run/sheet', { name: SH('Presenze') })) || []).some((r) => r[2] === 'Francesco' && r[0] === today), 'nella tabella: nessun check-in di Francesco oggi');
+  await F.page.$eval('#btn-checkin', (b) => b.click()); // si rifà, per i passi dopo
+  ok((await waitCount(M, 'Francesco', before + 1, 15000)) >= 0, 'F di nuovo dentro');
+
   console.log('2b. Server che non risponde: errore dopo 75 s e il check-in non viene più eseguito');
   M.slow.ms = 0;
   await M.ctx.route('https://finto.apps/**', (r) => r.abort()); // Apps Script irraggiungibile per Michy

@@ -125,7 +125,7 @@ const ctx = {
   SpreadsheetApp: { getActive: () => ss },
   PropertiesService: { getScriptProperties: () => props },
   CacheService: { getScriptCache: () => cache },
-  LockService: { getScriptLock: () => lock },
+  LockService: { getScriptLock: () => lock, getDocumentLock: () => lock },
   Session: { getScriptTimeZone: () => TZ },
   ContentService: { MimeType: { JSON: 'json' }, createTextOutput: (t) => ({ text: t, getContent() { return t; }, setMimeType() { return this; } }) },
   ScriptApp: { getProjectTriggers: () => [], deleteTrigger() {}, newTrigger: () => { const t = new Proxy({}, { get: (_, k) => (k === 'create' ? () => ({}) : () => t) }); return t; }, WeekDay: {} },

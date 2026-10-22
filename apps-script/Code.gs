@@ -3138,42 +3138,64 @@ function processQueue(test) {
   }
   const coll = `${fbPfx()}azioni`;
   let done = 0;
+  // Una sola esecuzione alla volta svuota la coda, in ordine di arrivo: con più esecuzioni insieme (un avviso
+  // per ogni tocco) "annulla → check-in → annulla" poteva finire eseguito fuori ordine. È un lock diverso da
+  // quello dello script, che le azioni prendono a loro volta.
+  const qlock = LockService.getDocumentLock();
+  if (qlock && !qlock.tryLock(25000)) {
+    TEST = was.TEST;
+    return 0; // un'altra esecuzione sta già svuotando la coda: prenderà anche queste
+  }
   try {
-    const res = firestoreCall('post', ':runQuery', {
-      structuredQuery: {
-        from: [{ collectionId: coll }],
-        where: { fieldFilter: { field: { fieldPath: 'stato' }, op: 'EQUAL', value: { stringValue: 'nuova' } } },
-        limit: 50,
-      },
-    });
-    const docs = (Array.isArray(res) ? res : []).map((x) => x.document).filter(Boolean);
-    docs.sort((a, b) => (a.fields.at.timestampValue < b.fields.at.timestampValue ? -1 : 1));
-    docs.forEach((d) => {
-      // Prenotata da questa esecuzione (se un'altra l'ha già presa, il documento è cambiato e si salta)
-      const claim = firestoreFetch('post', ':commit', {
-        writes: [{ update: { name: d.name, fields: { ...d.fields, stato: { stringValue: 'in corso' } } }, currentDocument: { updateTime: d.updateTime } }],
-      });
-      if (claim.code >= 300) return;
-      let out;
-      try {
-        const data = safeJson(d.fields.data.stringValue) || {};
-        const arrived = new Date(d.fields.at.timestampValue).getTime();
-        // Arrivata molto dopo il tocco (rete instabile) o rimasta in coda troppo (server che non rispondeva):
-        // il telefono ha già dato errore, quindi non si esegue
-        const late = (Number(data.tapAt) > 0 && arrived - Number(data.tapAt) > STALE_ACTION_MS) || Date.now() - arrived > SERVER_WAIT_MS;
-        out = late ? { error: 'Arrivata troppo tardi (connessione assente): rifalla' } : runQueued(d.fields.name.stringValue, d.fields.action.stringValue, data);
-      } catch (err) {
-        out = { error: String(err.message || err) };
-      }
-      firestoreCall('patch', `${d.name.split('/documents/')[1]}?updateMask.fieldPaths=stato&updateMask.fieldPaths=esito&updateMask.fieldPaths=fatta`, {
-        fields: { stato: { stringValue: 'fatta' }, esito: { stringValue: JSON.stringify(out).slice(0, 200000) }, fatta: { timestampValue: new Date().toISOString() } },
-      });
-      done++;
-    });
+    // ricontrolla finché è vuota: prende anche le azioni arrivate mentre eseguiva le altre
+    for (let round = 0; round < 10; round++) {
+      const n = processQueueRound(coll);
+      if (!n) break;
+      done += n;
+    }
   } finally {
+    if (qlock) qlock.releaseLock();
     TEST = was.TEST;
     TESTER = was.TESTER;
   }
+  return done;
+}
+
+/** Un giro sulla coda: esegue le azioni nuove in ordine di arrivo e restituisce quante ne ha trovate. */
+function processQueueRound(coll) {
+  let done = 0;
+  const res = firestoreCall('post', ':runQuery', {
+    structuredQuery: {
+      from: [{ collectionId: coll }],
+      where: { fieldFilter: { field: { fieldPath: 'stato' }, op: 'EQUAL', value: { stringValue: 'nuova' } } },
+      limit: 50,
+    },
+  });
+  const docs = (Array.isArray(res) ? res : []).map((x) => x.document).filter(Boolean);
+  if (!docs.length) return 0;
+  docs.sort((a, b) => (a.fields.at.timestampValue < b.fields.at.timestampValue ? -1 : 1));
+  docs.forEach((d) => {
+    // Prenotata da questa esecuzione (se un'altra l'ha già presa, il documento è cambiato e si salta)
+    const claim = firestoreFetch('post', ':commit', {
+      writes: [{ update: { name: d.name, fields: { ...d.fields, stato: { stringValue: 'in corso' } } }, currentDocument: { updateTime: d.updateTime } }],
+    });
+    if (claim.code >= 300) return;
+    let out;
+    try {
+      const data = safeJson(d.fields.data.stringValue) || {};
+      const arrived = new Date(d.fields.at.timestampValue).getTime();
+      // Arrivata molto dopo il tocco (rete instabile) o rimasta in coda troppo (server che non rispondeva):
+      // il telefono ha già dato errore, quindi non si esegue
+      const late = (Number(data.tapAt) > 0 && arrived - Number(data.tapAt) > STALE_ACTION_MS) || Date.now() - arrived > SERVER_WAIT_MS;
+      out = late ? { error: 'Arrivata troppo tardi (connessione assente): rifalla' } : runQueued(d.fields.name.stringValue, d.fields.action.stringValue, data);
+    } catch (err) {
+      out = { error: String(err.message || err) };
+    }
+    firestoreCall('patch', `${d.name.split('/documents/')[1]}?updateMask.fieldPaths=stato&updateMask.fieldPaths=esito&updateMask.fieldPaths=fatta`, {
+      fields: { stato: { stringValue: 'fatta' }, esito: { stringValue: JSON.stringify(out).slice(0, 200000) }, fatta: { timestampValue: new Date().toISOString() } },
+    });
+    done++;
+  });
   return done;
 }
 
