@@ -787,20 +787,38 @@ function checkin(user, source) {
     lock.releaseLock();
   }
   tmark('presenza');
-  const count = countInWeek(rows('presenze'), user.name, weekKey(dayString(new Date())));
-  addChatEvent(user.name, { kind: 'checkin', count, goal: user.goal, auto: source === 'automatico' });
-  tmark('evento chat');
-  announceAchievements(user);
-  tmark('traguardi');
-  dispatch('checkin', user.name);
-  try {
-    maybeOpenSfida(user);
-  } catch (err) {
-    console.error('Sfida non aperta', err);
-  }
-  tmark('sfide');
+  const rest = () => {
+    const count = countInWeek(rows('presenze'), user.name, weekKey(dayString(new Date())));
+    addChatEvent(user.name, { kind: 'checkin', count, goal: user.goal, auto: source === 'automatico' });
+    tmark('evento chat');
+    announceAchievements(user);
+    tmark('traguardi');
+    dispatch('checkin', user.name);
+    try {
+      maybeOpenSfida(user);
+    } catch (err) {
+      console.error('Sfida non aperta', err);
+    }
+    tmark('sfide');
+  };
+  // Dalla coda: evento in chat, traguardi, notifica e sfide dopo aver dato l'esito a tutti (il check-in è già
+  // salvato); se nel frattempo è stato annullato, non si fanno più
+  if (AFTER) {
+    const tester = TESTER;
+    const job = () => {
+      forget('presenze');
+      if (!rows('presenze').some((r) => r.day === dayString(new Date()) && r.name === user.name)) return;
+      TESTER = tester;
+      rest();
+    };
+    job.key = 'checkin|' + user.name; // check-in rifatto nello stesso giro: un solo evento, quello dell'ultimo
+    AFTER = AFTER.filter((j) => j.key !== job.key).concat(job);
+  } else rest();
   return { ok: true, alreadyToday: false };
 }
+
+// Lavori da fare dopo aver dato l'esito alle azioni in coda (null fuori dalla coda: si fanno subito)
+let AFTER = null;
 
 /** Annulla il check-in di oggi: lo toglie dalle presenze e dalla chat, senza notifiche. */
 function checkinUndo(user) {
@@ -3187,14 +3205,29 @@ function processQueue(test) {
     TEST = was.TEST;
     return 0; // un'altra esecuzione sta già svuotando la coda: prenderà anche queste
   }
+  AFTER = [];
   try {
-    // ricontrolla finché è vuota: prende anche le azioni arrivate mentre eseguiva le altre
+    // ricontrolla finché è vuota: prende anche le azioni arrivate mentre eseguiva le altre;
+    // poi i lavori rimandati (eventi in chat, traguardi, sfide) e di nuovo la coda
     for (let round = 0; round < 10; round++) {
       const n = processQueueRound(coll);
-      if (!n) break;
       done += n;
+      if (n) continue;
+      if (!AFTER.length) break;
+      const jobs = AFTER;
+      AFTER = [];
+      jobs.forEach((job) => {
+        try {
+          MEMO = {};
+          job();
+          flushTables();
+        } catch (err) {
+          console.error('Lavoro dopo la coda non riuscito', err);
+        }
+      });
     }
   } finally {
+    AFTER = null;
     if (qlock) qlock.releaseLock();
     TEST = was.TEST;
     TESTER = was.TESTER;

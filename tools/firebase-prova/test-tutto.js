@@ -158,6 +158,9 @@ async function waitCount(P, name, n, ms = 15000) {
   ok(!((await post('/run/sheet', { name: SH('Presenze') })) || []).some((r) => r[2] === 'Francesco' && r[0] === today), 'nella tabella: nessun check-in di Francesco oggi');
   await F.page.$eval('#btn-checkin', (b) => b.click()); // si rifà, per i passi dopo
   ok((await waitCount(M, 'Francesco', before + 1, 15000)) >= 0, 'F di nuovo dentro');
+  await sleep(3000);
+  const evs = ((await post('/run/sheet', { name: SH('Chat') })) || []).filter((r) => r[4] === 'event' && r[3] === 'Francesco' && r[1] === today && /"checkin"/.test(r[5]));
+  ok(evs.length === 1, `in chat un solo evento di check-in di Francesco (${evs.length})`);
 
   console.log('2b. Server che non risponde: errore dopo 75 s e il check-in non viene più eseguito');
   M.slow.ms = 0;
