@@ -2748,15 +2748,20 @@ function preloadTables(keys) {
   const paths = keys.filter(tablesOn).map((k) => tablePath(k, TEST && TEST_SHEETS.includes(k))).filter((p) => !TABLES[p] && PRELOADED[p] === undefined);
   if (!paths.length) return;
   const token = firestoreToken();
+  tmark('accesso firestore');
   const res = UrlFetchApp.fetchAll(paths.map((p) => ({ url: `${firestoreBase()}/${p}`, headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true })));
+  tmark('tabelle scaricate');
+  const sizes = [];
   res.forEach((r, i) => {
     const code = r.getResponseCode();
     if (code === 404) PRELOADED[paths[i]] = null;
     else if (code < 300) {
       const d = JSON.parse(r.getContentText());
       PRELOADED[paths[i]] = { rows: unpackRows(d.fields.rows.bytesValue), time: d.updateTime };
+      if (TIMES) sizes.push(`${paths[i].split('/')[1]} ${Math.round(d.fields.rows.bytesValue.length / 1024)}k/${PRELOADED[paths[i]].rows.length}r`);
     }
   });
+  tmark(`tabelle aperte (${sizes.join(', ')})`);
 }
 
 /** Scrive su Firestore le tabelle modificate. */
@@ -3382,6 +3387,7 @@ function misuraTempi(list) {
   const user = allUsers().find((u) => u.name === ADMIN_USERS[0]);
   if (!user) return { error: 'Admin non trovato' };
   TESTER = user.name;
+  tmark('utenti');
   preloadTables(['presenze', 'chat', 'piani', 'sudometro', 'sfide', 'cambi']);
   tmark('tabelle');
   let actions = list.split(',').map((a) => a.trim()).filter((a) => MISURA_ACTIONS.indexOf(a) >= 0).slice(0, 10);
