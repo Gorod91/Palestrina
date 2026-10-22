@@ -70,6 +70,13 @@
   .slide.on .mystery { animation: pop .8s cubic-bezier(.2, .8, .2, 1) .8s both, wobble 2.4s ease-in-out 1.8s infinite; }
   @keyframes wobble { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-8deg) scale(1.04); } 75% { transform: rotate(8deg) scale(1.04); } }
   /* Sfide */
+  /* I due tipi di sfide */
+  .kinds { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+  .kinds span { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: 18px; background: #1c1c1e; border: 1px solid #ff9f0a55; font-size: 17px; font-weight: 700; }
+  .kinds b, .kind-e b { display: grid; place-items: center; width: 30px; height: 30px; flex: none; border-radius: 50%; background: #ff9f0a; color: #000; font-size: 16px; font-weight: 900; letter-spacing: 0; }
+  .kinds-t { margin-top: 24px; font-size: 14px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .kind-e { display: flex; align-items: center; gap: 10px; }
+  .kind-e b { width: 26px; height: 26px; font-size: 14px; }
   .types { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 8px; }
   .types span { padding: 7px 14px; border-radius: 999px; background: #ff9f0a22; color: #ff9f0a; font-size: 15px; font-weight: 700; }
   .duel { margin: 26px 0 22px; padding: 18px; border-radius: 22px; background: #1c1c1e; border: 1px solid #ff9f0a88; }
@@ -118,10 +125,12 @@
       <p class="duel-b"><span class="in">Ci sto</span><span>Passo</span></p>
     </div>
     <p class="lead" data-a style="--d:1.5">Quando due o più di voi fanno check-in a meno di un'ora, in chat si apre una sfida a caso. Avete un'ora per dire "Ci sto".</p>
+    <p class="kinds-t" data-a style="--d:2.1">Le sfide sono di due tipi</p>
+    <div class="kinds" data-a style="--d:2.3"><span><b>1</b>Resistenza</span><span><b>2</b>Ripetizioni</span></div>
   </section>
 
   <section class="slide">
-    <p class="eyebrow orange" data-a style="--d:0">Resistenza</p>
+    <p class="eyebrow orange kind-e" data-a style="--d:0"><b>1</b>Tipo 1 di 2 · Resistenza</p>
     <h2 data-a style="--d:.1">Chi resiste di più,<br>vince.</h2>
     <div class="types"><span data-a style="--d:.5;--anim:pop">Plank</span><span data-a style="--d:.65;--anim:pop">Barchetta</span></div>
     <div class="bars2">
@@ -133,7 +142,7 @@
   </section>
 
   <section class="slide">
-    <p class="eyebrow orange" data-a style="--d:0">Ripetizioni</p>
+    <p class="eyebrow orange kind-e" data-a style="--d:0"><b>2</b>Tipo 2 di 2 · Ripetizioni</p>
     <h2 data-a style="--d:.1">Contro il vostro<br>record.</h2>
     <div class="types"><span data-a style="--d:.5;--anim:pop">Addominali</span><span data-a style="--d:.6;--anim:pop">Burpees</span></div>
     <div class="vs">
