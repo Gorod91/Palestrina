@@ -616,7 +616,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const timer = `<button class="wo-row" data-a="timer"><span class="wo-dot"></span><span><b>Timer Addominali</b><small>${timerSeconds()} s</small></span><span class="wo-chev">›</span></button>`;
     const other = (schede || []).map((s) => {
       const d = lastDone(s);
-      return `<div class="wo-srow"><button class="wo-row" data-a="sch:${esc(s.id)}"><span><b>${esc(s.name)}${diBadge(s)}</b><small>${s.ex.length} esercizi${d ? ` · ${ago(d)}` : ''}</small></span></button>`
+      return `<div class="wo-srow"><button class="wo-row" data-a="sch:${esc(s.id)}"><span><b>${esc(s.name)}${diBadge(s)}</b><small>${s.ex.length} ${s.ex.length === 1 ? 'esercizio' : 'esercizi'}${d ? ` · ${ago(d)}` : ''}</small></span></button>`
         + `<button class="wo-pen" data-a="ed:${esc(s.id)}" aria-label="Modifica ${esc(s.name)}"><svg aria-hidden="true"><use href="#i-pencil"/></svg></button></div>`;
     }).join('');
     let hero = '';
@@ -642,7 +642,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   }
 
   /** Bollino con la persona da cui viene una scheda copiata: resta anche se la scheda cambia nome. */
-  const diBadge = (sc) => (sc.di ? `<span class="wo-di"><i>${esc(sc.di[0])}</i>${esc(sc.di)}</span>` : '');
+  // Se l'ho modificata, nel bollino resta la persona e compare "modificata".
+  const diBadge = (sc) => (sc.di ? `<span class="wo-di${sc.mod ? ' mod' : ''}"><i>${esc(sc.di[0])}</i>${esc(sc.di)}${sc.mod ? '<em>modificata</em>' : ''}</span>` : '');
 
   function ago(d) {
     const n = daysAgo(d);
