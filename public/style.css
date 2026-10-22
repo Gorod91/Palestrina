@@ -851,7 +851,6 @@ body.keyboard .wo-bar { display: none; }
 .wo-srow .wo-row { border-bottom: 0; flex: 1; min-width: 0; }
 .wo-pen { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--card-2); color: var(--stand); }
 .wo-pen svg { width: 17px; height: 17px; }
-.wo-wide { margin: -4px 0 14px; padding: 13px 8px; font-size: 15px; }
 .wo-recpm { margin-left: auto; display: flex; align-items: center; gap: 6px; }
 .wo-recpm .wo-chip { margin: 0; }
 .wo-recb { width: 32px; height: 32px; flex: none; border: 0; border-radius: 50%; background: var(--card-2); color: var(--stand); font-size: 19px; font-weight: 800; }
@@ -903,6 +902,19 @@ body.keyboard .wo-bar { display: none; }
 .wo-pickpad { height: 84px; }
 .wo-who { display: flex; align-items: center; gap: 8px; margin: 16px 2px 8px; }
 .wo-av { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--card-2); font-size: 12px; font-weight: 800; }
-.wo-cprow { grid-template-columns: 1fr auto; }
-.wo-cprow > span:first-child { grid-column: auto !important; min-width: 0; }
-.wo-cpbtn { border: 0; border-radius: 99px; padding: 7px 14px; background: var(--stand); color: #000; font-size: 14px; font-weight: 800; }
+
+/* Schede degli altri: tasto nell'elenco e anteprima (per usarla si copia tra le mie) */
+.wo-altri { grid-template-columns: 36px 1fr auto; }
+.wo-altri > span:first-child { grid-column: auto !important; }
+.wo-altri-ic { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--card-2); color: var(--stand); }
+.wo-altri-ic svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+.wo-prev-t { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.wo-prev-t .wo-ed-title { margin-bottom: 10px; }
+.wo-prev-di { margin-bottom: 10px; padding: 3px 10px; border-radius: 99px; background: var(--stand); color: #000; font-size: 13px; font-weight: 800; }
+.wo-prev { padding: 2px 16px; margin-bottom: 14px; }
+.wo-prev-r { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.wo-prev-r:last-child { border-bottom: 0; }
+.wo-prev-r span { font-size: 16px; font-weight: 600; min-width: 0; }
+.wo-prev-r small { display: block; color: var(--muted); font-size: 13px; font-weight: 400; margin-top: 2px; }
+.wo-prev-r em { font-style: normal; color: var(--exercise); font-weight: 700; font-size: 15px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wo-prev-r.circ em { color: var(--stand); }

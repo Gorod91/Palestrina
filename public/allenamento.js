@@ -321,7 +321,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let schede = null; // le mie schede (null finché non arrivano)
   // cosa si vede: lista, esercizio, catalogo (allenamento libero)
   // ed: scheda in modifica; pickFor: il catalogo sceglie esercizi per la scheda ('edit'), un circuito nuovo ('circnew') o uno esistente ('circ:id')
-  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null };
+  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '' };
   let restEnd = 0;
   let restTotal = REST; // secondi del recupero in corso
   let serieSig = '';
@@ -379,6 +379,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         softDraw();
       }, (err) => toast(`Allenamento: ${err.message}`)),
     );
+    loadOthers(); // schede degli altri (per il tasto "Schede degli altri")
     // Serie salvate dall'altra parte (in prova se ora si è fuori, o viceversa): si possono copiare qui
     fs.getDocs(fs.query(fs.collection(db, (test ? '' : 'prova_') + 'serie'), fs.where('name', '==', me.name)))
       .then((snap) => {
@@ -476,7 +477,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   // Indietro trascinando dal bordo sinistro, come in Safari (dalla Home iOS non lo fa da solo):
   // la pagina segue il dito e sotto compare quella prima; oltre metà schermo o con uno scatto si torna lì.
-  const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor ? 'edit' : ui.view === 'newex' ? 'pick' : 'list');
+  const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor ? 'edit' : ui.view === 'newex' ? 'pick' : ui.view === 'prev' ? 'copy' : 'list');
   function goBack() {
     const v = backView();
     if (v !== 'pick') Object.assign(ui, { pickFor: v === 'edit' ? '' : ui.pickFor, sel: v === 'edit' ? [] : ui.sel });
@@ -484,7 +485,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     ui.view = v;
   }
   function viewHtml(v) {
-    return v === 'ex' ? exView() : v === 'pick' ? pickView() : v === 'edit' ? editView() : v === 'newex' ? newExView() : v === 'copy' ? copyView() : listView();
+    return v === 'ex' ? exView() : v === 'pick' ? pickView() : v === 'edit' ? editView() : v === 'newex' ? newExView() : v === 'copy' ? copyView() : v === 'prev' ? prevView() : listView();
   }
   let edge = null;
   root.addEventListener('pointerdown', (ev) => {
@@ -619,8 +620,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return `${recupera}${salvaLib}${hero}
       <h2 class="section">Le tue schede</h2>
       ${other ? `<section class="card wo-list">${other}</section>` : ''}
-      <div class="wo-btns"><button class="secondary" data-a="nuova">+ Nuova scheda</button><button class="secondary" data-a="copy">Copia una scheda</button></div>
-      <button class="secondary wo-wide" data-a="libero">Allenamento libero</button>
+      <section class="card wo-list"><button class="wo-row wo-altri" data-a="copy"><span class="wo-altri-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14.5c2.4 0 4 1.5 4.5 4"/></svg></span>`
+        + `<span><b>Schede degli altri</b><small>${esc(altri().names.join(', '))} · ${altri().n} schede</small></span><span class="wo-chev">›</span></button></section>
+      <div class="wo-btns"><button class="secondary" data-a="nuova">+ Nuova scheda</button><button class="secondary" data-a="libero">Allenamento libero</button></div>
       <section class="card wo-list">${timer}</section>`;
   }
 
@@ -1406,47 +1408,76 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const { fs, db } = x;
     fs.getDocs(fs.collection(db, pfx + 'schede')).then((snap) => {
       otherSchede = snap.docs.map((d) => d.data()).filter((d) => d.name !== me.name);
-      if (ui.view === 'copy') softDraw();
+      softDraw();
     }).catch(() => {});
   }
 
-  /** "Copia una scheda": le schede per persona (gli originali inseriti per gli altri, anche se li ho cambiati o eliminati
-   *  dai miei, e quelle di chi ha già le sue), poi le mie. */
-  function copyView() {
+  /** Schede degli altri per persona: gli originali inseriti per Rizzo, Ceppo, Gualo (anche se li ho cambiati o eliminati
+   *  dai miei) e quelle di chi ha già le sue. key: e:<id> (inserite qui) oppure o:<documento>:<n>. */
+  function altri() {
     const by = {};
     SCHEDE_ESEMPIO.filter((y) => y.di).forEach((y) => (by[y.di] ||= []).push({ sc: y, key: `e:${y.id}` }));
     otherSchede.forEach((d, i) => (d.list || []).forEach((y, j) => (by[d.name] ||= []).push({ sc: y, key: `o:${i}:${j}` })));
-    const row = ({ sc, key }) => `<div class="wo-row wo-cprow"><span><b>${esc(sc.name)}</b><small>${esc(sc.ex.slice(0, 4).map((id) => nameOf(id, sc)).join(', '))}${sc.ex.length > 4 ? '…' : ''}</small></span><button class="wo-cpbtn" data-a="cp:${key}">Copia</button></div>`;
-    const sec = (title, items) => (items.length ? `<div class="wo-who"><span class="wo-av">${esc(title[0])}</span><b>${esc(title)}</b></div><section class="card wo-list">${items.map(row).join('')}</section>` : '');
-    const mine = (schede || []).map((y) => ({ sc: y, key: `m:${y.id}` }));
+    const names = Object.keys(by);
+    return { by, names, n: names.reduce((t, k) => t + by[k].length, 0) };
+  }
+  const altroOf = (key) => {
+    if (key.startsWith('e:')) {
+      const sc = SCHEDE_ESEMPIO.find((y) => y.id === key.slice(2));
+      return sc ? { sc, chi: sc.di, ext: [] } : null;
+    }
+    const [, i, j] = key.split(':'), d = otherSchede[Number(i)];
+    return d && d.list && d.list[Number(j)] ? { sc: d.list[Number(j)], chi: d.name, ext: d.extra || [] } : null;
+  };
+  const giaMia = (sc) => (schede || []).some((y) => y.name === sc.name);
+
+  /** "Schede degli altri": l'elenco per persona; un tocco apre l'anteprima. */
+  function copyView() {
+    const { by, names } = altri();
+    const row = ({ sc, key }) => `<button class="wo-row" data-a="prev:${key}"><span><b>${esc(sc.name)}</b><small>${sc.ex.length} esercizi${giaMia(sc) ? ' · già tra le tue' : ''}</small></span><span class="wo-chev">›</span></button>`;
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Allenamento</button></div>
-      <h2 class="wo-ed-title">Copia una scheda</h2>
-      <p class="wo-sub">Diventa tua: la cambi senza toccare l'originale.</p>
-      ${Object.keys(by).map((n) => sec(n, by[n])).join('')}${sec('Le tue', mine)}`;
+      <h2 class="wo-ed-title">Schede degli altri</h2>
+      ${names.map((n) => `<div class="wo-who"><span class="wo-av">${esc(n[0])}</span><b>${esc(n)}</b></div><section class="card wo-list">${by[n].map(row).join('')}</section>`).join('') || '<p class="wo-empty">Nessuna scheda</p>'}`;
   }
 
-  function copyScheda(key) {
-    let src = null, ext = [];
-    if (key.startsWith('m:')) src = (schede || []).find((y) => y.id === key.slice(2));
-    else if (key.startsWith('e:')) src = SCHEDE_ESEMPIO.find((y) => y.id === key.slice(2));
-    else {
-      const [, i, j] = key.split(':'), d = otherSchede[Number(i)];
-      src = d && d.list ? d.list[Number(j)] : null;
-      ext = (d && d.extra) || [];
-    }
-    if (!src) return;
-    const txt = JSON.stringify(src);
-    ext.forEach((e) => { // le macchine nuove dell'altro che servono alla scheda
+  /** Anteprima di una scheda degli altri: per usarla si copia tra le mie. */
+  function prevView() {
+    const a = altroOf(ui.prev);
+    if (!a) return copyView();
+    const { sc, chi } = a;
+    const rows = sc.ex.map((id) => {
+      const c = circIn(sc, id), pi = sc.piano && sc.piano[id];
+      const v = c ? (c.lista ? c.durata || '' : `${c.giri} giri`) : pi && pi.s ? pi.s : '';
+      return `<div class="wo-prev-r${c ? ' circ' : ''}"><span>${esc(nameOf(id, sc))}${c ? `<small>${esc(c.ex.map((e) => nameOf(e, sc)).join(', '))}</small>` : ''}</span><em>${esc(v)}</em></div>`;
+    }).join('');
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Schede degli altri</button></div>
+      <div class="wo-prev-t"><h2 class="wo-ed-title">${esc(sc.name)}</h2><span class="wo-prev-di">di ${esc(chi)}</span></div>
+      <section class="card wo-prev">${rows}</section>
+      <button class="primary" data-a="cpsave">Copia tra le mie</button>
+      <p class="wo-sub wo-center">${giaMia(sc) ? `Ce l'hai già: la copia si chiamerà "${esc(sc.name)} (copia)".` : 'Per usarla la copi tra le tue; poi la puoi anche modificare.'}</p>`;
+  }
+
+  /** Copia la scheda in anteprima tra le mie (resta "di" chi l'ha fatta, quindi non viene proposta come da fare). */
+  function copyAltro() {
+    const a = altroOf(ui.prev);
+    if (!a) return;
+    const txt = JSON.stringify(a.sc);
+    a.ext.forEach((e) => { // le macchine nuove dell'altro che servono alla scheda
       if (!EX[e.id] && txt.includes(`"${e.id}"`)) {
         extra.push(e);
         addEx(e);
       }
     });
-    const c = clone(src);
-    delete c.id;
-    if (!key.startsWith('e:')) delete c.di; // gli originali inseriti per gli altri restano "di Rizzo" (non proposti come da fare)
-    c.name = (schede || []).some((y) => y.name === src.name) ? `${src.name} (copia)` : src.name;
-    openEditor(c, true);
+    const c = clone(a.sc);
+    c.id = newId('s');
+    c.di = a.chi;
+    if (giaMia(a.sc)) c.name = `${a.sc.name} (copia)`;
+    const list = clone(schede || []);
+    if (list.length >= 30) return toast('Si possono avere al massimo 30 schede');
+    list.push(c);
+    writeDoc(list);
+    Object.assign(ui, { view: 'list', prev: '' });
+    toast(`${c.name}: ora è tra le tue`);
   }
 
   // ---------- Tocchi ----------
@@ -1491,8 +1522,12 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       loadOthers();
       return draw();
     }
-    if (cmd === 'cp') {
-      copyScheda(arg);
+    if (cmd === 'prev') {
+      Object.assign(ui, { view: 'prev', prev: arg });
+      return draw();
+    }
+    if (cmd === 'cpsave') {
+      copyAltro();
       return draw();
     }
     if (cmd === 'fromlib') {
