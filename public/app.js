@@ -126,7 +126,8 @@ const fbdata = createFbData({
 /** Chi deve usare Firebase per tutto: '', 'prova' o 'tutti' (deciso dal server nello stato). */
 function fbMode() {
   const f = (state && state.features) || {};
-  if (testOn()) return f.provaTutto ? 'prova' : '';
+  // "Agisci come": stato e azioni di un altro, che su Firebase non ci sono per chi prova: si passa dal server
+  if (testOn()) return f.provaTutto && !store.get('actAs') ? 'prova' : '';
   return f.firebaseTutto ? 'tutti' : '';
 }
 const fbOk = () => !!fbStarted && fbdata.ready() && fbLiveState;
@@ -1398,6 +1399,7 @@ $('act-as').addEventListener('change', async (e) => {
   store.set('actAs', e.target.value || null);
   store.set('state', null);
   toast(e.target.value ? `Ora agisci come ${e.target.selectedOptions[0].textContent} (solo in prova)` : 'Di nuovo te stesso');
+  fbDataStop(); // agendo come un altro si passa dal server; tornando se stessi Firebase si ricollega
   await refresh();
   chat.reload();
 });
