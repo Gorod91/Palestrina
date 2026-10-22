@@ -170,6 +170,7 @@ input::placeholder { color: #636366; }
 }
 .tabbar svg { width: 26px; height: 26px; }
 .tabbar button.active { color: var(--exercise); }
+.tabbar button.active { --db-bar: #c7c7cc; --db-1: var(--move); --db-2: var(--exercise); --db-3: var(--stand); } /* manubrio dell'Allenamento */
 
 /* ---------- Timer addominali ---------- */
 .timer { display: flex; flex-direction: column; align-items: center; padding-top: 18px; min-height: calc(100dvh - 250px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
