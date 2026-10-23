@@ -6,6 +6,7 @@ import { createFbData } from './fbdata.js';
 import { makeZip } from './zip.js';
 import { createWorkout } from './allenamento.js';
 import { alF } from './genere.js';
+import { initSheetDrag } from './sheetdrag.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -1109,6 +1110,7 @@ function cameraError(err) {
 
 // ---------- Chat ----------
 
+initSheetDrag(); // fogli dal basso: si chiudono trascinandoli giù
 const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: crownFor, isF, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => (testOn() ? 'prova' : state && state.features && state.features.firebase ? 'tutti' : ''), fbOnly: () => fbOk() });
 
 // ---------- Allenamento (fase 1, solo in prova) ----------

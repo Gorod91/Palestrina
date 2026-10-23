@@ -589,6 +589,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     glide = null;
     setupAll();
     setupDrag();
+    sheetTouch();
     tickRest();
   }
 
@@ -1424,6 +1425,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     else if (el.id === 'wo-nx-m' && ui.nx) ui.nx.m = v;
     else return false;
     return true;
+  }
+
+  /** Fogli corti (senza niente da scorrere): tutto il foglio si trascina, senza che Safari lo faccia rimbalzare. */
+  function sheetTouch() {
+    root.querySelectorAll('.wo-edsheet-box').forEach((b) => (b.style.touchAction = b.scrollHeight <= b.clientHeight + 1 ? 'none' : ''));
   }
 
   /** Esercizi della modifica: si spostano trascinando ≡ su o giù; le altre righe si fanno da parte. */
