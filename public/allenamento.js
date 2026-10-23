@@ -684,10 +684,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   /** Foglio "Cambia ordine": si trascinano le schede del giro; ★ la toglie. */
   function rotSheetHtml({ list }) {
-    const rows = list.map((y, k) => `<div class="wo-ed-row" data-k="${k}"><span class="wo-grip" data-grip="${k}" aria-label="Trascina per spostare">≡</span>
+    const rows = list.map((y, k) => `<div class="wo-ed-row wo-rot-row" data-k="${k}" data-grip="${k}"><span class="wo-grip" aria-label="Trascina per spostare">≡</span>
       <span class="wo-ed-n"><b>${k + 1}. ${esc(y.name)}${diBadge(y)}</b></span><span></span><button class="wo-star on" data-a="rotx:${esc(y.id)}" aria-label="Togli dalla rotazione">★</button></div>`).join('');
     return `<div class="wo-edsheet"><div class="wo-edsheet-dim" data-a="rotclose"></div><div class="wo-edsheet-box"><div class="wo-grab"></div>
-      <b class="wo-sh-t">Ordine della rotazione</b><p class="wo-sub">Trascina ≡ per cambiare l'ordine. Dopo l'ultima si ricomincia.</p>
+      <b class="wo-sh-t">Ordine della rotazione</b><p class="wo-sub">Trascina una scheda per cambiare l'ordine. Dopo l'ultima si ricomincia.</p>
       <section class="wo-ed-list" data-kind="rot">${rows}</section><button class="primary" data-a="rotclose">Fatto</button></div></div>`;
   }
 
@@ -1438,7 +1438,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (!list) return;
     list.addEventListener('pointerdown', (ev) => {
       const grip = ev.target.closest('[data-grip]');
-      if (!grip) return;
+      if (!grip || ev.target.closest('button')) return; // nella rotazione si trascina tutta la riga, tranne la ★
       ev.preventDefault();
       const rows = [...list.querySelectorAll('.wo-ed-row')], k = Number(grip.dataset.grip), row = rows[k];
       const rects = rows.map((r) => r.getBoundingClientRect());

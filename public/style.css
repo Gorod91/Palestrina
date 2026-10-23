@@ -960,3 +960,4 @@ body.keyboard .wo-bar { display: none; }
 .sheet-card::before { content: ''; display: block; width: 40px; height: 5px; margin: -8px auto 12px; border-radius: 3px; background: #48484a; }
 .sheet-head { touch-action: none; }
 .sheet-card { overscroll-behavior: contain; }
+.wo-rot-row { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; } /* tutta la riga si trascina */
