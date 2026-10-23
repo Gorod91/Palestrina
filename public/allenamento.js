@@ -68,7 +68,7 @@ export const CATALOGO = [
   { id: 'plank-ginocchia', n: 'Plank sollevo ginocchia', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
   { id: 'ponte-mono', n: 'Ponte monopodalico', g: 'Glutei', m: 'Tappetino', t: 'rip' },
   { id: 'plank-commando', n: 'Plank commando', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
-  { id: 'ercolina-rot', n: 'Rotazioni busto', g: 'Addominali', m: 'Ercolina' },
+  { id: 'ercolina-rot', n: 'Rotazioni busto all\'ercolina', g: 'Addominali', m: 'Ercolina' },
   { id: 'goblet-box', n: 'Goblet squat con box', g: 'Gambe', m: 'Manubri' },
   { id: 'pekdek-or', n: 'Pek dek orizzontale', g: 'Petto', m: 'Pek dek' },
   { id: 'rematore-armstrong', n: 'Rematore Armstrong', g: 'Schiena', m: 'Rematore Armstrong' },
