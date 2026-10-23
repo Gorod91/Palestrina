@@ -625,13 +625,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }).join('');
     let hero = '';
     const ri = rotInfo();
-    if (ri) hero = rotHtml(ri);
-    else if (p) {
-      const n = doneToday(p), d = lastDone(p);
-      const all = n === p.ex.length;
-      const sub = all ? 'Fatta oggi ✓' : n ? `${n} di ${p.ex.length} esercizi fatti` : `${p.ex.length} esercizi${d ? ` · l'hai fatta ${ago(d)}` : ' · mai fatta'}`;
-      hero = `<section class="wo-hero"><div class="wo-hero-name">${esc(p.name)}${diBadge(p)}</div><div class="wo-sub">${sub}</div><button class="primary" data-a="go:${esc(p.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'}</button></section>`;
-    }
+    if (ri) hero = ri.list.length > 1 ? rotHtml(ri) : heroHtml(ri.list[0]); // una sola in rotazione: il riquadro di sempre
+    else if (p) hero = heroHtml(p);
     const dc = daCopiare();
     const recupera = dc.length ? `<section class="card wo-copy"><b>${dc.length} ${dc.length === 1 ? 'esercizio salvato' : 'esercizi salvati'} ${pfx ? 'fuori dalla prova' : 'in modalità prova'}</b>
       <span class="wo-sub">${esc(dc.map((a) => (EX[a.ex] || { n: a.ex }).n).join(', '))}</span><button class="primary" data-a="copia">Copia qui</button></section>` : '';
@@ -653,6 +648,14 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   // Se l'ho modificata, nel bollino resta la persona e compare "modificata".
   const diBadge = (sc) => (sc.di ? `<span class="wo-di${sc.mod ? ' mod' : ''}"><i>${esc(sc.di[0])}</i>${esc(sc.di)}${sc.mod ? '<em>modificata</em>' : ''}</span>` : '');
 
+  /** Riquadro grande della scheda da fare. */
+  function heroHtml(p) {
+    const n = doneToday(p), d = lastDone(p);
+    const all = n === p.ex.length;
+    const sub = all ? 'Fatta oggi ✓' : n ? `${n} di ${p.ex.length} esercizi fatti` : `${p.ex.length} esercizi${d ? ` · l'hai fatta ${ago(d)}` : ' · mai fatta'}`;
+    return `<section class="wo-hero"><div class="wo-hero-name">${esc(p.name)}${diBadge(p)}</div><div class="wo-sub">${sub}</div><button class="primary" data-a="go:${esc(p.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'}</button></section>`;
+  }
+
   // ---------- Rotazione: le schede da fare a turno (stellina) ----------
   const lastAt = (sch) => serie.filter((a) => a.scheda === sch.id).reduce((m, a) => Math.max(m, a.at && a.at.toMillis ? a.at.toMillis() : 0), 0);
 
@@ -671,17 +674,17 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const cards = list.map((y, i) => {
       const d = lastDone(y);
       const sub = i === cur ? (all ? 'fatta oggi ✓' : n ? `${n} di ${y.ex.length}` : 'oggi') : i < cur ? (d ? `✓ ${ago(d)}` : 'mai fatta') : 'dopo';
-      return `<button class="wo-rc${i === cur ? ' cur' : i < cur ? ' done' : ''}" data-a="sch:${esc(y.id)}">${i === cur ? '<span class="wo-rc-tag">oggi</span>' : ''}<span class="wo-rc-n">${i + 1}</span><b>${esc(y.name)}</b><small>${sub}</small></button>`;
+      return `<button class="wo-rc${i === cur ? ' cur' : i < cur ? ' done' : ''}" data-a="sch:${esc(y.id)}">${i === cur ? '<span class="wo-rc-tag">oggi</span>' : ''}<span class="wo-rc-n">${i + 1}</span><b>${esc(y.name)}</b>${diBadge(y)}<small>${sub}</small></button>`;
     }).join('');
     return `<section class="wo-rot"><div class="wo-rot-h"><h2 class="section">In rotazione</h2>${list.length > 1 ? '<button class="wo-rot-ord" data-a="rotord">Cambia ordine</button>' : ''}</div>
       <div class="wo-rot-g" style="--cols:${Math.min(list.length, 4)}">${cards}</div>
-      <button class="primary" data-a="go:${esc(sc.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'} ${esc(sc.name)}</button></section>`;
+      <button class="primary" data-a="go:${esc(sc.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'} ${esc(sc.name)}${diBadge(sc)}</button></section>`;
   }
 
   /** Foglio "Cambia ordine": si trascinano le schede del giro; ★ la toglie. */
   function rotSheetHtml({ list }) {
     const rows = list.map((y, k) => `<div class="wo-ed-row" data-k="${k}"><span class="wo-grip" data-grip="${k}" aria-label="Trascina per spostare">≡</span>
-      <span class="wo-ed-n"><b>${k + 1}. ${esc(y.name)}</b></span><span></span><button class="wo-star on" data-a="rotx:${esc(y.id)}" aria-label="Togli dalla rotazione">★</button></div>`).join('');
+      <span class="wo-ed-n"><b>${k + 1}. ${esc(y.name)}${diBadge(y)}</b></span><span></span><button class="wo-star on" data-a="rotx:${esc(y.id)}" aria-label="Togli dalla rotazione">★</button></div>`).join('');
     return `<div class="wo-edsheet"><div class="wo-edsheet-dim" data-a="rotclose"></div><div class="wo-edsheet-box"><div class="wo-grab"></div>
       <b class="wo-sh-t">Ordine della rotazione</b><p class="wo-sub">Trascina ≡ per cambiare l'ordine. Dopo l'ultima si ricomincia.</p>
       <section class="wo-ed-list" data-kind="rot">${rows}</section><button class="primary" data-a="rotclose">Fatto</button></div></div>`;
@@ -702,7 +705,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const sch = (schede || []).find((s) => s.id === ui.scheda);
     // "ok" anche su quello aperto: scorrendo via, la barretta resta verde se l'esercizio è fatto ("cur" ha la precedenza)
     const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : ''}${isDone(id) ? ' ok' : ''}" data-a="j:${k}" aria-label="${esc(nameOf(id))}"></button>`).join('');
-    const title = sch ? `${esc(sch.name)} · <span id="wo-num">${ui.i + 1}</span>/${ui.list.length}` : 'Allenamento libero';
+    const title = sch ? `${esc(sch.name)}${diBadge(sch)} · <span id="wo-num">${ui.i + 1}</span>/${ui.list.length}` : 'Allenamento libero';
     const many = ui.list.length > 1;
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button></div>
       ${many ? `<div class="wo-dots" id="wo-dots">${dots}</div>` : ''}
@@ -1228,7 +1231,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         <button class="wo-ed-x" data-a="edrm:${k}" aria-label="Togli">×</button></div>`;
     }).join('');
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Annulla</button></div>
-      <h2 class="wo-ed-title">${ed.isNew ? 'Nuova scheda' : 'Modifica la scheda'}</h2>
+      <h2 class="wo-ed-title">${ed.isNew ? 'Nuova scheda' : 'Modifica la scheda'}${diBadge(ed)}</h2>
       <label class="wo-lbl" for="wo-ed-name">Nome</label>
       <input id="wo-ed-name" class="plain wo-ed-name" value="${esc(ed.name)}" placeholder="Per esempio Scheda B" maxlength="40" autocomplete="off">
       <div class="wo-lbl">Esercizi${ed.ex.length > 1 ? ' · trascina ≡ per spostarli' : ''}</div>
@@ -1277,7 +1280,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const ed = ui.ed;
     const had = ui.pickFor === 'edit' ? ed.ex : ui.pickFor.startsWith('circ:') ? ed.circuiti[ui.pickFor.slice(5)].ex : [];
     const n = ui.sel.length;
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${esc(ed.name || (ed.isNew ? 'Nuova scheda' : 'Scheda'))}</button></div>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${esc(ed.name || (ed.isNew ? 'Nuova scheda' : 'Scheda'))}${diBadge(ed)}</button></div>
       <input id="wo-q" class="plain wo-search" placeholder="Cerca un esercizio" value="${esc(ui.q)}" autocomplete="off">
       <div class="wo-groups"><button class="${ui.g ? '' : 'on'}" data-a="g:">Tutti</button>${groups.map((g) => `<button class="${ui.g === g ? 'on' : ''}" data-a="g:${esc(g)}">${esc(g)}</button>`).join('')}</div>
       <section class="card wo-list">

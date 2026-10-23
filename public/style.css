@@ -943,3 +943,11 @@ body.keyboard .wo-bar { display: none; }
 .wo-rc.cur .wo-rc-n { background: var(--exercise); color: #000; }
 .wo-rc-tag { position: absolute; top: -7px; right: 6px; padding: 2px 6px; border-radius: 99px; background: var(--exercise); color: #000; font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
 .wo-edsheet .wo-ed-list[data-kind="rot"] .wo-ed-row { grid-template-columns: 26px minmax(0, 1fr) 0 36px; }
+/* bollino dentro i riquadri della rotazione, nel tasto verde e nei titoli */
+.wo-rc .wo-di { justify-self: start; margin: 1px 0 0; font-size: 10.5px; max-width: 100%; }
+.wo-rc .wo-di i { width: 15px; height: 15px; font-size: 9px; }
+.primary .wo-di { background: rgba(0, 0, 0, .14); color: #000; vertical-align: 1px; }
+.primary .wo-di i { background: #000; color: var(--exercise); }
+.primary .wo-di em { color: #000; border-left-color: rgba(0, 0, 0, .25); }
+.wo-back .wo-di { font-size: 12px; vertical-align: 1px; }
+.wo-ed-title .wo-di { font-size: 13px; vertical-align: 5px; }
