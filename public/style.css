@@ -933,7 +933,7 @@ body.keyboard .wo-bar { display: none; }
 .wo-rot { margin-bottom: 8px; }
 .wo-rot-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .wo-rot-ord { border: 0; background: none; color: var(--stand); font-size: 15px; font-weight: 600; padding: 4px 0; }
-.wo-rot-g { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin: 2px 0 12px; }
+.wo-rot-g { display: grid; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); /* poche schede: si allargano */ gap: 7px; margin: 2px 0 12px; }
 .wo-rc { position: relative; display: grid; align-content: start; gap: 3px; min-width: 0; padding: 8px 8px 9px; border: 0; border-radius: 14px; background: var(--card); color: var(--fg); text-align: left; }
 .wo-rc b { font-size: 14px; line-height: 1.15; overflow-wrap: anywhere; }
 .wo-rc small { color: var(--muted); font-size: 11px; }

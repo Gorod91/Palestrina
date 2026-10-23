@@ -674,7 +674,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       return `<button class="wo-rc${i === cur ? ' cur' : i < cur ? ' done' : ''}" data-a="sch:${esc(y.id)}">${i === cur ? '<span class="wo-rc-tag">oggi</span>' : ''}<span class="wo-rc-n">${i + 1}</span><b>${esc(y.name)}</b><small>${sub}</small></button>`;
     }).join('');
     return `<section class="wo-rot"><div class="wo-rot-h"><h2 class="section">In rotazione</h2>${list.length > 1 ? '<button class="wo-rot-ord" data-a="rotord">Cambia ordine</button>' : ''}</div>
-      <div class="wo-rot-g">${cards}</div>
+      <div class="wo-rot-g" style="--cols:${Math.min(list.length, 4)}">${cards}</div>
       <button class="primary" data-a="go:${esc(sc.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'} ${esc(sc.name)}</button></section>`;
   }
 
