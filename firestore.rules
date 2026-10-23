@@ -54,13 +54,16 @@ service cloud.firestore {
     match /{coll}/{id} {
       allow read: if pal() && allenamento() && coll in ['serie', 'prova_serie', 'schede', 'prova_schede', 'catalogo', 'prova_catalogo'];
 
-      // Catalogo comune (id = esercizio): l'attrezzo cambiato dall'app vale per tutti
+      // Catalogo comune (id = esercizio): nome, attrezzo, gruppo e come si segna cambiati dall'app valgono per tutti
       allow create, update: if pal() && allenamento()
         && coll in ['catalogo', 'prova_catalogo']
         && id.matches('^[a-z0-9-]{1,40}$')
-        && request.resource.data.keys().hasOnly(['m', 'by', 'at'])
+        && request.resource.data.keys().hasOnly(['n', 'm', 'g', 't', 'by', 'at'])
         && request.resource.data.m is string
         && request.resource.data.m.size() <= 40
+        && (!('n' in request.resource.data) || (request.resource.data.n is string && request.resource.data.n.size() >= 1 && request.resource.data.n.size() <= 60))
+        && (!('g' in request.resource.data) || (request.resource.data.g is string && request.resource.data.g.size() <= 30))
+        && (!('t' in request.resource.data) || request.resource.data.t in ['kg', 'rip', 'sec', 'm'])
         && request.resource.data.by == request.auth.token.name
         && request.resource.data.at == request.time;
 
