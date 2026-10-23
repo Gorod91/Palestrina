@@ -398,6 +398,14 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       }, (err) => toast(`Allenamento: ${err.message}`)),
     );
     loadOthers(); // schede degli altri (per il tasto "Schede degli altri")
+    // Catalogo comune: attrezzo cambiato dall'app (vale per tutte le schede di tutti)
+    unsubs.push(fs.onSnapshot(fs.collection(db, pfx + 'catalogo'), (snap) => {
+      snap.docs.forEach((d) => {
+        const e = EX[d.id], m = d.data().m;
+        if (e && typeof m === 'string') e.m = m;
+      });
+      softDraw();
+    }, () => {}));
     // Serie salvate dall'altra parte (in prova se ora si è fuori, o viceversa): si possono copiare qui
     fs.getDocs(fs.query(fs.collection(db, (test ? '' : 'prova_') + 'serie'), fs.where('name', '==', me.name)))
       .then((snap) => {
@@ -1259,6 +1267,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         <div class="wo-lbl">${t === 'sec' ? 'Durata' : t === 'm' ? 'Metri o minuti' : 'Ripetizioni'}</div>
         <div class="wo-sh-seg">${REPS[t].map((v) => `<button class="${v === r ? 'on' : ''}" data-a="plr:${esc(v)}">${esc(v)}</button>`).join('')}</div>
         <input id="wo-pl-r" class="plain wo-sh-in" value="${REPS[t].includes(r) ? '' : esc(r)}" placeholder="Altro, per esempio 8 per lato" maxlength="30" autocomplete="off">
+        <label class="wo-lbl" for="wo-pl-m">Attrezzo · vale per tutte le schede</label>
+        <input id="wo-pl-m" class="plain wo-sh-in" value="${esc(e.m || '')}" placeholder="Per esempio Kettlebell, Macchina, Manubri" maxlength="40" autocomplete="off">
         <div class="wo-lbl">Nota (facoltativa)</div>
         <input id="wo-pl-nota" class="plain wo-sh-in" value="${esc(pi.nota || '')}" placeholder="Per esempio sedile al 4" maxlength="80" autocomplete="off">`;
     } else {
@@ -1272,6 +1282,17 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         <button class="link-button" data-a="csadd">+ Aggiungi esercizi al circuito</button>`;
     }
     return `<div class="wo-edsheet"><div class="wo-edsheet-dim" data-a="shclose"></div><div class="wo-edsheet-box"><div class="wo-grab"></div>${body}<button class="primary" data-a="shclose">Fatto</button></div></div>`;
+  }
+
+  /** Attrezzo di un esercizio nel catalogo comune (catalogo/<id>): cambia in tutte le schede. */
+  function saveAttrezzo(ex, v) {
+    const e = EX[ex], m = String(v || '').replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (!e || m === (e.m || '')) return;
+    e.m = m;
+    const { fs, db } = x;
+    fs.setDoc(fs.doc(db, pfx + 'catalogo', ex), { m, by: me.name, at: fs.serverTimestamp() })
+      .catch((err) => toast(`Attrezzo non salvato: ${err.message}`));
+    toast(`${e.n}: ${m || 'senza attrezzo'}, in tutte le schede`);
   }
 
   function openPick(forWhat) {
@@ -1728,6 +1749,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   });
 
   root.addEventListener('change', (ev) => {
+    if (ev.target.id === 'wo-pl-m' && ui.sheet) return saveAttrezzo(ui.sheet.ex, ev.target.value);
     const f = ev.target.dataset.f, page = ev.target.closest('.wo-page');
     if (!f || !page) return;
     ui.i = Number(page.dataset.k);
