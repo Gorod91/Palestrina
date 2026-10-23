@@ -1252,7 +1252,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const rows = ed.ex.map((id, k) => {
       const c = edCirc(id), pill = planPill(id);
       const sub = c ? `${c.lista ? 'da spuntare' : 'circuito'} · ${c.ex.length} esercizi` : esc((EX[id] || {}).m || '');
-      return `<div class="wo-ed-row${c ? ' circ' : ''}" data-k="${k}"><span class="wo-grip" data-grip="${k}" aria-label="Trascina per spostare">≡</span>
+      return `<div class="wo-ed-row${c ? ' circ' : ''}" data-k="${k}" data-a="edplan:${k}"><span class="wo-grip" aria-label="Tieni premuto per spostare">≡</span>
         <span class="wo-ed-n"><b>${esc(c ? c.n : (EX[id] || { n: id }).n)}</b><small>${sub}</small></span>
         <button class="wo-ed-plan${pill === 'Imposta' ? ' empty' : ''}" data-a="edplan:${k}">${esc(pill)}</button>
         <button class="wo-ed-x" data-a="edrm:${k}" aria-label="Togli">×</button></div>`;
@@ -1261,7 +1261,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <h2 class="wo-ed-title">${ed.isNew ? 'Nuova scheda' : 'Modifica la scheda'}${diBadge(ed)}</h2>
       <label class="wo-lbl" for="wo-ed-name">Nome</label>
       <input id="wo-ed-name" class="plain wo-ed-name" value="${esc(ed.name)}" placeholder="Per esempio Scheda B" maxlength="40" autocomplete="off">
-      <div class="wo-lbl">Esercizi${ed.ex.length > 1 ? ' · trascina ≡ per spostarli' : ''}</div>
+      <div class="wo-lbl">Esercizi${ed.ex.length > 1 ? ' · tieni premuto per spostarli' : ''}</div>
       ${rows ? `<section class="wo-ed-list">${rows}</section>` : '<p class="wo-empty">Ancora nessun esercizio</p>'}
       <div class="wo-btns"><button class="secondary" data-a="edadd">+ Esercizi</button><button class="secondary" data-a="edcirc">+ Blocco</button></div>
       <button class="primary" data-a="edsave">Salva</button>
@@ -1503,54 +1503,91 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     root.querySelectorAll('.wo-edsheet-box').forEach((b) => (b.style.touchAction = b.scrollHeight <= b.clientHeight + 1 ? 'none' : ''));
   }
 
-  /** Esercizi della modifica: si spostano trascinando ≡ su o giù; le altre righe si fanno da parte. */
+  /** Righe da riordinare. Nella modifica: tenendo premuto un punto qualsiasi della riga (subito dalla ≡), e un tocco apre
+   *  il foglio Esercizio; nella rotazione: subito, da tutta la riga. Le altre righe si fanno da parte. */
+  let dragging = false, dragClick = false;
+  document.addEventListener('touchmove', (e) => { if (dragging) e.preventDefault(); }, { passive: false }); // niente scorrimento mentre si trascina
+  root.addEventListener('click', (ev) => {
+    if (dragClick) { ev.stopPropagation(); ev.preventDefault(); }
+  }, true);
+
   function setupDrag() {
     const list = root.querySelector('.wo-ed-list');
     if (!list) return;
+    const rotList = list.dataset.kind === 'rot';
     list.addEventListener('pointerdown', (ev) => {
-      const grip = ev.target.closest('[data-grip]');
-      if (!grip || ev.target.closest('button')) return; // nella rotazione si trascina tutta la riga, tranne la ★
-      ev.preventDefault();
-      const rows = [...list.querySelectorAll('.wo-ed-row')], k = Number(grip.dataset.grip), row = rows[k];
-      const rects = rows.map((r) => r.getBoundingClientRect());
-      const step = rows.length > 1 ? rects[1].top - rects[0].top : rects[k].height;
-      const mids = rects.map((r) => r.top + r.height / 2), y0 = ev.clientY;
-      let to = k;
-      grip.setPointerCapture(ev.pointerId);
-      row.classList.add('drag');
-      const move = (e) => {
-        const dy = e.clientY - y0, mid = mids[k] + dy;
-        row.style.transform = `translateY(${dy}px)`;
-        let t = k;
-        mids.forEach((m, j) => {
-          if (j < k && mid < m) t = Math.min(t, j);
-          if (j > k && mid > m) t = Math.max(t, j);
-        });
-        if (t !== to && navigator.vibrate) navigator.vibrate(6);
-        to = t;
-        rows.forEach((r, j) => {
-          if (j === k) return;
-          const sh = k < to && j > k && j <= to ? -step : k > to && j < k && j >= to ? step : 0;
-          r.style.transform = sh ? `translateY(${sh}px)` : '';
-        });
+      const row = ev.target.closest('.wo-ed-row');
+      if (!row || ev.target.closest(rotList ? 'button' : '.wo-ed-x')) return; // la ★ e la × restano tasti
+      if (rotList || ev.target.closest('.wo-grip')) {
+        ev.preventDefault();
+        return startDrag(list, row, ev.pointerId, ev.clientY);
+      }
+      // tenere premuto: parte dopo un attimo, se intanto il dito non si è mosso (altrimenti si sta scorrendo)
+      const x0 = ev.clientX, y0 = ev.clientY, id = ev.pointerId;
+      let last = y0;
+      const timer = setTimeout(() => { stop(); startDrag(list, row, id, y0, last); }, 380);
+      const mv = (e) => { if (e.pointerId !== id) return; last = e.clientY; if (Math.abs(e.clientY - y0) > 8 || Math.abs(e.clientX - x0) > 8) { clearTimeout(timer); stop(); } };
+      const stop = () => {
+        document.removeEventListener('pointermove', mv);
+        document.removeEventListener('pointerup', cancel);
+        document.removeEventListener('pointercancel', cancel);
       };
-      const up = () => {
-        grip.removeEventListener('pointermove', move);
-        grip.removeEventListener('pointerup', up);
-        grip.removeEventListener('pointercancel', up);
-        if (list.dataset.kind === 'rot') {
-          const ids = rotInfo().list.map((y) => y.id);
-          ids.splice(to, 0, ids.splice(k, 1)[0]);
-          rot = ids;
-          writeDoc();
-        } else ui.ed.ex.splice(to, 0, ui.ed.ex.splice(k, 1)[0]);
-        draw();
-      };
-      grip.addEventListener('pointermove', move);
-      grip.addEventListener('pointerup', up);
-      grip.addEventListener('pointercancel', up);
+      const cancel = () => { clearTimeout(timer); stop(); };
+      document.addEventListener('pointermove', mv);
+      document.addEventListener('pointerup', cancel);
+      document.addEventListener('pointercancel', cancel);
     });
   }
+
+  function startDrag(list, row, pointerId, y0, yNow = y0) {
+    const rows = [...list.querySelectorAll('.wo-ed-row')], k = rows.indexOf(row);
+    const rects = rows.map((r) => r.getBoundingClientRect());
+    const step = rows.length > 1 ? rects[1].top - rects[0].top : rects[k].height;
+    const mids = rects.map((r) => r.top + r.height / 2);
+    let to = k;
+    dragging = true;
+    try { row.setPointerCapture(pointerId); } catch {}
+    row.classList.add('drag');
+    if (navigator.vibrate) navigator.vibrate(12);
+    const move = (e) => {
+      if (e.pointerId !== pointerId) return;
+      const dy = e.clientY - y0, mid = mids[k] + dy;
+      row.style.transform = `translateY(${dy}px)`;
+      let t = k;
+      mids.forEach((m, j) => {
+        if (j < k && mid < m) t = Math.min(t, j);
+        if (j > k && mid > m) t = Math.max(t, j);
+      });
+      if (t !== to && navigator.vibrate) navigator.vibrate(6);
+      to = t;
+      rows.forEach((r, j) => {
+        if (j === k) return;
+        const sh = k < to && j > k && j <= to ? -step : k > to && j < k && j >= to ? step : 0;
+        r.style.transform = sh ? `translateY(${sh}px)` : '';
+      });
+    };
+    const up = (e) => {
+      if (e.pointerId !== pointerId) return;
+      document.removeEventListener('pointermove', move);
+      document.removeEventListener('pointerup', up);
+      document.removeEventListener('pointercancel', up);
+      dragging = false;
+      dragClick = true; // il dito alzato non vale come tocco sulla riga
+      setTimeout(() => (dragClick = false), 60);
+      if (list.dataset.kind === 'rot') {
+        const ids = rotInfo().list.map((y) => y.id);
+        ids.splice(to, 0, ids.splice(k, 1)[0]);
+        rot = ids;
+        writeDoc();
+      } else ui.ed.ex.splice(to, 0, ui.ed.ex.splice(k, 1)[0]);
+      draw();
+    };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up);
+    document.addEventListener('pointercancel', up);
+    if (yNow !== y0) move({ pointerId, clientY: yNow });
+  }
+
 
   function loadOthers() {
     const { fs, db } = x;
