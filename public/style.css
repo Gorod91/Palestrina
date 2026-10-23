@@ -978,3 +978,4 @@ body.keyboard .wo-bar { display: none; }
 /* Modifica: la riga intera si tocca (foglio Esercizio) o si tiene premuta (per spostarla) */
 .wo-ed-row { cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .wo-ed-row.drag { cursor: grabbing; }
+.wo-exed-ok { margin-top: 22px; }

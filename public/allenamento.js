@@ -347,7 +347,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let schede = null; // le mie schede (null finché non arrivano)
   // cosa si vede: lista, esercizio, catalogo (allenamento libero)
   // ed: scheda in modifica; pickFor: il catalogo sceglie esercizi per la scheda ('edit'), un circuito nuovo ('circnew') o uno esistente ('circ:id')
-  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '', rotSheet: false };
+  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '', rotSheet: false, exed: null };
   let restEnd = 0;
   let restTotal = REST; // secondi del recupero in corso
   let serieSig = '';
@@ -511,15 +511,19 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   // Indietro trascinando dal bordo sinistro, come in Safari (dalla Home iOS non lo fa da solo):
   // la pagina segue il dito e sotto compare quella prima; oltre metà schermo o con uno scatto si torna lì.
-  const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor ? 'edit' : ui.view === 'newex' ? 'pick' : ui.view === 'prev' ? 'copy' : 'list');
+  const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor ? 'edit' : ui.view === 'newex' ? 'pick' : ui.view === 'prev' ? 'copy' : ui.view === 'exed' ? 'edit' : 'list');
   function goBack() {
     const v = backView();
+    if (ui.view === 'exed') { // dalla pagina Esercizio: alla modifica (o al foglio del circuito da cui eri partito)
+      ui.sheet = ui.exed && ui.exed.back ? ui.exed.back : null;
+      ui.exed = null;
+    }
     if (v !== 'pick') Object.assign(ui, { pickFor: v === 'edit' ? '' : ui.pickFor, sel: v === 'edit' ? [] : ui.sel });
     if (v === 'list') Object.assign(ui, { ed: null, pickFor: '', sheet: null });
     ui.view = v;
   }
   function viewHtml(v) {
-    return v === 'ex' ? exView() : v === 'pick' ? pickView() : v === 'edit' ? editView() : v === 'newex' ? newExView() : v === 'copy' ? copyView() : v === 'prev' ? prevView() : listView();
+    return v === 'ex' ? exView() : v === 'pick' ? pickView() : v === 'edit' ? editView() : v === 'newex' ? newExView() : v === 'copy' ? copyView() : v === 'prev' ? prevView() : v === 'exed' ? exedView() : listView();
   }
   let edge = null;
   root.addEventListener('pointerdown', (ev) => {
@@ -596,7 +600,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const sc = document.getElementById('scroller'); // area che scorre dell'app
     if (sc && ui.view !== shownView) { // pagina nuova: si parte dall'alto (tornando alla modifica, dal punto in cui eri)
       scrollMem[shownView] = sc.scrollTop;
-      const back = ui.view === 'edit' && ['pick', 'newex'].includes(shownView);
+      const back = ui.view === 'edit' && ['pick', 'newex', 'exed'].includes(shownView);
       shownView = ui.view;
       root.innerHTML = viewHtml(ui.view) + (ui.view === 'list' ? '' : '<div class="wo-edge" aria-hidden="true"></div>');
       sc.scrollTop = back ? scrollMem.edit || 0 : 0;
@@ -1276,32 +1280,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function sheetHtml() {
     const sh = ui.sheet, ed = ui.ed;
     let body;
-    if (sh.kind === 'plan') {
-      // Foglio Esercizio: sopra quello che vale per tutte le schede (catalogo comune), sotto quello di questa scheda
-      const e = EX[sh.ex] || { n: sh.ex }, t = unit(e), pi = ed.piano[sh.ex] || {}, { n, r } = splitPlan(pi.s);
-      const gruppi = [...new Set([...GRUPPI, e.g].filter(Boolean))];
-      const cambiato = sh.t0 && sh.t0 !== t && serie.some((a) => a.ex === sh.ex);
-      body = `<b class="wo-sh-t">${esc(e.n)}</b>
-        <div class="wo-part">Per tutte le schede</div>
-        <label class="wo-lbl" for="wo-pl-n">Nome</label>
-        <input id="wo-pl-n" class="plain wo-sh-in" value="${esc(e.n)}" maxlength="60" autocomplete="off">
-        <label class="wo-lbl" for="wo-pl-m">Attrezzo</label>
-        <input id="wo-pl-m" class="plain wo-sh-in" value="${esc(e.m || '')}" placeholder="Per esempio Kettlebell, Macchina, Manubri" maxlength="40" autocomplete="off">
-        <div class="wo-lbl">Gruppo</div>
-        <div class="wo-groups wrap">${gruppi.map((g) => `<button class="${e.g === g ? 'on' : ''}" data-a="plg:${esc(g)}">${esc(g)}</button>`).join('')}</div>
-        <div class="wo-lbl">Come si segna</div>
-        <div class="wo-sh-seg">${TIPI.map(([k, l]) => `<button class="${t === k ? 'on' : ''}" data-a="plt:${k}">${l}</button>`).join('')}</div>
-        ${cambiato ? `<p class="wo-warn">Prima era "${TIPI.find(([k]) => k === sh.t0)[1]}": le serie già fatte restano come erano, da ora si segna in questo modo. Vale in tutte le schede.</p>` : ''}
-        ${sh.back ? '' : `<div class="wo-part loc">In questa scheda</div>
-        <div class="wo-sh-step"><span class="wo-lbl">Serie</span><span class="wo-pm"><button data-a="pln-" aria-label="Una serie in meno">−</button><b>${n}</b><button data-a="pln+" aria-label="Una serie in più">+</button></span></div>
-        <div class="wo-lbl">${t === 'sec' ? 'Durata' : t === 'm' ? 'Metri o minuti' : 'Ripetizioni'}</div>
-        <div class="wo-sh-seg">${REPS[t].map((v) => `<button class="${v === r ? 'on' : ''}" data-a="plr:${esc(v)}">${esc(v)}</button>`).join('')}</div>
-        <input id="wo-pl-r" class="plain wo-sh-in" value="${REPS[t].includes(r) ? '' : esc(r)}" placeholder="Altro, per esempio 8 per lato" maxlength="30" autocomplete="off">
-        ${t === 'kg' ? `<label class="wo-lbl" for="wo-pl-kg">Peso iniziale · la prima volta</label>
-        <div class="wo-kgf"><input id="wo-pl-kg" class="plain wo-sh-in" inputmode="decimal" value="${pi.kg ? kgf(pi.kg) : ''}" placeholder="0" autocomplete="off"><span>kg</span></div>` : ''}
-        <div class="wo-lbl">Nota (facoltativa)</div>
-        <input id="wo-pl-nota" class="plain wo-sh-in" value="${esc(pi.nota || '')}" placeholder="Per esempio sedile al 4" maxlength="80" autocomplete="off">`}`;
-    } else if (sh.kind === 'newblock') {
+    if (sh.kind === 'newblock') {
       body = `<b class="wo-sh-t">Nuovo blocco</b><p class="wo-sub">Scegli il tipo, poi gli esercizi.</p>
         <div class="wo-kinds2"><button class="${sh.lista ? '' : 'on'}" data-a="nbk:circ"><b>Circuito</b>Esercizi di fila, ripetuti per più giri, con recupero</button>
         <button class="${sh.lista ? 'on' : ''}" data-a="nbk:lista"><b>Lista da spuntare</b>Come la mobilità: si spunta ogni esercizio</button></div>
@@ -1332,6 +1311,37 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const { fs, db } = x;
     fs.setDoc(fs.doc(db, pfx + 'catalogo', ex), { ...next, by: me.name, at: fs.serverTimestamp() })
       .catch((err) => toast(`Esercizio non salvato: ${err.message}`));
+  }
+
+  /** Pagina Esercizio (a tutto schermo): sopra quello che vale per tutte le schede, sotto quello di questa scheda. */
+  function exedView() {
+    const pe = ui.exed, ed = ui.ed;
+      const e = EX[pe.ex] || { n: pe.ex }, t = unit(e), pi = ed.piano[pe.ex] || {}, { n, r } = splitPlan(pi.s);
+      const gruppi = [...new Set([...GRUPPI, e.g].filter(Boolean))];
+      const cambiato = pe.t0 && pe.t0 !== t && serie.some((a) => a.ex === pe.ex);
+      const body = `
+        <div class="wo-part">Per tutte le schede</div>
+        <label class="wo-lbl" for="wo-pl-n">Nome</label>
+        <input id="wo-pl-n" class="plain wo-sh-in" value="${esc(e.n)}" maxlength="60" autocomplete="off">
+        <label class="wo-lbl" for="wo-pl-m">Attrezzo</label>
+        <input id="wo-pl-m" class="plain wo-sh-in" value="${esc(e.m || '')}" placeholder="Per esempio Kettlebell, Macchina, Manubri" maxlength="40" autocomplete="off">
+        <div class="wo-lbl">Gruppo</div>
+        <div class="wo-groups wrap">${gruppi.map((g) => `<button class="${e.g === g ? 'on' : ''}" data-a="plg:${esc(g)}">${esc(g)}</button>`).join('')}</div>
+        <div class="wo-lbl">Come si segna</div>
+        <div class="wo-sh-seg">${TIPI.map(([k, l]) => `<button class="${t === k ? 'on' : ''}" data-a="plt:${k}">${l}</button>`).join('')}</div>
+        ${cambiato ? `<p class="wo-warn">Prima era "${TIPI.find(([k]) => k === pe.t0)[1]}": le serie già fatte restano come erano, da ora si segna in questo modo. Vale in tutte le schede.</p>` : ''}
+        ${pe.back ? '' : `<div class="wo-part loc">In questa scheda</div>
+        <div class="wo-sh-step"><span class="wo-lbl">Serie</span><span class="wo-pm"><button data-a="pln-" aria-label="Una serie in meno">−</button><b>${n}</b><button data-a="pln+" aria-label="Una serie in più">+</button></span></div>
+        <div class="wo-lbl">${t === 'sec' ? 'Durata' : t === 'm' ? 'Metri o minuti' : 'Ripetizioni'}</div>
+        <div class="wo-sh-seg">${REPS[t].map((v) => `<button class="${v === r ? 'on' : ''}" data-a="plr:${esc(v)}">${esc(v)}</button>`).join('')}</div>
+        <input id="wo-pl-r" class="plain wo-sh-in" value="${REPS[t].includes(r) ? '' : esc(r)}" placeholder="Altro, per esempio 8 per lato" maxlength="30" autocomplete="off">
+        ${t === 'kg' ? `<label class="wo-lbl" for="wo-pl-kg">Peso iniziale · la prima volta</label>
+        <div class="wo-kgf"><input id="wo-pl-kg" class="plain wo-sh-in" inputmode="decimal" value="${pi.kg ? kgf(pi.kg) : ''}" placeholder="0" autocomplete="off"><span>kg</span></div>` : ''}
+        <div class="wo-lbl">Nota (facoltativa)</div>
+        <input id="wo-pl-nota" class="plain wo-sh-in" value="${esc(pi.nota || '')}" placeholder="Per esempio sedile al 4" maxlength="80" autocomplete="off">`}`;
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${pe.back ? esc(ed.circuiti[pe.back.cid].n) : esc(ed.name || 'Scheda')}</button></div>
+      <h2 class="wo-ed-title">${esc((EX[pe.ex] || { n: pe.ex }).n)}</h2>${body}
+      <button class="primary wo-exed-ok" data-a="back">Fatto</button>`;
   }
 
   function openPick(forWhat) {
@@ -1442,25 +1452,27 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   /** Comandi della modifica; false se il comando non è suo. */
   function editCmd(cmd, arg) {
     const ed = ui.ed, sh = ui.sheet;
-    const pi = () => (ed.piano[sh.ex] ||= {});
+    const pe = ui.exed;
+    const pi = () => (ed.piano[pe.ex] ||= {});
     const circ = () => ed.circuiti[sh.cid];
     if (cmd === 'edrm') ed.ex.splice(Number(arg), 1);
     else if (cmd === 'edplan') {
       const id = ed.ex[Number(arg)];
-      ui.sheet = id[0] === '@' ? { kind: 'circ', cid: id.slice(1) } : { kind: 'plan', ex: id, t0: unit(EX[id]) };
+      if (id[0] === '@') ui.sheet = { kind: 'circ', cid: id.slice(1) };
+      else Object.assign(ui, { exed: { ex: id, t0: unit(EX[id]) }, view: 'exed' });
     } else if (cmd === 'shclose') ui.sheet = sh && sh.back ? sh.back : null; // dal circuito si torna al circuito
-    else if (cmd === 'plg') saveCat(sh.ex, { g: arg });
-    else if (cmd === 'plt') saveCat(sh.ex, { t: arg });
+    else if (cmd === 'plg') saveCat(pe.ex, { g: arg });
+    else if (cmd === 'plt') saveCat(pe.ex, { t: arg });
     else if (cmd === 'csp-' || cmd === 'csp+') {
       const p = Math.max(0, Math.min(60, (circ().pausa || 0) + (cmd === 'csp+' ? 5 : -5)));
       if (p) circ().pausa = p;
       else delete circ().pausa;
-    } else if (cmd === 'csex') ui.sheet = { kind: 'plan', ex: arg, t0: unit(EX[arg]), back: sh };
+    } else if (cmd === 'csex') Object.assign(ui, { exed: { ex: arg, t0: unit(EX[arg]), back: sh }, sheet: null, view: 'exed' });
     else if (cmd === 'nbk') ui.sheet = { kind: 'newblock', lista: arg === 'lista' };
     else if (cmd === 'nbgo') { const l = sh.lista; ui.sheet = null; openPick(l ? 'listanew' : 'circnew'); }
     else if (cmd === 'pln-' || cmd === 'pln+') {
       const p = splitPlan(pi().s);
-      pi().s = joinPlan(Math.max(1, Math.min(10, p.n + (cmd === 'pln+' ? 1 : -1))), p.r || (unit(EX[sh.ex]) === 'sec' ? '30"' : '10'));
+      pi().s = joinPlan(Math.max(1, Math.min(10, p.n + (cmd === 'pln+' ? 1 : -1))), p.r || (unit(EX[pe.ex]) === 'sec' ? '30"' : '10'));
     } else if (cmd === 'plr') pi().s = joinPlan(splitPlan(pi().s).n, arg);
     else if (cmd === 'csg-' || cmd === 'csg+') circ().giri = Math.max(1, Math.min(8, circ().giri + (cmd === 'csg+' ? 1 : -1)));
     else if (cmd === 'csr-' || cmd === 'csr+') circ().rec = Math.max(15, Math.min(300, circ().rec + (cmd === 'csr+' ? 15 : -15)));
@@ -1485,9 +1497,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const ed = ui.ed, sh = ui.sheet, v = el.value;
     if (!ed) return false;
     if (el.id === 'wo-ed-name') ed.name = v;
-    else if (el.id === 'wo-pl-nota') (ed.piano[sh.ex] ||= {}).nota = v;
+    else if (el.id === 'wo-pl-nota') (ed.piano[ui.exed.ex] ||= {}).nota = v;
     else if (el.id === 'wo-pl-r') {
-      const pi = (ed.piano[sh.ex] ||= {});
+      const pi = (ed.piano[ui.exed.ex] ||= {});
       pi.s = joinPlan(splitPlan(pi.s).n, v.trim());
     } else if (el.id === 'wo-cs-name') ed.circuiti[sh.cid].n = v;
     else if (el.id === 'wo-cs-dur') ed.circuiti[sh.cid].durata = v.trim();
@@ -1834,13 +1846,13 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   });
 
   root.addEventListener('change', (ev) => {
-    if (ui.sheet && ui.sheet.kind === 'plan' && ['wo-pl-n', 'wo-pl-m'].includes(ev.target.id)) {
+    if (ui.exed && ['wo-pl-n', 'wo-pl-m'].includes(ev.target.id)) {
       const v = ev.target.value.replace(/\s+/g, ' ').trim();
-      if (ev.target.id === 'wo-pl-n') return v ? saveCat(ui.sheet.ex, { n: v.slice(0, 60) }) : toast('Il nome non può essere vuoto');
-      return saveCat(ui.sheet.ex, { m: v.slice(0, 40) });
+      if (ev.target.id === 'wo-pl-n') return v ? saveCat(ui.exed.ex, { n: v.slice(0, 60) }) : toast('Il nome non può essere vuoto');
+      return saveCat(ui.exed.ex, { m: v.slice(0, 40) });
     }
-    if (ev.target.id === 'wo-pl-kg' && ui.ed && ui.sheet) { // peso iniziale di questa scheda
-      const v = Number(ev.target.value.replace(',', '.')), pi = (ui.ed.piano[ui.sheet.ex] ||= {});
+    if (ev.target.id === 'wo-pl-kg' && ui.ed && ui.exed) { // peso iniziale di questa scheda
+      const v = Number(ev.target.value.replace(',', '.')), pi = (ui.ed.piano[ui.exed.ex] ||= {});
       if (v > 0 && v <= 500) pi.kg = Math.round(v * 4) / 4;
       else delete pi.kg;
       return;
