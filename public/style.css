@@ -961,3 +961,17 @@ body.keyboard .wo-bar { display: none; }
 .sheet-head { touch-action: none; }
 .sheet-card { overscroll-behavior: contain; }
 .wo-rot-row { touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; } /* tutta la riga si trascina */
+
+/* Foglio Esercizio: per tutte le schede (azzurro) e in questa scheda (verde) */
+.wo-part { display: flex; align-items: center; gap: 8px; margin: 14px 0 0; color: var(--stand); font-size: 12px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.wo-part.loc { color: var(--exercise); }
+.wo-part::after { content: ''; flex: 1; height: 1px; background: var(--line); }
+.wo-warn { margin: 6px 2px 0; color: #ff9f0a; font-size: 13px; line-height: 1.35; }
+.wo-kgf { display: flex; align-items: center; gap: 8px; }
+.wo-kgf input { flex: 1; margin-top: 6px; text-align: center; font-size: 18px; font-weight: 700; }
+.wo-kgf span { color: var(--muted); font-size: 15px; }
+.wo-kinds2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin: 8px 0 4px; }
+.wo-kinds2 button { display: grid; gap: 4px; align-content: start; padding: 12px; border: 0; border-radius: 14px; background: var(--card); color: var(--muted); font-size: 13px; text-align: left; }
+.wo-kinds2 button b { color: var(--fg); font-size: 16px; }
+.wo-kinds2 button.on { outline: 1.5px solid var(--exercise); outline-offset: -1.5px; }
+.wo-sh-exn { border: 0; background: none; padding: 0; color: var(--fg); font-size: 15px; font-weight: 600; text-align: left; overflow-wrap: anywhere; text-decoration: underline; text-decoration-color: #48484a; text-underline-offset: 3px; }
