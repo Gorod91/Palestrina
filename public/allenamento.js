@@ -7,8 +7,9 @@ import { fbSignIn, fbUid } from './fbchat.js';
 import { figSvg } from './figure.js';
 import { popCount } from './timer.js';
 
-// Catalogo di esempio: quello vero delle macchine della nostra palestra arriverà più avanti.
+// Catalogo: gli esercizi delle schede che abbiamo; le macchine nuove si aggiungono dall'app ("Nuova macchina").
 // t: 'kg' (peso e ripetizioni, se manca), 'rip' (solo ripetizioni, a corpo libero), 'sec' (a tempo, in secondi), 'm' (metri)
+// old: non più nel catalogo (non si sceglie), resta solo per mostrare il nome delle serie già salvate
 export const CATALOGO = [
   { id: 'rot-anca', n: 'Rotazioni d\'anca', g: 'Mobilità', m: 'Apertura e chiusura', t: 'rip' },
   { id: 'slanci', n: 'Slanci per lato', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
@@ -22,21 +23,21 @@ export const CATALOGO = [
   { id: 'plank', n: 'Plank sui gomiti', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
   { id: 'barchetta', n: 'Barchetta', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
   { id: 'panca', n: 'Panca piana', g: 'Petto', m: 'Bilanciere' },
-  { id: 'chest-press', n: 'Chest press', g: 'Petto', m: 'Macchina 2' },
-  { id: 'croci', n: 'Croci ai cavi', g: 'Petto', m: 'Cavi' },
+  { id: 'chest-press', n: 'Chest press', g: 'Petto', m: 'Macchina' },
+  { id: 'croci', n: 'Croci ai cavi', g: 'Petto', m: 'Cavi', old: true },
   { id: 'lat', n: 'Lat machine', g: 'Schiena', m: 'Macchina' },
-  { id: 'pulley', n: 'Pulley basso', g: 'Schiena', m: 'Macchina 6' },
-  { id: 'rematore', n: 'Rematore con manubrio', g: 'Schiena', m: 'Manubri' },
-  { id: 'leg-press', n: 'Leg press', g: 'Gambe', m: 'Macchina 7' },
-  { id: 'leg-ext', n: 'Leg extension', g: 'Gambe', m: 'Macchina 4' },
-  { id: 'leg-curl', n: 'Leg curl', g: 'Gambe', m: 'Macchina 5' },
-  { id: 'hip-thrust', n: 'Hip thrust', g: 'Glutei', m: 'Bilanciere' },
-  { id: 'calf', n: 'Calf in piedi', g: 'Polpacci', m: 'Macchina 9' },
-  { id: 'shoulder', n: 'Shoulder press', g: 'Spalle', m: 'Macchina 8' },
+  { id: 'pulley', n: 'Pulley basso', g: 'Schiena', m: 'Macchina' },
+  { id: 'rematore', n: 'Rematore con manubrio', g: 'Schiena', m: 'Manubri', old: true },
+  { id: 'leg-press', n: 'Leg press', g: 'Gambe', m: 'Macchina' },
+  { id: 'leg-ext', n: 'Leg extension', g: 'Gambe', m: 'Macchina' },
+  { id: 'leg-curl', n: 'Leg curl', g: 'Gambe', m: 'Macchina' },
+  { id: 'hip-thrust', n: 'Hip thrust', g: 'Glutei', m: 'Bilanciere', old: true },
+  { id: 'calf', n: 'Calf in piedi', g: 'Polpacci', m: 'Macchina', old: true },
+  { id: 'shoulder', n: 'Shoulder press', g: 'Spalle', m: 'Macchina', old: true },
   { id: 'alzate', n: 'Alzate laterali', g: 'Spalle', m: 'Manubri' },
   { id: 'curl', n: 'Curl con manubri', g: 'Bicipiti', m: 'Manubri' },
-  { id: 'pushdown', n: 'Push down ai cavi', g: 'Tricipiti', m: 'Cavi' },
-  { id: 'crunch', n: 'Crunch alla macchina', g: 'Addominali', m: 'Macchina 10' },
+  { id: 'pushdown', n: 'Push down ai cavi', g: 'Tricipiti', m: 'Cavi', old: true },
+  { id: 'crunch', n: 'Crunch alla macchina', g: 'Addominali', m: 'Macchina', old: true },
   { id: 'croci-alto', n: 'Croci ai cavi dall\'alto', g: 'Petto', m: 'Cavi' },
   { id: 'leg-press-or', n: 'Leg press orizzontale', g: 'Gambe', m: 'Macchina' },
   { id: 'polpacci-lp', n: 'Polpacci alla leg press orizzontale', g: 'Polpacci', m: 'Macchina' },
@@ -1168,9 +1169,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   });
 
   function pickView() {
-    const groups = [...new Set(CATALOGO.map((e) => e.g))];
+    const cat = CATALOGO.filter((e) => !e.old); // old: tolti dal catalogo, restano solo per i nomi delle serie già fatte
+    const groups = [...new Set(cat.map((e) => e.g))];
     const q = ui.q.trim().toLowerCase();
-    const list = CATALOGO.filter((e) => (!ui.g || e.g === ui.g) && (!q || e.n.toLowerCase().includes(q)));
+    const list = cat.filter((e) => (!ui.g || e.g === ui.g) && (!q || e.n.toLowerCase().includes(q)));
     if (ui.pickFor) return pickMultiView(groups, list);
     return `<button class="wo-back" data-a="back">‹ Allenamento libero</button>
       <input id="wo-q" class="plain wo-search" placeholder="Cerca un esercizio" value="${esc(ui.q)}" autocomplete="off">
@@ -1179,7 +1181,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         const l = lastTime(e.id);
         return `<button class="wo-row" data-a="pick:${e.id}"><span><b>${esc(e.n)}</b><small>${esc(e.g)} · ${esc(e.m)}${l ? ` · ${summary(l.sets, unit(e))}` : ''}</small></span><span class="wo-chev">›</span></button>`;
       }).join('') || '<p class="wo-empty">Nessun esercizio</p>'}</section>
-      <p class="footnote">Catalogo di esempio: quello vero delle nostre macchine arriverà più avanti.</p>`;
+      <p class="footnote">Manca una macchina? Aggiungila da una scheda: ✎ → + Esercizi → Nuova macchina.</p>`;
   }
 
   // ---------- Schede: crea, modifica, copia (fase 2) ----------
