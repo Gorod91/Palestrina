@@ -17,7 +17,7 @@ export const CATALOGO = [
   { id: 'aperture-bastone', n: 'Aperture con bastone', g: 'Mobilità', m: 'Bastone', t: 'rip' },
   { id: 'squat', n: 'Squat', g: 'Gambe', m: 'Kettlebell' },
   { id: 'spinte-manubri', n: 'Spinte in alto con manubri in piedi', g: 'Spalle', m: 'Manubri' },
-  { id: 'pulley-medio', n: 'Pulley grip medio', g: 'Schiena', m: 'Pulley' },
+  { id: 'pulley-medio', n: 'Pulley MAG grip medio', g: 'Schiena', m: 'Pulley' },
   { id: 'chest-press-sdraiato', n: 'Chest press orizzontale', g: 'Petto', m: 'Chest press orizzontale' },
   { id: 'situps', n: 'Sit-up', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
   { id: 'plank', n: 'Plank sui gomiti', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
@@ -26,6 +26,7 @@ export const CATALOGO = [
   { id: 'chest-press', n: 'Chest press', g: 'Petto', m: 'Chest press' },
   { id: 'croci', n: 'Croci ai cavi', g: 'Petto', m: 'Cavi', old: true },
   { id: 'lat', n: 'Lat machine', g: 'Schiena', m: 'Lat machine' },
+  { id: 'lat-mag', n: 'Lat machine MAG grip medio', g: 'Schiena', m: 'Lat machine' },
   { id: 'pulley', n: 'Pulley basso', g: 'Schiena', m: 'Pulley' },
   { id: 'rematore', n: 'Rematore con manubrio', g: 'Schiena', m: 'Manubri', old: true },
   { id: 'leg-press', n: 'Leg press', g: 'Gambe', m: 'Leg press' },
@@ -113,14 +114,14 @@ const SCHEDE_ESEMPIO = [
     name: 'Scheda A',
     // "@addome" è un circuito: sit-up, plank e barchetta di fila, ripetuti per più giri (ogni giro salvato come una serie)
     // "@mobilita" è una lista da spuntare (5 minuti di mobilità all'inizio)
-    ex: ['@mobilita', 'squat', 'lat', 'spinte-manubri', 'pulley-medio', 'chest-press-sdraiato', 'curl', '@addome'],
+    ex: ['@mobilita', 'squat', 'lat-mag', 'spinte-manubri', 'pulley-medio', 'chest-press-sdraiato', 'curl', '@addome'],
     circuiti: {
       mobilita: { n: 'Mobilità', lista: true, durata: "5'", ex: ['rot-anca', 'slanci', 'cane-gatto', 'aperture-bastone'] },
       addome: { n: 'Circuito addome', ex: ['situps', 'plank', 'barchetta'], giri: 3, rec: 60 },
     },
     piano: {
       squat: { s: '4 × 6-8' },
-      lat: { s: '3 × 8-10' },
+      'lat-mag': { s: '3 × 8-10' },
       'spinte-manubri': { s: '4 × 6-8' },
       'pulley-medio': { s: '3 × 8-10', nota: '1" fermo al petto' },
       'chest-press-sdraiato': { s: '3 × 8-10', nota: '2° piano' },
@@ -251,6 +252,7 @@ SCHEDE_ESEMPIO.push(
 //   { id, op: 'piano', scheda, ex, set: { s, nota, kg, rec, rip } }  piano di un esercizio (se c'è ancora; null toglie il campo)
 //   { id, op: 'aggiungi', scheda, ex, dopo, piano }                  esercizio in più (se manca), dopo `dopo` o in fondo
 //   { id, op: 'togli', scheda, ex }                                  toglie un esercizio
+//   { id, op: 'sostituisci', scheda, ex, con }                       mette `con` al posto di `ex` (stesso posto e piano)
 //   { id, op: 'circuito', scheda, c, set: { n, giri, rec, ex } }     cambia un circuito (c senza @)
 //   { id, op: 'nome', scheda, name }                                 rinomina una scheda
 //   { id, op: 'nome', di, da, name }                                 rinomina le copie "di" qualcuno che si chiamano ancora `da`
@@ -264,6 +266,8 @@ const AGGIORNAMENTI = [
   { id: 5, op: 'nome', di: 'Ceppo', da: 'Ceppo', name: 'Total body' },
   { id: 6, op: 'nome', di: 'Gualo', da: 'Gualo A', name: 'Scheda A' },
   { id: 7, op: 'nome', di: 'Gualo', da: 'Gualo B', name: 'Scheda B' },
+  // 24/10: nella Scheda A di Francesco la lat machine è con la MAG grip medio (esercizio nuovo)
+  { id: 8, op: 'sostituisci', scheda: 'a', ex: 'lat', con: 'lat-mag', per: ['Francesco'] },
 ];
 
 /** Applica un aggiornamento all'elenco di schede (già copiato); quello che non trova lo salta. */
@@ -290,6 +294,11 @@ function applyAgg(list, a) {
     if (k >= 0) sc.ex.splice(k + 1, 0, a.ex);
     else sc.ex.push(a.ex);
     if (a.piano) sc.piano[a.ex] = { ...a.piano };
+  } else if (a.op === 'sostituisci') {
+    const at = sc.ex.indexOf(a.ex);
+    if (at >= 0 && !sc.ex.includes(a.con)) sc.ex[at] = a.con;
+    Object.values(sc.circuiti || {}).forEach((c) => { const k = c.ex.indexOf(a.ex); if (k >= 0) c.ex[k] = a.con; });
+    if (sc.piano[a.ex] && !sc.piano[a.con]) sc.piano[a.con] = sc.piano[a.ex];
   } else if (a.op === 'togli') {
     sc.ex = sc.ex.filter((e) => e !== a.ex);
   } else if (a.op === 'circuito') {
