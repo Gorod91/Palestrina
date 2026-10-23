@@ -336,7 +336,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let schede = null; // le mie schede (null finché non arrivano)
   // cosa si vede: lista, esercizio, catalogo (allenamento libero)
   // ed: scheda in modifica; pickFor: il catalogo sceglie esercizi per la scheda ('edit'), un circuito nuovo ('circnew') o uno esistente ('circ:id')
-  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '' };
+  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '', rotSheet: false };
   let restEnd = 0;
   let restTotal = REST; // secondi del recupero in corso
   let serieSig = '';
@@ -348,6 +348,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let otherSchede = []; // documenti delle schede degli altri, per "Copia una scheda"
   let hasDoc = false; // le mie schede sono già salvate su Firebase (altrimenti si usano quelle di esempio)
   let aggDone = []; // id degli aggiornamenti mirati già applicati alle mie schede
+  let rot = []; // schede in rotazione, in ordine (id)
 
   async function start(user, test) {
     const k = `${user.name}|${test}`;
@@ -384,6 +385,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         extra.forEach(addEx);
         recMap = (d && d.rec) || {};
         aggDone = (d && d.agg) || [];
+        rot = (d && d.rot) || [];
         const todo = d ? AGGIORNAMENTI.filter((a) => !aggDone.includes(a.id) && (!a.per || a.per.includes(me.name))) : [];
         if (todo.length) { // aggiornamenti mirati non ancora applicati: si applicano e si salvano subito
           const list = JSON.parse(JSON.stringify(schede));
@@ -430,6 +432,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     otherSchede = [];
     hasDoc = false;
     aggDone = [];
+    rot = [];
     Object.assign(ui, { view: 'list', ed: null, pickFor: '', sel: [], sheet: null });
     pages = {};
   }
@@ -617,10 +620,13 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const other = (schede || []).map((s) => {
       const d = lastDone(s);
       return `<div class="wo-srow"><button class="wo-row" data-a="sch:${esc(s.id)}"><span><b>${esc(s.name)}${diBadge(s)}</b><small>${s.ex.length} ${s.ex.length === 1 ? 'esercizio' : 'esercizi'}${d ? ` · ${ago(d)}` : ''}</small></span></button>`
+        + `<button class="wo-star${rot.includes(s.id) ? ' on' : ''}" data-a="rotx:${esc(s.id)}" aria-label="${rot.includes(s.id) ? 'Togli dalla rotazione' : 'Metti in rotazione'}">${rot.includes(s.id) ? '★' : '☆'}</button>`
         + `<button class="wo-pen" data-a="ed:${esc(s.id)}" aria-label="Modifica ${esc(s.name)}"><svg aria-hidden="true"><use href="#i-pencil"/></svg></button></div>`;
     }).join('');
     let hero = '';
-    if (p) {
+    const ri = rotInfo();
+    if (ri) hero = rotHtml(ri);
+    else if (p) {
       const n = doneToday(p), d = lastDone(p);
       const all = n === p.ex.length;
       const sub = all ? 'Fatta oggi ✓' : n ? `${n} di ${p.ex.length} esercizi fatti` : `${p.ex.length} esercizi${d ? ` · l'hai fatta ${ago(d)}` : ' · mai fatta'}`;
@@ -633,8 +639,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const salvaLib = lib.length ? `<section class="card wo-copy"><b>Oggi hai fatto ${lib.length} ${lib.length === 1 ? 'esercizio libero' : 'esercizi liberi'}</b>
       <span class="wo-sub">${esc(lib.map((a) => nameOf(a.ex)).join(', '))}</span><button class="secondary" data-a="fromlib">Salva come scheda</button></section>` : '';
     return `${recupera}${salvaLib}${hero}
-      <h2 class="section">Le tue schede</h2>
+      <h2 class="section">${ri ? 'Tutte le schede' : 'Le tue schede'}</h2>
+      ${other && !rot.length ? '<p class="wo-sub wo-rot-hint">Tocca ☆ per mettere una scheda in rotazione</p>' : ''}
       ${other ? `<section class="card wo-list">${other}</section>` : ''}
+      ${ui.rotSheet && ri ? rotSheetHtml(ri) : ''}
       <section class="card wo-list"><button class="wo-row wo-altri" data-a="copy"><span class="wo-altri-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14.5c2.4 0 4 1.5 4.5 4"/></svg></span>`
         + `<span><b>Schede degli altri</b><small>${esc(altri().names.join(', '))} · ${altri().n} schede</small></span><span class="wo-chev">›</span></button></section>
       <div class="wo-btns"><button class="secondary" data-a="nuova">+ Nuova scheda</button><button class="secondary" data-a="libero">Allenamento libero</button></div>
@@ -644,6 +652,40 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   /** Bollino con la persona da cui viene una scheda copiata: resta anche se la scheda cambia nome. */
   // Se l'ho modificata, nel bollino resta la persona e compare "modificata".
   const diBadge = (sc) => (sc.di ? `<span class="wo-di${sc.mod ? ' mod' : ''}"><i>${esc(sc.di[0])}</i>${esc(sc.di)}${sc.mod ? '<em>modificata</em>' : ''}</span>` : '');
+
+  // ---------- Rotazione: le schede da fare a turno (stellina) ----------
+  const lastAt = (sch) => serie.filter((a) => a.scheda === sch.id).reduce((m, a) => Math.max(m, a.at && a.at.toMillis ? a.at.toMillis() : 0), 0);
+
+  /** Schede in rotazione e quella che tocca: dopo l'ultima fatta del giro (o quella iniziata oggi), poi si ricomincia. */
+  function rotInfo() {
+    const list = rot.map((id) => (schede || []).find((y) => y.id === id)).filter(Boolean);
+    if (!list.length) return null;
+    let last = -1, best = 0;
+    list.forEach((y, i) => { const t = lastAt(y); if (t > best) { best = t; last = i; } });
+    const cur = last < 0 ? 0 : lastDone(list[last]) === today() ? last : (last + 1) % list.length;
+    return { list, cur };
+  }
+
+  function rotHtml({ list, cur }) {
+    const sc = list[cur], n = doneToday(sc), all = n === sc.ex.length;
+    const cards = list.map((y, i) => {
+      const d = lastDone(y);
+      const sub = i === cur ? (all ? 'fatta oggi ✓' : n ? `${n} di ${y.ex.length}` : 'oggi') : i < cur ? (d ? `✓ ${ago(d)}` : 'mai fatta') : 'dopo';
+      return `<button class="wo-rc${i === cur ? ' cur' : i < cur ? ' done' : ''}" data-a="sch:${esc(y.id)}">${i === cur ? '<span class="wo-rc-tag">oggi</span>' : ''}<span class="wo-rc-n">${i + 1}</span><b>${esc(y.name)}</b><small>${sub}</small></button>`;
+    }).join('');
+    return `<section class="wo-rot"><div class="wo-rot-h"><h2 class="section">In rotazione</h2>${list.length > 1 ? '<button class="wo-rot-ord" data-a="rotord">Cambia ordine</button>' : ''}</div>
+      <div class="wo-rot-g">${cards}</div>
+      <button class="primary" data-a="go:${esc(sc.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'} ${esc(sc.name)}</button></section>`;
+  }
+
+  /** Foglio "Cambia ordine": si trascinano le schede del giro; ★ la toglie. */
+  function rotSheetHtml({ list }) {
+    const rows = list.map((y, k) => `<div class="wo-ed-row" data-k="${k}"><span class="wo-grip" data-grip="${k}" aria-label="Trascina per spostare">≡</span>
+      <span class="wo-ed-n"><b>${k + 1}. ${esc(y.name)}</b></span><span></span><button class="wo-star on" data-a="rotx:${esc(y.id)}" aria-label="Togli dalla rotazione">★</button></div>`).join('');
+    return `<div class="wo-edsheet"><div class="wo-edsheet-dim" data-a="rotclose"></div><div class="wo-edsheet-box"><div class="wo-grab"></div>
+      <b class="wo-sh-t">Ordine della rotazione</b><p class="wo-sub">Trascina ≡ per cambiare l'ordine. Dopo l'ultima si ricomincia.</p>
+      <section class="wo-ed-list" data-kind="rot">${rows}</section><button class="primary" data-a="rotclose">Fatto</button></div></div>`;
+  }
 
   function ago(d) {
     const n = daysAgo(d);
@@ -1146,7 +1188,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     schede = list;
     if (!hasDoc) aggDone = AGGIORNAMENTI.map((a) => a.id); // le schede di esempio li contengono già
     hasDoc = true;
-    const data = JSON.parse(JSON.stringify({ name: me.name, list, extra, rec: recMap, agg: aggDone })); // via i campi undefined
+    const data = JSON.parse(JSON.stringify({ name: me.name, list, extra, rec: recMap, agg: aggDone, rot })); // via i campi undefined
     fs.setDoc(fs.doc(db, pfx + 'schede', fbUid(me.name)), { ...data, at: fs.serverTimestamp() })
       .catch((err) => toast(`Schede non salvate: ${err.message}`));
   }
@@ -1325,6 +1367,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function deleteEditor() {
     const ed = ui.ed;
     if (!confirm(`Eliminare la scheda "${ed.name || 'senza nome'}"? Le serie già fatte restano.`)) return;
+    rot = rot.filter((id) => id !== ed.id);
     writeDoc(clone(schede).filter((y) => y.id !== ed.id));
     Object.assign(ui, { ed: null, sheet: null, view: 'list' });
     toast('Scheda eliminata');
@@ -1415,7 +1458,12 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         grip.removeEventListener('pointermove', move);
         grip.removeEventListener('pointerup', up);
         grip.removeEventListener('pointercancel', up);
-        ui.ed.ex.splice(to, 0, ui.ed.ex.splice(k, 1)[0]);
+        if (list.dataset.kind === 'rot') {
+          const ids = rotInfo().list.map((y) => y.id);
+          ids.splice(to, 0, ids.splice(k, 1)[0]);
+          rot = ids;
+          writeDoc();
+        } else ui.ed.ex.splice(to, 0, ui.ed.ex.splice(k, 1)[0]);
         draw();
       };
       grip.addEventListener('pointermove', move);
@@ -1529,6 +1577,16 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (cmd === 'copia') {
       copia();
       return toast('Serie copiate');
+    }
+    if (cmd === 'rotx') { // stellina: entra in fondo al giro o esce
+      rot = rot.includes(arg) ? rot.filter((id) => id !== arg) : [...rot, arg];
+      if (rot.length < 2) ui.rotSheet = false;
+      writeDoc();
+      return draw();
+    }
+    if (cmd === 'rotord' || cmd === 'rotclose') {
+      ui.rotSheet = cmd === 'rotord';
+      return draw();
     }
     if (cmd === 'nuova') {
       openEditor({}, true);

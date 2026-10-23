@@ -925,3 +925,21 @@ body.keyboard .wo-bar { display: none; }
 .wo-di i { width: 17px; height: 17px; display: grid; place-items: center; border-radius: 50%; background: var(--stand); color: #000; font-size: 10px; font-style: normal; font-weight: 800; }
 .wo-hero-name .wo-di { font-size: 13px; vertical-align: 5px; }
 .wo-di em { margin-left: 2px; padding-left: 6px; border-left: 1px solid rgba(0, 217, 255, .35); font-style: normal; font-weight: 600; color: var(--fg); opacity: .8; }
+
+/* Rotazione: griglia delle schede da fare a turno, stellina nell'elenco */
+.wo-star { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; background: none; color: #636366; font-size: 21px; line-height: 1; }
+.wo-star.on { color: var(--exercise); }
+.wo-rot-hint { margin: -6px 2px 8px; font-size: 13px; }
+.wo-rot { margin-bottom: 8px; }
+.wo-rot-h { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.wo-rot-ord { border: 0; background: none; color: var(--stand); font-size: 15px; font-weight: 600; padding: 4px 0; }
+.wo-rot-g { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin: 2px 0 12px; }
+.wo-rc { position: relative; display: grid; align-content: start; gap: 3px; min-width: 0; padding: 8px 8px 9px; border: 0; border-radius: 14px; background: var(--card); color: var(--fg); text-align: left; }
+.wo-rc b { font-size: 14px; line-height: 1.15; overflow-wrap: anywhere; }
+.wo-rc small { color: var(--muted); font-size: 11px; }
+.wo-rc-n { width: 19px; height: 19px; border-radius: 50%; display: grid; place-items: center; background: var(--card-2); color: var(--muted); font-size: 11px; font-weight: 800; }
+.wo-rc.done { opacity: .55; }
+.wo-rc.cur { background: linear-gradient(150deg, rgba(166, 255, 0, .24), rgba(0, 217, 255, .12)); outline: 1.5px solid var(--exercise); outline-offset: -1.5px; }
+.wo-rc.cur .wo-rc-n { background: var(--exercise); color: #000; }
+.wo-rc-tag { position: absolute; top: -7px; right: 6px; padding: 2px 6px; border-radius: 99px; background: var(--exercise); color: #000; font-size: 9px; font-weight: 800; letter-spacing: .05em; text-transform: uppercase; }
+.wo-edsheet .wo-ed-list[data-kind="rot"] .wo-ed-row { grid-template-columns: 26px minmax(0, 1fr) 0 36px; }
