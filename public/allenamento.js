@@ -347,7 +347,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let schede = null; // le mie schede (null finché non arrivano)
   // cosa si vede: lista, esercizio, catalogo (allenamento libero)
   // ed: scheda in modifica; pickFor: il catalogo sceglie esercizi per la scheda ('edit'), un circuito nuovo ('circnew') o uno esistente ('circ:id')
-  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '', rotSheet: false, exed: null };
+  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '', rotSheet: false, exed: null, cired: null };
   let restEnd = 0;
   let restTotal = REST; // secondi del recupero in corso
   let serieSig = '';
@@ -511,19 +511,18 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   // Indietro trascinando dal bordo sinistro, come in Safari (dalla Home iOS non lo fa da solo):
   // la pagina segue il dito e sotto compare quella prima; oltre metà schermo o con uno scatto si torna lì.
-  const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor ? 'edit' : ui.view === 'newex' ? 'pick' : ui.view === 'prev' ? 'copy' : ui.view === 'exed' ? 'edit' : 'list');
+  const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor && !ui.pickFor.startsWith('circ:') ? 'edit' : ui.view === 'newex' ? 'pick' : ui.view === 'prev' ? 'copy' : ui.view === 'exed' ? (ui.exed && ui.exed.back ? 'cired' : 'edit') : ui.view === 'cired' ? 'edit' : ui.view === 'pick' && ui.cired ? 'cired' : 'list');
   function goBack() {
     const v = backView();
-    if (ui.view === 'exed') { // dalla pagina Esercizio: alla modifica (o al foglio del circuito da cui eri partito)
-      ui.sheet = ui.exed && ui.exed.back ? ui.exed.back : null;
-      ui.exed = null;
-    }
+    if (ui.view === 'exed') ui.exed = null; // dalla pagina Esercizio: alla modifica (o al circuito da cui eri partito)
+    if (ui.view === 'cired') ui.cired = null;
+    if (ui.view === 'pick' && v === 'cired') Object.assign(ui, { pickFor: '', sel: [] });
     if (v !== 'pick') Object.assign(ui, { pickFor: v === 'edit' ? '' : ui.pickFor, sel: v === 'edit' ? [] : ui.sel });
     if (v === 'list') Object.assign(ui, { ed: null, pickFor: '', sheet: null });
     ui.view = v;
   }
   function viewHtml(v) {
-    return v === 'ex' ? exView() : v === 'pick' ? pickView() : v === 'edit' ? editView() : v === 'newex' ? newExView() : v === 'copy' ? copyView() : v === 'prev' ? prevView() : v === 'exed' ? exedView() : listView();
+    return v === 'ex' ? exView() : v === 'pick' ? pickView() : v === 'edit' ? editView() : v === 'newex' ? newExView() : v === 'copy' ? copyView() : v === 'prev' ? prevView() : v === 'exed' ? exedView() : v === 'cired' ? ciredView() : listView();
   }
   let edge = null;
   root.addEventListener('pointerdown', (ev) => {
@@ -600,7 +599,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const sc = document.getElementById('scroller'); // area che scorre dell'app
     if (sc && ui.view !== shownView) { // pagina nuova: si parte dall'alto (tornando alla modifica, dal punto in cui eri)
       scrollMem[shownView] = sc.scrollTop;
-      const back = ui.view === 'edit' && ['pick', 'newex', 'exed'].includes(shownView);
+      const back = ui.view === 'edit' && ['pick', 'newex', 'exed', 'cired'].includes(shownView);
       shownView = ui.view;
       root.innerHTML = viewHtml(ui.view) + (ui.view === 'list' ? '' : '<div class="wo-edge" aria-hidden="true"></div>');
       sc.scrollTop = back ? scrollMem.edit || 0 : 0;
@@ -1286,16 +1285,6 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         <button class="${sh.lista ? 'on' : ''}" data-a="nbk:lista"><b>Lista da spuntare</b>Come la mobilità: si spunta ogni esercizio</button></div>
         <button class="primary" data-a="nbgo">Scegli gli esercizi</button>`;
       return `<div class="wo-edsheet"><div class="wo-edsheet-dim" data-a="shclose"></div><div class="wo-edsheet-box"><div class="wo-grab"></div>${body}</div></div>`;
-    } else {
-      const c = ed.circuiti[sh.cid];
-      body = `<input id="wo-cs-name" class="plain wo-sh-in wo-sh-name" value="${esc(c.n)}" maxlength="40" aria-label="Nome del circuito" autocomplete="off">
-        ${c.lista ? `<div class="wo-lbl">Durata</div><input id="wo-cs-dur" class="plain wo-sh-in" value="${esc(c.durata || '')}" placeholder="Per esempio 5'" maxlength="10" autocomplete="off">`
-          : `<div class="wo-sh-step"><span class="wo-lbl">Giri</span><span class="wo-pm"><button data-a="csg-" aria-label="Un giro in meno">−</button><b>${c.giri}</b><button data-a="csg+" aria-label="Un giro in più">+</button></span></div>
-             <div class="wo-sh-step"><span class="wo-lbl">Recupero tra i giri</span><span class="wo-pm"><button data-a="csr-" aria-label="15 secondi in meno">−</button><b>${mmss(c.rec)}${c.rec < 60 ? '"' : ''}</b><button data-a="csr+" aria-label="15 secondi in più">+</button></span></div>
-             <div class="wo-sh-step"><span class="wo-lbl">Pausa tra gli esercizi</span><span class="wo-pm"><button data-a="csp-" aria-label="5 secondi in meno">−</button><b>${c.pausa ? `${c.pausa}"` : 'no'}</b><button data-a="csp+" aria-label="5 secondi in più">+</button></span></div>`}
-        <div class="wo-lbl">Esercizi · ${c.lista ? 'ripetizioni' : 'ripetizioni o secondi per giro'}</div>
-        <div class="wo-sh-exs">${c.ex.map((e) => `<div class="wo-sh-ex"><button class="wo-sh-exn" data-a="csex:${e}">${esc((EX[e] || { n: e }).n)}</button><input data-csv="${e}" class="plain" value="${esc((ed.piano[e] || {}).s || '')}" placeholder="${unit(EX[e]) === 'sec' ? '30&quot;' : '10'}" maxlength="20" aria-label="${esc((EX[e] || { n: e }).n)}" autocomplete="off"><button class="wo-ed-x" data-a="csrm:${e}" aria-label="Togli">×</button></div>`).join('')}</div>
-        <button class="link-button" data-a="csadd">+ Aggiungi esercizi al circuito</button>`;
     }
     return `<div class="wo-edsheet"><div class="wo-edsheet-dim" data-a="shclose"></div><div class="wo-edsheet-box"><div class="wo-grab"></div>${body}<button class="primary" data-a="shclose">Fatto</button></div></div>`;
   }
@@ -1344,6 +1333,23 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <button class="primary wo-exed-ok" data-a="back">Fatto</button>`;
   }
 
+  /** Circuito o lista da spuntare, a pagina intera: nome, giri, recupero, pausa ed esercizi (un tocco apre la loro pagina). */
+  function ciredView() {
+    const ed = ui.ed, c = ed.circuiti[ui.cired.cid];
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${esc(ed.name || 'Scheda')}</button></div>
+      <h2 class="wo-ed-title">${c.lista ? 'Lista da spuntare' : 'Circuito'}</h2>
+      <label class="wo-lbl" for="wo-cs-name">Nome</label>
+      <input id="wo-cs-name" class="plain wo-ed-name" value="${esc(c.n)}" maxlength="40" autocomplete="off">
+        ${c.lista ? `<div class="wo-lbl">Durata</div><input id="wo-cs-dur" class="plain wo-sh-in" value="${esc(c.durata || '')}" placeholder="Per esempio 5'" maxlength="10" autocomplete="off">`
+          : `<div class="wo-sh-step"><span class="wo-lbl">Giri</span><span class="wo-pm"><button data-a="csg-" aria-label="Un giro in meno">−</button><b>${c.giri}</b><button data-a="csg+" aria-label="Un giro in più">+</button></span></div>
+             <div class="wo-sh-step"><span class="wo-lbl">Recupero tra i giri</span><span class="wo-pm"><button data-a="csr-" aria-label="15 secondi in meno">−</button><b>${mmss(c.rec)}${c.rec < 60 ? '"' : ''}</b><button data-a="csr+" aria-label="15 secondi in più">+</button></span></div>
+             <div class="wo-sh-step"><span class="wo-lbl">Pausa tra gli esercizi</span><span class="wo-pm"><button data-a="csp-" aria-label="5 secondi in meno">−</button><b>${c.pausa ? `${c.pausa}"` : 'no'}</b><button data-a="csp+" aria-label="5 secondi in più">+</button></span></div>`}
+        <div class="wo-lbl">Esercizi · ${c.lista ? 'ripetizioni' : 'ripetizioni o secondi per giro'}</div>
+        <div class="wo-sh-exs">${c.ex.map((e) => `<div class="wo-sh-ex"><button class="wo-sh-exn" data-a="csex:${e}">${esc((EX[e] || { n: e }).n)}</button><input data-csv="${e}" class="plain" value="${esc((ed.piano[e] || {}).s || '')}" placeholder="${unit(EX[e]) === 'sec' ? '30&quot;' : '10'}" maxlength="20" aria-label="${esc((EX[e] || { n: e }).n)}" autocomplete="off"><button class="wo-ed-x" data-a="csrm:${e}" aria-label="Togli">×</button></div>`).join('')}</div>
+        <button class="link-button" data-a="csadd">+ Aggiungi esercizi al circuito</button>
+      <button class="primary wo-exed-ok" data-a="back">Fatto</button>`;
+  }
+
   function openPick(forWhat) {
     Object.assign(ui, { pickFor: forWhat, sel: [], q: '', g: '', view: 'pick' });
   }
@@ -1374,12 +1380,13 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const cid = newId('c');
       ed.circuiti[cid] = ui.pickFor === 'listanew' ? { n: 'Lista', lista: true, durata: '', ex: sel.slice() } : { n: 'Circuito', ex: sel.slice(), giri: 3, rec: 60 };
       ed.ex.push('@' + cid);
-      ui.sheet = { kind: 'circ', cid }; // subito giri e recupero
+      ui.cired = { cid }; // subito giri e recupero
     } else if (ui.pickFor.startsWith('circ:')) {
       const c = ed.circuiti[ui.pickFor.slice(5)];
       sel.forEach((e) => { if (!c.ex.includes(e)) c.ex.push(e); });
     }
-    Object.assign(ui, { pickFor: '', sel: [], view: 'edit' });
+    const toCirc = ui.pickFor.startsWith('circ:') || ui.cired;
+    Object.assign(ui, { pickFor: '', sel: [], view: toCirc ? 'cired' : 'edit' });
   }
 
   const GRUPPI = ['Petto', 'Schiena', 'Gambe', 'Glutei', 'Polpacci', 'Spalle', 'Bicipiti', 'Tricipiti', 'Addominali', 'Mobilità', 'Cardio'];
@@ -1454,11 +1461,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const ed = ui.ed, sh = ui.sheet;
     const pe = ui.exed;
     const pi = () => (ed.piano[pe.ex] ||= {});
-    const circ = () => ed.circuiti[sh.cid];
+    const circ = () => ed.circuiti[ui.cired.cid];
     if (cmd === 'edrm') ed.ex.splice(Number(arg), 1);
     else if (cmd === 'edplan') {
       const id = ed.ex[Number(arg)];
-      if (id[0] === '@') ui.sheet = { kind: 'circ', cid: id.slice(1) };
+      if (id[0] === '@') Object.assign(ui, { cired: { cid: id.slice(1) }, view: 'cired' });
       else Object.assign(ui, { exed: { ex: id, t0: unit(EX[id]) }, view: 'exed' });
     } else if (cmd === 'shclose') ui.sheet = sh && sh.back ? sh.back : null; // dal circuito si torna al circuito
     else if (cmd === 'plg') saveCat(pe.ex, { g: arg });
@@ -1467,7 +1474,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const p = Math.max(0, Math.min(60, (circ().pausa || 0) + (cmd === 'csp+' ? 5 : -5)));
       if (p) circ().pausa = p;
       else delete circ().pausa;
-    } else if (cmd === 'csex') Object.assign(ui, { exed: { ex: arg, t0: unit(EX[arg]), back: sh }, sheet: null, view: 'exed' });
+    } else if (cmd === 'csex') Object.assign(ui, { exed: { ex: arg, t0: unit(EX[arg]), back: ui.cired }, view: 'exed' });
     else if (cmd === 'nbk') ui.sheet = { kind: 'newblock', lista: arg === 'lista' };
     else if (cmd === 'nbgo') { const l = sh.lista; ui.sheet = null; openPick(l ? 'listanew' : 'circnew'); }
     else if (cmd === 'pln-' || cmd === 'pln+') {
@@ -1477,7 +1484,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     else if (cmd === 'csg-' || cmd === 'csg+') circ().giri = Math.max(1, Math.min(8, circ().giri + (cmd === 'csg+' ? 1 : -1)));
     else if (cmd === 'csr-' || cmd === 'csr+') circ().rec = Math.max(15, Math.min(300, circ().rec + (cmd === 'csr+' ? 15 : -15)));
     else if (cmd === 'csrm') circ().ex = circ().ex.filter((e) => e !== arg);
-    else if (cmd === 'csadd') openPick('circ:' + sh.cid);
+    else if (cmd === 'csadd') openPick('circ:' + ui.cired.cid);
     else if (cmd === 'edadd') openPick('edit');
     else if (cmd === 'edcirc') ui.sheet = { kind: 'newblock', lista: false };
     else if (cmd === 'psel') ui.sel = ui.sel.includes(arg) ? ui.sel.filter((e) => e !== arg) : [...ui.sel, arg];
@@ -1501,8 +1508,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     else if (el.id === 'wo-pl-r') {
       const pi = (ed.piano[ui.exed.ex] ||= {});
       pi.s = joinPlan(splitPlan(pi.s).n, v.trim());
-    } else if (el.id === 'wo-cs-name') ed.circuiti[sh.cid].n = v;
-    else if (el.id === 'wo-cs-dur') ed.circuiti[sh.cid].durata = v.trim();
+    } else if (el.id === 'wo-cs-name') ed.circuiti[ui.cired.cid].n = v;
+    else if (el.id === 'wo-cs-dur') ed.circuiti[ui.cired.cid].durata = v.trim();
     else if (el.dataset.csv) (ed.piano[el.dataset.csv] ||= {}).s = v.trim();
     else if (el.id === 'wo-nx-n' && ui.nx) ui.nx.n = v;
     else if (el.id === 'wo-nx-m' && ui.nx) ui.nx.m = v;
