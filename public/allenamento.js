@@ -15,7 +15,7 @@ export const CATALOGO = [
   { id: 'slanci', n: 'Slanci per lato', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
   { id: 'cane-gatto', n: 'Cane-gatto a 4 zampe', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
   { id: 'aperture-bastone', n: 'Aperture con bastone', g: 'Mobilità', m: 'Bastone', t: 'rip' },
-  { id: 'squat', n: 'Squat', g: 'Gambe', m: 'Bilanciere' },
+  { id: 'squat', n: 'Squat', g: 'Gambe', m: 'Kettlebell' },
   { id: 'spinte-manubri', n: 'Spinte in alto con manubri in piedi', g: 'Spalle', m: 'Manubri' },
   { id: 'pulley-medio', n: 'Pulley grip medio', g: 'Schiena', m: 'Cavo' },
   { id: 'chest-press-sdraiato', n: 'Chest press sdraiato', g: 'Petto', m: 'Macchina' },
