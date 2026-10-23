@@ -52,7 +52,17 @@ service cloud.firestore {
       return request.auth.token.name in ['Francesco'];
     }
     match /{coll}/{id} {
-      allow read: if pal() && allenamento() && coll in ['serie', 'prova_serie', 'schede', 'prova_schede'];
+      allow read: if pal() && allenamento() && coll in ['serie', 'prova_serie', 'schede', 'prova_schede', 'catalogo', 'prova_catalogo'];
+
+      // Catalogo comune (id = esercizio): l'attrezzo cambiato dall'app vale per tutti
+      allow create, update: if pal() && allenamento()
+        && coll in ['catalogo', 'prova_catalogo']
+        && id.matches('^[a-z0-9-]{1,40}$')
+        && request.resource.data.keys().hasOnly(['m', 'by', 'at'])
+        && request.resource.data.m is string
+        && request.resource.data.m.size() <= 40
+        && request.resource.data.by == request.auth.token.name
+        && request.resource.data.at == request.time;
 
       // Serie di un esercizio in un giorno (id = giorno_uid_esercizio): si possono correggere
       allow create, update: if pal() && allenamento()
