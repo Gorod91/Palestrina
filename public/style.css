@@ -979,3 +979,11 @@ body.keyboard .wo-bar { display: none; }
 .wo-ed-row { cursor: pointer; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .wo-ed-row.drag { cursor: grabbing; }
 .wo-exed-ok { margin-top: 22px; }
+
+/* Cambio di pagina come su iPhone: la nuova entra da destra, tornando indietro quella di prima rientra da sinistra */
+#workout.wo-push, #workout.wo-pop { overflow-x: clip; }
+#workout.wo-push > :not(.wo-bar):not(.wo-edge):not(.wo-sheet):not(.wo-edsheet) { animation: wo-push .3s cubic-bezier(.2, .8, .2, 1); }
+#workout.wo-pop > :not(.wo-bar):not(.wo-edge):not(.wo-sheet):not(.wo-edsheet) { animation: wo-pop .3s cubic-bezier(.2, .8, .2, 1); }
+@keyframes wo-push { from { transform: translateX(100%); } to { transform: none; } }
+@keyframes wo-pop { from { transform: translateX(-30%); opacity: .4; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #workout.wo-push > *, #workout.wo-pop > * { animation: none !important; } }

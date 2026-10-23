@@ -512,7 +512,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   // Indietro trascinando dal bordo sinistro, come in Safari (dalla Home iOS non lo fa da solo):
   // la pagina segue il dito e sotto compare quella prima; oltre metà schermo o con uno scatto si torna lì.
   const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor && !ui.pickFor.startsWith('circ:') ? 'edit' : ui.view === 'newex' ? 'pick' : ui.view === 'prev' ? 'copy' : ui.view === 'exed' ? (ui.exed && ui.exed.back ? 'cired' : 'edit') : ui.view === 'cired' ? 'edit' : ui.view === 'pick' && ui.cired ? 'cired' : 'list');
-  function goBack() {
+  function goBack(anim = 'wo-pop') {
+    navAnim = anim ? 'wo-pop' : '';
     const v = backView();
     if (ui.view === 'exed') ui.exed = null; // dalla pagina Esercizio: alla modifica (o al circuito da cui eri partito)
     if (ui.view === 'cired') ui.cired = null;
@@ -575,7 +576,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     setTimeout(() => {
       root.classList.remove('wo-swiping');
       if (go) {
-        goBack();
+        goBack('');
         draw();
         window.scrollTo(0, 0);
       } else {
@@ -589,6 +590,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   root.addEventListener('pointercancel', edgeEnd);
 
   let shownView = 'list';
+  let navAnim = 'wo-push'; // animazione del prossimo cambio di pagina ('' dopo il trascinamento dal bordo, che si anima da solo)
+  /** Profondità delle pagine: entrando più in fondo la pagina arriva da destra, tornando su da sinistra. */
+  const depth = (v) => ({ list: 0, copy: 1, edit: 1, prev: 2, cired: 2, exed: 3, newex: 3 })[v] ?? (v === 'pick' ? (ui.pickFor ? 2 : 1) : v === 'ex' ? (ui.scheda ? 1 : 2) : 1);
   const scrollMem = {};
   function draw() {
     if (!me) return;
@@ -600,9 +604,19 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (sc && ui.view !== shownView) { // pagina nuova: si parte dall'alto (tornando alla modifica, dal punto in cui eri)
       scrollMem[shownView] = sc.scrollTop;
       const back = ui.view === 'edit' && ['pick', 'newex', 'exed', 'cired'].includes(shownView);
+      if (navAnim) navAnim = depth(ui.view) < depth(shownView) ? 'wo-pop' : 'wo-push'; // si va più in fondo o si torna su
       shownView = ui.view;
       root.innerHTML = viewHtml(ui.view) + (ui.view === 'list' ? '' : '<div class="wo-edge" aria-hidden="true"></div>');
       sc.scrollTop = back ? scrollMem.edit || 0 : 0;
+      // come su iPhone: la pagina nuova entra da destra; tornando indietro quella di prima rientra da sinistra
+      if (navAnim) {
+        root.classList.remove('wo-push', 'wo-pop');
+        void root.offsetWidth;
+        root.classList.add(navAnim);
+        clearTimeout(root._anim);
+        root._anim = setTimeout(() => root.classList.remove('wo-push', 'wo-pop'), 320);
+      }
+      navAnim = 'wo-push';
     } else root.innerHTML = viewHtml(ui.view) + (ui.view === 'list' ? '' : '<div class="wo-edge" aria-hidden="true"></div>');
     const pager = root.querySelector('#wo-pager');
     if (pager) {
