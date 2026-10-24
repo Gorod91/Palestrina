@@ -987,3 +987,30 @@ body.keyboard .wo-bar { display: none; }
 @keyframes wo-push { from { transform: translateX(100%); } to { transform: none; } }
 @keyframes wo-pop { from { transform: translateX(-30%); opacity: .4; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { #workout.wo-push > *, #workout.wo-pop > * { animation: none !important; } }
+
+/* Scelta esercizi: muscoli (corpo con il muscolo acceso, inquadrato sulla zona) e famiglie di attrezzi */
+.wo-pk-sec { margin: 4px 4px 8px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.wo-recs { display: flex; gap: 6px; overflow-x: auto; margin: 0 0 14px; padding-bottom: 2px; scrollbar-width: none; }
+.wo-recs button { flex: none; padding: 8px 12px; border: 0; border-radius: 99px; background: var(--card); color: var(--fg); font-size: 14px; font-weight: 600; }
+.wo-recs button.on { background: var(--exercise); color: #000; }
+.wo-mus { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin: 0 0 14px; }
+.wo-mt { display: grid; justify-items: center; align-content: center; gap: 3px; min-height: 96px; padding: 8px 4px; border: 0; border-radius: 14px; background: var(--card); color: var(--fg); font-size: 13px; font-weight: 700; }
+.wo-mt small { color: var(--muted); font-size: 11px; font-weight: 500; }
+.wo-fams { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 14px; }
+.wo-ft { display: flex; align-items: center; gap: 9px; padding: 8px 10px; border: 0; border-radius: 14px; background: var(--card); color: var(--fg); font-size: 13.5px; font-weight: 700; text-align: left; line-height: 1.2; }
+.wo-fico { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 12px; background: #161618; flex: none; }
+.wo-fico svg { width: 44px; height: 44px; }
+.wo-ft .wo-fico { width: 42px; height: 42px; border-radius: 10px; } .wo-ft .wo-fico svg { width: 36px; height: 36px; }
+.wo-fico.big { width: 96px; height: 96px; border-radius: 22px; } .wo-fico.big svg { width: 80px; height: 80px; }
+.wo-pkh { display: flex; align-items: center; gap: 14px; margin: 0 0 14px; }
+.wo-pkh b { font-size: 28px; font-weight: 800; letter-spacing: -.02em; line-height: 1.1; }
+.wo-letter { padding: 8px 16px 2px; color: var(--stand); font-size: 13px; font-weight: 800; }
+.wo-pk-new { margin-top: 0; }
+.wo-bodyw { display: inline-flex; gap: 6px; }
+.wo-body { width: 32px; height: 64px; }
+.wo-body.big { width: 66px; height: 132px; }
+.wo-bodyw.crop .wo-body { width: 52px; height: 52px; border-radius: 12px; background: #161618; }
+.wo-body path, .wo-body ellipse { fill: #2e3440; stroke: #6b7689; stroke-width: .7; stroke-linejoin: round; }
+.wo-bodyw.crop .wo-body path, .wo-bodyw.crop .wo-body ellipse { stroke-width: 1; }
+.m-petto .petto, .m-spalle .spalle, .m-addominali .addominali, .m-bicipiti .bicipiti, .m-tricipiti .tricipiti,
+.m-gambe .gambe, .m-polpacci .polpacci, .m-schiena .schiena, .m-glutei .glutei { fill: var(--exercise); stroke: #4a7300; }

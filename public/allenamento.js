@@ -5,6 +5,7 @@
 // schede/<uid> = { name, list: [{ id, name, ex: [id esercizio] }], extra, rec, agg, at }.
 import { fbSignIn, fbUid } from './fbchat.js';
 import { figSvg } from './figure.js';
+import { bodySvg, ICONE } from './corpo.js';
 import { popCount } from './timer.js';
 
 // Catalogo: gli esercizi delle schede che abbiamo; gli esercizi nuovi si aggiungono dall'app ("Nuovo esercizio").
@@ -364,8 +365,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let serie = []; // le mie serie (tutte)
   let schede = null; // le mie schede (null finché non arrivano)
   // cosa si vede: lista, esercizio, catalogo (allenamento libero)
+  // pg: pagina della scelta esercizi ('m:Petto' muscolo, 'f:Cardio' famiglia di attrezzi, 'a' tutti; '' la prima), pf: filtro lì dentro
   // ed: scheda in modifica; pickFor: il catalogo sceglie esercizi per la scheda ('edit'), un circuito nuovo ('circnew') o uno esistente ('circ:id')
-  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '', rotSheet: false, exed: null, cired: null };
+  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', pg: '', pf: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '', rotSheet: false, exed: null, cired: null };
   let restEnd = 0;
   let restTotal = REST; // secondi del recupero in corso
   let serieSig = '';
@@ -535,6 +537,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor && !ui.pickFor.startsWith('circ:') ? 'edit' : ui.view === 'newex' ? 'pick' : ui.view === 'prev' ? 'copy' : ui.view === 'exed' ? (ui.exed && ui.exed.back ? 'cired' : 'edit') : ui.view === 'cired' ? 'edit' : ui.view === 'pick' && ui.cired ? 'cired' : 'list');
   function goBack(anim = 'wo-pop') {
     navAnim = anim ? 'wo-pop' : '';
+    if (ui.view === 'pick' && ui.pg && !ui.q.trim()) { // da un muscolo o una famiglia: alla prima pagina della scelta
+      Object.assign(ui, { pg: '', pf: '' });
+      return;
+    }
     const v = backView();
     if (ui.view === 'exed') ui.exed = null; // dalla pagina Esercizio: alla modifica (o al circuito da cui eri partito)
     if (ui.view === 'cired') ui.cired = null;
@@ -557,10 +563,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const dx = Math.max(0, ev.clientX - edge.x);
     if (!edge.under && dx > 6) {
       edge.els = [...root.children].filter((el) => !el.classList.contains('wo-edge'));
-      const v = ui.view;
-      ui.view = backView();
+      const v = ui.view, pg = ui.pg;
+      if (v === 'pick' && pg && !ui.q.trim()) ui.pg = ''; // sotto: la prima pagina della scelta
+      else ui.view = backView();
       const html = viewHtml(ui.view);
-      ui.view = v;
+      Object.assign(ui, { view: v, pg });
       edge.under = document.createElement('div');
       edge.under.className = 'wo-under';
       edge.under.innerHTML = html;
@@ -613,7 +620,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let shownView = 'list';
   let navAnim = 'wo-push'; // animazione del prossimo cambio di pagina ('' dopo il trascinamento dal bordo, che si anima da solo)
   /** Profondità delle pagine: entrando più in fondo la pagina arriva da destra, tornando su da sinistra. */
-  const depth = (v) => ({ list: 0, copy: 1, edit: 1, prev: 2, cired: 2, exed: 3, newex: 3 })[v] ?? (v === 'pick' ? (ui.pickFor ? 2 : 1) : v === 'ex' ? (ui.scheda ? 1 : 2) : 1);
+  const vkey = () => (ui.view === 'pick' && ui.pg && !ui.q.trim() ? 'pick:' + ui.pg : ui.view); // muscolo o attrezzo: pagina a sé
+  const depth = (v) => (v.startsWith('pick:') ? depth('pick') + 1 : null) ?? ({ list: 0, copy: 1, edit: 1, prev: 2, cired: 2, exed: 3, newex: 3 })[v] ?? (v === 'pick' ? (ui.pickFor ? 2 : 1) : v === 'ex' ? (ui.scheda ? 1 : 2) : 1);
   const scrollMem = {};
   function draw() {
     if (!me) return;
@@ -622,13 +630,14 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       return;
     }
     const sc = document.getElementById('scroller'); // area che scorre dell'app
-    if (sc && ui.view !== shownView) { // pagina nuova: si parte dall'alto (tornando alla modifica, dal punto in cui eri)
+    const vk = vkey();
+    if (sc && vk !== shownView) { // pagina nuova: si parte dall'alto (tornando alla modifica o alla scelta, dal punto in cui eri)
       scrollMem[shownView] = sc.scrollTop;
-      const back = ui.view === 'edit' && ['pick', 'newex', 'exed', 'cired'].includes(shownView);
-      if (navAnim) navAnim = depth(ui.view) < depth(shownView) ? 'wo-pop' : 'wo-push'; // si va più in fondo o si torna su
-      shownView = ui.view;
+      const back = (vk === 'edit' && ['pick', 'newex', 'exed', 'cired'].includes(shownView.split(':')[0])) || (vk === 'pick' && shownView.startsWith('pick:'));
+      if (navAnim) navAnim = depth(vk) < depth(shownView) ? 'wo-pop' : 'wo-push'; // si va più in fondo o si torna su
+      shownView = vk;
       root.innerHTML = viewHtml(ui.view) + (ui.view === 'list' ? '' : '<div class="wo-edge" aria-hidden="true"></div>');
-      sc.scrollTop = back ? scrollMem.edit || 0 : 0;
+      sc.scrollTop = back ? scrollMem[vk] || 0 : 0;
       // come su iPhone: la pagina nuova entra da destra; tornando indietro quella di prima rientra da sinistra
       if (navAnim) {
         root.classList.remove('wo-push', 'wo-pop');
@@ -1230,19 +1239,78 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }
   });
 
-  function pickView() {
+  const MUSCOLI = ['Petto', 'Schiena', 'Spalle', 'Bicipiti', 'Tricipiti', 'Gambe', 'Glutei', 'Polpacci', 'Addominali']; // col disegno del corpo
+  const FAMIGLIE = ['Corpo libero', 'Macchine e cavi', 'Bilancieri, manubri e kettlebell', 'Cardio'];
+  /** Famiglia di attrezzi di un esercizio (il vogatore resta con le macchine: Cardio è l'attrezzo "Cardio"). */
+  function famOf(e) {
+    const m = (e.m || '').toLowerCase();
+    if (m === 'cardio') return 'Cardio';
+    if (!m || ['corpo libero', 'tappetino', 'bastone', 'sbarra', 'rialzo'].includes(m)) return 'Corpo libero';
+    if (/^(manubri|kettlebell|bilanciere)/.test(m)) return 'Bilancieri, manubri e kettlebell';
+    return 'Macchine e cavi';
+  }
+  const alpha = (a, b) => a.n.localeCompare(b.n, 'it');
+
+  /** Scelta degli esercizi: prima pagina con muscoli e attrezzi, poi l'elenco in ordine alfabetico; la ricerca guarda
+   *  nome, muscolo e attrezzo. Con la spunta (multi) si scelgono più esercizi per una scheda o un circuito. */
+  function pickBody(multi, had = []) {
     const cat = CATALOGO.filter((e) => !e.old); // old: tolti dal catalogo, restano solo per i nomi delle serie già fatte
-    const groups = [...new Set(cat.map((e) => e.g))];
     const q = ui.q.trim().toLowerCase();
-    const list = cat.filter((e) => (!ui.g || e.g === ui.g) && (!q || e.n.toLowerCase().includes(q)));
-    if (ui.pickFor) return pickMultiView(groups, list);
-    return `<button class="wo-back" data-a="back">‹ Allenamento libero</button>
-      <input id="wo-q" class="plain wo-search" placeholder="Cerca un esercizio" value="${esc(ui.q)}" autocomplete="off">
-      <div class="wo-groups"><button class="${ui.g ? '' : 'on'}" data-a="g:">Tutti</button>${groups.map((g) => `<button class="${ui.g === g ? 'on' : ''}" data-a="g:${esc(g)}">${esc(g)}</button>`).join('')}</div>
-      <section class="card wo-list">${list.map((e) => {
+    const row = (e) => {
+      if (!multi) {
         const l = lastTime(e.id, unit(e));
-        return `<button class="wo-row" data-a="pick:${e.id}"><span><b>${esc(e.n)}</b><small>${esc(e.g)} · ${esc(e.m)}${l ? ` · ${summary(l.sets, unit(e))}` : ''}</small></span><span class="wo-chev">›</span></button>`;
-      }).join('') || '<p class="wo-empty">Nessun esercizio</p>'}</section>
+        return `<button class="wo-row" data-a="pick:${e.id}"><span><b>${esc(e.n)}</b><small>${esc(e.m || e.g)}${l ? ` · ${summary(l.sets, unit(e))}` : ''}</small></span><span class="wo-chev">›</span></button>`;
+      }
+      const h = had.includes(e.id), on = ui.sel.includes(e.id);
+      return `<button class="wo-row wo-prow" data-a="${h ? '' : `psel:${e.id}`}"${h ? ' aria-disabled="true"' : ''}><span class="wo-chk${on ? ' on' : ''}${h ? ' had' : ''}">${on || h ? '✓' : ''}</span><span><b>${esc(e.n)}</b><small>${h ? 'già nella scheda' : esc(e.m || e.g)}</small></span></button>`;
+    };
+    const newRow = multi ? `<button class="wo-row wo-prow" data-a="newex"><span class="wo-chk add"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></span><span><b>Nuovo esercizio</b><small>se non è nell'elenco</small></span></button>` : '';
+    const listHtml = (arr, letters = false) => {
+      let prev = '';
+      const rows = arr.map((e) => {
+        const l = e.n[0].toUpperCase(), head = letters && l !== prev ? `<div class="wo-letter">${esc(l)}</div>` : '';
+        prev = l;
+        return head + row(e);
+      }).join('');
+      return `<section class="card wo-list">${newRow}${rows || (multi ? '' : '<p class="wo-empty">Nessun esercizio</p>')}</section>`;
+    };
+    const search = `<input id="wo-q" class="plain wo-search" placeholder="Cerca per nome, muscolo o attrezzo" value="${esc(ui.q)}" autocomplete="off">`;
+    if (q) {
+      const hit = cat.filter((e) => [e.n, e.g, e.m, famOf(e)].some((v) => (v || '').toLowerCase().includes(q))).sort(alpha);
+      return `${search}<div class="wo-pk-sec">${hit.length} ${hit.length === 1 ? 'esercizio' : 'esercizi'}</div>${listHtml(hit)}`;
+    }
+    const kind = ui.pg[0] || '', val = ui.pg.slice(2);
+    if (kind) {
+      const inPg = cat.filter((e) => kind === 'a' || (kind === 'm' ? e.g === val : famOf(e) === val)).sort(alpha);
+      const by = (e) => (kind === 'm' ? famOf(e) : e.g);
+      const chipsOf = kind === 'a' ? [] : [...new Set(inPg.map(by))].sort((x, y) => (kind === 'm' ? FAMIGLIE.indexOf(x) - FAMIGLIE.indexOf(y) : GRUPPI.indexOf(x) - GRUPPI.indexOf(y)));
+      const list = ui.pf ? inPg.filter((e) => by(e) === ui.pf) : inPg;
+      const pic = kind === 'm' && MUSCOLI.includes(val) ? bodySvg(val, { both: true, cls: 'big' }) : ICONE[val] ? `<span class="wo-fico big">${ICONE[val]}</span>` : '';
+      const head = `<div class="wo-pkh">${pic}<b>${kind === 'a' ? 'Tutti gli esercizi' : esc(val)}</b></div>`;
+      const chips = chipsOf.length > 1 ? `<div class="wo-groups"><button class="${ui.pf ? '' : 'on'}" data-a="pf:">Tutti</button>${chipsOf.map((c) => `<button class="${ui.pf === c ? 'on' : ''}" data-a="pf:${esc(c)}">${esc(c)}</button>`).join('')}</div>` : '';
+      return head + chips + listHtml(list, kind === 'a');
+    }
+    // prima pagina: recenti, muscoli, attrezzi
+    const rec = [];
+    serie.slice().sort((a, b) => (a.day < b.day ? 1 : -1)).forEach((x2) => { const id = UNITI[x2.ex] || x2.ex; if (EX[id] && !EX[id].old && !rec.includes(id)) rec.push(id); });
+    (schede || []).filter((y) => !y.di).forEach((y) => y.ex.concat(...Object.values(y.circuiti || {}).map((c) => c.ex)).forEach((id) => { if (EX[id] && !EX[id].old && !rec.includes(id)) rec.push(id); }));
+    const recIds = rec.filter((id) => !had.includes(id)).slice(0, 10);
+    const recHtml = recIds.length ? `<div class="wo-pk-sec">Nelle tue schede e di recente</div><div class="wo-recs">${recIds.map((id) => `<button class="${ui.sel.includes(id) ? 'on' : ''}" data-a="${multi ? 'psel' : 'pick'}:${id}">${esc(EX[id].n)}</button>`).join('')}</div>` : '';
+    const n = (f) => cat.filter(f).length;
+    const tile = (pg, pic, name, small) => `<button class="wo-mt" data-a="pg:${esc(pg)}">${pic}<b>${esc(name)}</b><small>${small}</small></button>`;
+    const mus = [...MUSCOLI.map((g) => tile('m:' + g, bodySvg(g, { crop: true }), g, n((e) => e.g === g))),
+      ...['Mobilità', 'Cardio'].map((g) => tile('m:' + g, `<span class="wo-fico">${ICONE[g]}</span>`, g, n((e) => e.g === g))),
+      tile('a', '', 'Tutti', `${cat.length} A-Z`)].join('');
+    const fams = FAMIGLIE.map((f) => `<button class="wo-ft" data-a="pg:f:${esc(f)}"><span class="wo-fico">${ICONE[f]}</span><b>${esc(f)}</b></button>`).join('');
+    return `${search}${recHtml}<div class="wo-pk-sec">Per muscolo</div><div class="wo-mus">${mus}</div>
+      <div class="wo-pk-sec">Per attrezzo</div><div class="wo-fams">${fams}</div>
+      ${multi ? `<section class="card wo-list wo-pk-new">${newRow}</section>` : ''}`;
+  }
+
+  function pickView() {
+    if (ui.pickFor) return pickMultiView();
+    const back = ui.pg && !ui.q.trim() ? 'Esercizi' : 'Allenamento libero';
+    return `<button class="wo-back" data-a="back">‹ ${back}</button>${pickBody(false)}
       <p class="footnote">Manca un esercizio? Aggiungilo da una scheda: ✎ → + Esercizi → Nuovo esercizio.</p>`;
   }
 
@@ -1387,24 +1455,17 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   }
 
   function openPick(forWhat) {
-    Object.assign(ui, { pickFor: forWhat, sel: [], q: '', g: '', view: 'pick' });
+    Object.assign(ui, { pickFor: forWhat, sel: [], q: '', g: '', pg: '', pf: '', view: 'pick' });
   }
 
   /** Catalogo con la spunta multipla: si scelgono più esercizi e si aggiungono insieme. */
-  function pickMultiView(groups, list) {
+  function pickMultiView() {
     const ed = ui.ed;
     const had = ui.pickFor === 'edit' ? ed.ex : ui.pickFor.startsWith('circ:') ? ed.circuiti[ui.pickFor.slice(5)].ex : [];
     const n = ui.sel.length;
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${esc(ed.name || (ed.isNew ? 'Nuova scheda' : 'Scheda'))}${diBadge(ed)}</button></div>
-      <input id="wo-q" class="plain wo-search" placeholder="Cerca un esercizio" value="${esc(ui.q)}" autocomplete="off">
-      <div class="wo-groups"><button class="${ui.g ? '' : 'on'}" data-a="g:">Tutti</button>${groups.map((g) => `<button class="${ui.g === g ? 'on' : ''}" data-a="g:${esc(g)}">${esc(g)}</button>`).join('')}</div>
-      <section class="card wo-list">
-        <button class="wo-row wo-prow" data-a="newex"><span class="wo-chk add"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></span><span><b>Nuovo esercizio</b><small>se non è nell'elenco</small></span></button>
-        ${list.map((e) => {
-          const h = had.includes(e.id), on = ui.sel.includes(e.id);
-          return `<button class="wo-row wo-prow" data-a="${h ? '' : `psel:${e.id}`}"${h ? ' aria-disabled="true"' : ''}><span class="wo-chk${on ? ' on' : ''}${h ? ' had' : ''}">${on || h ? '✓' : ''}</span><span><b>${esc(e.n)}</b><small>${h ? 'già nella scheda' : `${esc(e.g)} · ${esc(e.m)}`}</small></span></button>`;
-        }).join('')}
-      </section>
+    const back = ui.pg && !ui.q.trim() ? 'Esercizi' : `${esc(ed.name || (ed.isNew ? 'Nuova scheda' : 'Scheda'))}${diBadge(ed)}`;
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${back}</button></div>
+      ${pickBody(true, had)}
       <div class="wo-pickpad"></div>
       <div class="wo-pickbar"><button class="primary" data-a="padd"${n ? '' : ' disabled'}>${n ? `Aggiungi ${n} ${n === 1 ? 'esercizio' : 'esercizi'}` : 'Scegli gli esercizi'}</button></div>`;
   }
@@ -1454,7 +1515,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     addEx(e);
     writeDoc();
     ui.sel.push(e.id);
-    Object.assign(ui, { view: 'pick', q: '', g: e.g, nx: null });
+    Object.assign(ui, { view: 'pick', q: '', g: e.g, pg: 'm:' + e.g, pf: '', nx: null });
   }
 
   function saveEditor() {
@@ -1528,7 +1589,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     else if (cmd === 'edcirc') ui.sheet = { kind: 'newblock', lista: false };
     else if (cmd === 'psel') ui.sel = ui.sel.includes(arg) ? ui.sel.filter((e) => e !== arg) : [...ui.sel, arg];
     else if (cmd === 'padd') pickDone();
-    else if (cmd === 'newex') Object.assign(ui, { nx: { n: ui.q.trim(), g: ui.g || '', t: 'kg', m: '' }, view: 'newex' });
+    else if (cmd === 'newex') Object.assign(ui, { nx: { n: ui.q.trim(), g: ui.pg.startsWith('m:') ? ui.pg.slice(2) : '', t: 'kg', m: '' }, view: 'newex' });
     else if (cmd === 'nxg') ui.nx.g = arg;
     else if (cmd === 'nxt') ui.nx.t = arg;
     else if (cmd === 'nxsave') saveNewEx();
@@ -1804,7 +1865,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const k = s.ex.findIndex((e) => !isDone(e, s));
       openEx(cmd === 'go' && k >= 0 ? k : 0);
     } else if (cmd === 'libero') {
-      ui.view = 'pick';
+      Object.assign(ui, { view: 'pick', q: '', pg: '', pf: '' });
+    } else if (cmd === 'pg') {
+      Object.assign(ui, { pg: arg, pf: '' });
+    } else if (cmd === 'pf') {
+      ui.pf = arg;
     } else if (cmd === 'pick') {
       ui.scheda = '';
       ui.list = [arg];
