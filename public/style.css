@@ -1014,3 +1014,38 @@ body.keyboard .wo-bar { display: none; }
 .wo-bodyw.crop .wo-body path, .wo-bodyw.crop .wo-body ellipse { stroke-width: 1; }
 .m-petto .petto, .m-spalle .spalle, .m-addominali .addominali, .m-bicipiti .bicipiti, .m-tricipiti .tricipiti,
 .m-gambe .gambe, .m-polpacci .polpacci, .m-schiena .schiena, .m-glutei .glutei { fill: var(--exercise); stroke: #4a7300; }
+
+/* Sudometro: rivelazione del punteggio (sudoreveal.js) */
+.sr { position: fixed; inset: 0; z-index: 30; background: #000; display: flex; justify-content: center; overflow: hidden;
+  padding: calc(env(safe-area-inset-top) + 28px) 22px calc(env(safe-area-inset-bottom) + 24px); }
+html.ios.standalone .sr { top: var(--ios-top, 0px); }
+.sr-in { width: 100%; max-width: 380px; display: flex; flex-direction: column; align-items: center; }
+.sr-kick { font-size: 12px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.sr-selfie { width: 112px; height: 112px; border-radius: 50%; object-fit: cover; margin-top: 16px; box-shadow: 0 0 0 3px var(--card-2); }
+.sr-meter { display: grid; grid-template-columns: auto auto; gap: 48px; align-items: end; margin-top: 18px; }
+.sr-tube { position: relative; width: 46px; height: min(300px, 38vh); }
+.sr-glass { position: absolute; left: 8px; right: 8px; top: 0; bottom: 34px; border-radius: 16px 16px 0 0; background: var(--card); box-shadow: inset 0 0 0 2px var(--card-2); overflow: hidden; }
+.sr-fill { position: absolute; left: 4px; right: 4px; bottom: 0; height: 0; border-radius: 10px 10px 0 0;
+  background: linear-gradient(to top, var(--stand) 0%, var(--exercise) 45%, #ff5a1f 75%, var(--move) 100%); background-size: 100% min(266px, calc(38vh - 34px)); background-position: bottom; }
+.sr-bulb { position: absolute; left: 0; right: 0; bottom: 0; height: 46px; border-radius: 50%; background: var(--card); box-shadow: inset 0 0 0 2px var(--card-2); display: grid; place-items: center; }
+.sr-bulb i { width: 34px; height: 34px; border-radius: 50%; background: var(--stand); }
+.sr-ticks { position: absolute; left: 50px; top: 0; bottom: 34px; width: 34px; }
+.sr-ticks span { position: absolute; left: 0; font-size: 10px; font-weight: 700; color: var(--muted); transform: translateY(50%); font-variant-numeric: tabular-nums; }
+.sr-ticks span::before { content: ''; display: inline-block; width: 7px; height: 1.5px; background: var(--card-2); vertical-align: middle; margin-right: 4px; }
+.sr-read { display: grid; justify-items: start; gap: 2px; padding-bottom: 40px; min-width: 140px; }
+.sr-num { font-size: 92px; font-weight: 900; letter-spacing: -.05em; line-height: .9; font-variant-numeric: tabular-nums; }
+.sr-num.shake { animation: sr-shake .09s linear infinite; }
+.sr-num.pop { animation: sr-pop .5s cubic-bezier(.2, 1.6, .4, 1); }
+.sr-of { font-size: 13px; color: var(--muted); font-weight: 600; }
+.sr-title { margin-top: 20px; min-height: 40px; text-align: center; opacity: 0; transform: translateY(10px); transition: opacity .45s, transform .45s; }
+.sr-title.on { opacity: 1; transform: none; }
+.sr-title b { font-size: 26px; font-weight: 800; letter-spacing: -.02em; background: linear-gradient(90deg, var(--exercise), var(--stand) 50%, var(--move)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.sr-title.tease b { background: none; color: var(--muted); }
+.sr-ok { margin-top: auto; width: 100%; opacity: 0; pointer-events: none; transition: opacity .4s .3s; }
+.sr-ok.on { opacity: 1; pointer-events: auto; }
+.sr-flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, rgba(255, 255, 255, .22), transparent 60%); opacity: 0; pointer-events: none; }
+.sr-flash.go { animation: sr-flash .6s ease-out; }
+.sr-fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+@keyframes sr-shake { 0% { transform: translate(0, 0); } 25% { transform: translate(-1.5px, 1px); } 50% { transform: translate(1.5px, -1px); } 75% { transform: translate(-1px, -1px); } 100% { transform: translate(0, 0); } }
+@keyframes sr-pop { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@keyframes sr-flash { 0% { opacity: 1; } 100% { opacity: 0; } }

@@ -7,6 +7,7 @@ import { makeZip } from './zip.js';
 import { createWorkout } from './allenamento.js';
 import { alF } from './genere.js';
 import { initSheetDrag } from './sheetdrag.js';
+import { showSudoReveal } from './sudoreveal.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -1005,6 +1006,14 @@ async function takeSweat(debug, overwrite = false) {
       state = { ...state, me: { ...state.me, sudometroToday: { score: shown.score, title: shown.title, photoId: '', saving: true } } };
       optimistic++;
       renderSudometro();
+      // Il punteggio si rivela con il termometro, mentre la foto si pubblica
+      const f = isF(state.me.name);
+      showSudoReveal({
+        score: shown.score,
+        title: alF(clean(shown.title), f),
+        titleAt: (v) => alF(clean((sudometro.TITLES.find(([min]) => v >= min) || sudometro.TITLES[sudometro.TITLES.length - 1])[1]), f),
+        photo: `data:image/jpeg;base64,${photo}`,
+      });
     } else sudoBusy('Pubblico la foto…');
     const r = await api('sudometro', {
       score: shown.score,
@@ -1040,7 +1049,7 @@ async function takeSweat(debug, overwrite = false) {
       ].filter(Boolean).join('\n');
       toast('Prova di debug salvata');
     } else {
-      toast(shown.warnings.length ? shown.warnings.join(' ') : `${shown.score}: ${alF(shown.title, isF(state.me.name))}`, 6000);
+      if (shown.warnings.length) toast(shown.warnings.join(' '), 6000); // il punteggio l'ha già mostrato il termometro
     }
     await refresh();
   } catch (err) {
