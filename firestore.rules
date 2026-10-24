@@ -67,10 +67,10 @@ service cloud.firestore {
         && request.resource.data.by == request.auth.token.name
         && request.resource.data.at == request.time;
 
-      // Serie di un esercizio in un giorno (id = giorno_uid_esercizio): si possono correggere
+      // Serie di un esercizio in un giorno (id = giorno_uid_esercizio; t: come si segnava nella scheda): si possono correggere
       allow create, update: if pal() && allenamento()
         && coll in ['serie', 'prova_serie']
-        && request.resource.data.keys().hasOnly(['name', 'ex', 'sets', 'day', 'scheda', 'nome', 'at'])
+        && request.resource.data.keys().hasOnly(['name', 'ex', 'sets', 't', 'day', 'scheda', 'nome', 'at'])
         && id == request.resource.data.day + '_' + request.auth.uid + '_' + request.resource.data.ex
         && request.resource.data.name == request.auth.token.name
         && request.resource.data.ex is string
@@ -78,6 +78,7 @@ service cloud.firestore {
         && request.resource.data.scheda is string
         && request.resource.data.scheda.size() <= 40
         && (!('nome' in request.resource.data) || (request.resource.data.nome is string && request.resource.data.nome.size() <= 60))
+        && (!('t' in request.resource.data) || request.resource.data.t in ['kg', 'rip', 'sec', 'm'])
         && request.resource.data.sets is list
         && request.resource.data.sets.size() >= 1
         && request.resource.data.sets.size() <= 20
