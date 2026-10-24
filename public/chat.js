@@ -933,7 +933,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         const mine = m.name === me.name;
         const row = el('div', `msg ${mine ? 'mine' : 'theirs'}`);
         if (!mine && lastSender !== m.name) {
-          const sender = el('div', 'sender', m.display);
+          const sender = el('div', 'sender', m.display || who(m.name)); // i messaggi di Firebase hanno solo il nome
           if (isKing(m.name)) sender.insertAdjacentHTML('beforeend', crown(m.name));
           row.append(sender);
         }
