@@ -250,6 +250,10 @@ SCHEDE_ESEMPIO.push(
   },
 );
 
+/** Schede di chi non ha ancora salvato niente: quelle senza `di` sono di Francesco; agli altri le proprie
+ *  (quelle "di" loro, diventano sue), le altre si copiano da "Copia da altri". */
+const esempi = (name) => (name === 'Francesco' ? SCHEDE_ESEMPIO : SCHEDE_ESEMPIO.filter((y) => y.di === name).map(({ di, ...y }) => y));
+
 // Aggiornamenti mirati delle schede (quando Francesco chiede di sistemarne una già salvata nei dati di qualcuno):
 // ognuno si applica una sola volta alla copia salvata (gli id fatti restano in `agg`) e cambia solo quello che dice,
 // lasciando il resto come l'ha personalizzato la persona. Chi non ha ancora salvato niente usa SCHEDE_ESEMPIO,
@@ -411,7 +415,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       fs.onSnapshot(fs.doc(db, pfx + 'schede', fbUid(me.name)), (snap) => {
         const d = snap.exists() ? snap.data() : null;
         hasDoc = !!d;
-        schede = d ? d.list || [] : SCHEDE_ESEMPIO;
+        schede = d ? d.list || [] : esempi(me.name);
         extra = (d && d.extra) || [];
         extra.forEach(addEx);
         recMap = (d && d.rec) || {};

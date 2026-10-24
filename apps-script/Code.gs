@@ -327,9 +327,9 @@ const NEWS = [
     id: '2026-11',
     month: '2026-10',
     from: '2026-11-01',
-    features: ['apripista', 'sfide'],
+    features: ['apripista', 'sfide', 'allenamento'],
     title: 'Novità di novembre',
-    body: 'Apripista… e una sorpresa. Tocca per vedere.',
+    body: 'Apripista, le schede di allenamento… e una sorpresa. Tocca per vedere.',
   },
 ];
 
@@ -355,9 +355,27 @@ function releaseNews(month, id) {
   NEWS.filter((n) => (!month || n.month === month) && (!id || n.id === id) && !releasedNews().includes(n.id)).forEach((n) => {
     props.setProperty('NEWS_RELEASED', JSON.stringify(releasedNews().concat(n.id)));
     forget('news');
+    if (n.features.includes('allenamento')) openWorkout();
     addChatEvent('', { kind: 'news', id: n.id, title: n.title, body: n.body });
     dispatch('news', n.id);
   });
+}
+
+/** Allenamento per tutti: le regole di Firebase lo aprono quando c'è state/allenamento (prova_state nella prova). */
+function openWorkout() {
+  try {
+    firestoreCall('patch', `${TEST ? 'prova_' : ''}state/allenamento`, { fields: { on: { booleanValue: true }, at: { timestampValue: new Date().toISOString() } } });
+    props.setProperty('WORKOUT_OPEN', '1');
+  } catch (err) {
+    console.error('Allenamento non aperto su Firebase', err); // si riprova al prossimo stato chiesto
+  }
+}
+/** Allenamento attivo per una persona: chi lo prova da prima, poi tutti con le novità di novembre. */
+function workoutFor(user) {
+  if (WORKOUT_USERS.includes(user.name)) return true;
+  if (!featureOn('allenamento')) return false;
+  if (!props.getProperty('WORKOUT_OPEN')) openWorkout();
+  return true;
 }
 
 /** Data di uscita di una novità con orario. */
@@ -696,7 +714,7 @@ function handle(req, user) {
         }
         return json({ ok: true });
       case 'fbToken':
-        if (!fbChatOn() && !WORKOUT_USERS.includes(user.name)) return json({ error: 'Non disponibile' });
+        if (!fbChatOn() && !workoutFor(user)) return json({ error: 'Non disponibile' });
         return json(firebaseToken(user));
       case 'setTimer': {
         const s = Math.round(Number(req.seconds));
@@ -1028,7 +1046,7 @@ function buildState(user) {
       debug: user.debug,
       admin: user.admin,
       tester: user.admin || PROVA_USERS.includes(user.name),
-      allenamento: WORKOUT_USERS.includes(user.name),
+      allenamento: workoutFor(user),
       actingAs: !!user.actingAs,
       checkedInToday: presenze.some((r) => r.day === today && r.name === user.name),
       sudometroToday: mySudoToday ? { score: mySudoToday.score, title: mySudoToday.title, photoId: mySudoToday.photoId, refId: mySudoToday.refId } : null,
