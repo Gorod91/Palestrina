@@ -1,6 +1,6 @@
 // Allenamento (fase 1, solo in modalità prova): schede, serie e "l'ultima volta" per ogni esercizio.
 // Tutto su Firebase: le serie si salvano sul telefono anche senza campo e partono appena torna la rete.
-// Raccolte (in prova con prefisso prova_): serie/<giorno>_<uid>_<esercizio> = { name, ex, sets: [{ kg, reps }], day, scheda, nome, at }
+// Raccolte (in prova con prefisso prova_): serie/<giorno>_<uid>_<esercizio> = { name, ex, sets: [{ kg, reps }], t, day, scheda, nome, at }
 // (nome: della scheda in quel momento, per i grafici anche se poi la scheda cambia nome o viene eliminata),
 // schede/<uid> = { name, list: [{ id, name, ex: [id esercizio] }], extra, rec, agg, at }.
 import { fbSignIn, fbUid } from './fbchat.js';
@@ -53,7 +53,7 @@ export const CATALOGO = [
   { id: 'french-press', n: 'French press con manubri', g: 'Tricipiti', m: 'Manubri' },
   { id: 'russian-twist', n: 'Russian twist', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
   { id: 'plank-laterale', n: 'Plank laterale', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
-  { id: 'situps-tempo', n: 'Sit-up', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
+  { id: 'situps-tempo', n: 'Sit-up', g: 'Addominali', m: 'Corpo libero', t: 'sec', old: true },
   { id: 'v-sit', n: 'V-sit crunch', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
   // Ceppo
   { id: 'riscaldamento', n: 'Riscaldamento', g: 'Mobilità', m: 'Cardio', t: 'rip' },
@@ -80,8 +80,8 @@ export const CATALOGO = [
   { id: 'shoulder-bil', n: 'Shoulder press in piedi con bilanciere', g: 'Spalle', m: 'Bilanciere' },
   { id: 'curl-alt', n: 'Curl alternato con manubri', g: 'Bicipiti', m: 'Manubri' },
   { id: 'crunch-terra', n: 'Crunch', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
-  { id: 'russian-twist-rip', n: 'Russian twist', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
-  { id: 'v-sit-rip', n: 'V-sit crunch', g: 'Addominali', m: 'Corpo libero', t: 'rip' },
+  { id: 'russian-twist-rip', n: 'Russian twist', g: 'Addominali', m: 'Corpo libero', t: 'rip', old: true },
+  { id: 'v-sit-rip', n: 'V-sit crunch', g: 'Addominali', m: 'Corpo libero', t: 'rip', old: true },
   { id: 'low-row', n: 'Low row', g: 'Schiena', m: 'Low row' },
   { id: 'leg-curl-sdraiato', n: 'Leg curl sdraiato', g: 'Gambe', m: 'Leg curl' },
   { id: 'hyper-ext', n: 'Iperestensioni', g: 'Schiena', m: 'Panca hyper extension', t: 'rip' },
@@ -89,6 +89,9 @@ export const CATALOGO = [
   { id: 'vogatore', n: 'Vogatore', g: 'Cardio', m: 'Vogatore', t: 'm' },
 ];
 const EX = Object.fromEntries(CATALOGO.map((e) => [e.id, e]));
+// Doppioni uniti (lo stesso esercizio a tempo e a ripetizioni): il vecchio id resta solo per le serie già salvate,
+// e "l'ultima volta" del nuovo le conta se sono state fatte nello stesso modo. Come si segna lo dice la scheda (piano.t).
+const UNITI = { 'situps-tempo': 'situps', 'russian-twist-rip': 'russian-twist', 'v-sit-rip': 'v-sit' };
 /** Esercizio cambiato dall'app nel catalogo comune: nome, attrezzo, gruppo, come si segna ('kg' = peso e ripetizioni). */
 function applyCat(e, d) {
   if (!e || !d) return;
@@ -139,8 +142,9 @@ const SCHEDE_ESEMPIO = [
 
 // Schede di Rizzo (di: non vengono proposte come "da fare"): in fondo a tutte il circuito addome,
 // 30" di lavoro per esercizio, di fila, e recupero tra i giri (pausa: secondi tra un esercizio e l'altro, se servono).
-const ADDOME_R = { n: 'Circuito addome', ex: ['russian-twist', 'plank-laterale', 'situps-tempo', 'v-sit', 'barchetta'], giri: 2, rec: 60 };
+const ADDOME_R = { n: 'Circuito addome', ex: ['russian-twist', 'plank-laterale', 'situps', 'v-sit', 'barchetta'], giri: 2, rec: 60 };
 const PIANO_ADDOME_R = Object.fromEntries(ADDOME_R.ex.map((e) => [e, { s: '30"' }]));
+PIANO_ADDOME_R.situps.t = 'sec';
 const rizzo = (id, name, piano) => ({
   id, name, di: 'Rizzo',
   ex: [...Object.keys(piano), '@addome-r'],
@@ -212,7 +216,7 @@ SCHEDE_ESEMPIO.push(
     ex: ['@mob-g', 'leg-press-mono', 'shoulder-bil', 'leg-ext', 'chest-press', 'curl-alt', '@addome-g'],
     circuiti: {
       'mob-g': MOB_G,
-      'addome-g': { n: 'Circuito addome', ex: ['crunch-terra', 'russian-twist-rip', 'barchetta', 'v-sit-rip', 'plank-laterale'], giri: 2, rec: 60 },
+      'addome-g': { n: 'Circuito addome', ex: ['crunch-terra', 'russian-twist', 'barchetta', 'v-sit', 'plank-laterale'], giri: 2, rec: 60 },
     },
     piano: {
       ...PIANO_MOB_G,
@@ -222,9 +226,9 @@ SCHEDE_ESEMPIO.push(
       'chest-press': { s: '3 × 8-10' },
       'curl-alt': { s: '3 × 8-10' },
       'crunch-terra': { s: '15' },
-      'russian-twist-rip': { s: '30' },
+      'russian-twist': { s: '30', t: 'rip' },
       barchetta: { s: '30"' },
-      'v-sit-rip': { s: '12 dx, sx, centro' },
+      'v-sit': { s: '12 dx, sx, centro', t: 'rip' },
       'plank-laterale': { s: '20"' },
     },
   },
@@ -252,7 +256,7 @@ SCHEDE_ESEMPIO.push(
 //   { id, op: 'piano', scheda, ex, set: { s, nota, kg, rec, rip } }  piano di un esercizio (se c'è ancora; null toglie il campo)
 //   { id, op: 'aggiungi', scheda, ex, dopo, piano }                  esercizio in più (se manca), dopo `dopo` o in fondo
 //   { id, op: 'togli', scheda, ex }                                  toglie un esercizio
-//   { id, op: 'sostituisci', scheda, ex, con }                       mette `con` al posto di `ex` (stesso posto e piano)
+//   { id, op: 'sostituisci', scheda, ex, con, t }                    mette `con` al posto di `ex` (stesso posto e piano; t: come si segna lì)
 //   { id, op: 'circuito', scheda, c, set: { n, giri, rec, ex } }     cambia un circuito (c senza @)
 //   { id, op: 'nome', scheda, name }                                 rinomina una scheda
 //   { id, op: 'nome', di, da, name }                                 rinomina le copie "di" qualcuno che si chiamano ancora `da`
@@ -268,6 +272,10 @@ const AGGIORNAMENTI = [
   { id: 7, op: 'nome', di: 'Gualo', da: 'Gualo B', name: 'Scheda B' },
   // 24/10: nella Scheda A di Francesco la lat machine è con la MAG grip medio (esercizio nuovo)
   { id: 8, op: 'sostituisci', scheda: 'a', ex: 'lat', con: 'lat-mag', per: ['Francesco'] },
+  // 24/10: doppioni uniti, a tempo o a ripetizioni lo dice la scheda
+  ...['r-upper', 'r-lower', 'r-davanti', 'r-dietro'].map((sc, i) => ({ id: 9 + i, op: 'sostituisci', scheda: sc, ex: 'situps-tempo', con: 'situps', t: 'sec' })),
+  { id: 13, op: 'sostituisci', scheda: 'g-a', ex: 'russian-twist-rip', con: 'russian-twist', t: 'rip' },
+  { id: 14, op: 'sostituisci', scheda: 'g-a', ex: 'v-sit-rip', con: 'v-sit', t: 'rip' },
 ];
 
 /** Applica un aggiornamento all'elenco di schede (già copiato); quello che non trova lo salta. */
@@ -299,6 +307,7 @@ function applyAgg(list, a) {
     if (at >= 0 && !sc.ex.includes(a.con)) sc.ex[at] = a.con;
     Object.values(sc.circuiti || {}).forEach((c) => { const k = c.ex.indexOf(a.ex); if (k >= 0) c.ex[k] = a.con; });
     if (sc.piano[a.ex] && !sc.piano[a.con]) sc.piano[a.con] = sc.piano[a.ex];
+    if (a.t) sc.piano[a.con] = { ...sc.piano[a.con], t: a.t };
   } else if (a.op === 'togli') {
     sc.ex = sc.ex.filter((e) => e !== a.ex);
   } else if (a.op === 'circuito') {
@@ -438,7 +447,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function copia() {
     const { fs, db } = x;
     daCopiare().forEach((a) => {
-      fs.setDoc(fs.doc(db, pfx + 'serie', a.id), { name: me.name, ex: a.ex, sets: copy(a.sets), day: a.day, scheda: a.scheda || '', nome: a.nome || '', at: fs.serverTimestamp() })
+      fs.setDoc(fs.doc(db, pfx + 'serie', a.id), { name: me.name, ex: a.ex, sets: copy(a.sets), ...(a.t ? { t: a.t } : {}), day: a.day, scheda: a.scheda || '', nome: a.nome || '', at: fs.serverTimestamp() })
         .catch((err) => toast(`Serie non copiate: ${err.message}`));
     });
   }
@@ -466,12 +475,15 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   const todayDoc = (ex) => serie.find((s) => s.ex === ex && s.day === today());
   /** L'ultima volta prima di oggi. */
-  function lastTime(ex) {
-    return serie.filter((s) => s.ex === ex && s.day < today()).sort((a, b) => (a.day < b.day ? 1 : -1))[0] || null;
+  function lastTime(ex, t = tOf(ex)) {
+    return serie.filter((s) => (s.ex === ex || UNITI[s.ex] === ex) && s.day < today() && (s.t || unit(EX[s.ex])) === t)
+      .sort((a, b) => (a.day < b.day ? 1 : -1))[0] || null;
   }
   /** Circuito di una scheda ("@nome"), oppure null per un esercizio normale. */
   const circIn = (sch, id) => (id[0] === '@' && sch && sch.circuiti ? sch.circuiti[id.slice(1)] || null : null);
   const curSch = () => (schede || []).find((s) => s.id === ui.scheda);
+  /** Come si segna un esercizio in una scheda: quello scelto lì, altrimenti quello del catalogo. */
+  const tOf = (ex, sch = curSch()) => (sch && sch.piano && sch.piano[ex] && sch.piano[ex].t) || unit(EX[ex]);
   /** Fatto oggi: per un circuito, tutti i suoi esercizi salvati. */
   function isDone(id, sch = curSch()) {
     const c = circIn(sch, id);
@@ -493,7 +505,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const { fs, db } = x;
     const day = today();
     // Non si aspetta Firebase: senza campo resta sul telefono e parte da solo appena torna la rete
-    fs.setDoc(fs.doc(db, pfx + 'serie', `${day}_${fbUid(me.name)}_${ex}`), { name: me.name, ex, sets: copy(sets), day, scheda: ui.scheda, nome: curSch() ? curSch().name.slice(0, 60) : '', at: fs.serverTimestamp() })
+    fs.setDoc(fs.doc(db, pfx + 'serie', `${day}_${fbUid(me.name)}_${ex}`), { name: me.name, ex, sets: copy(sets), t: tOf(ex), day, scheda: ui.scheda, nome: curSch() ? curSch().name.slice(0, 60) : '', at: fs.serverTimestamp() })
       .catch((err) => toast(`Serie non salvate: ${err.message}`));
   }
 
@@ -817,12 +829,12 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (isDone(id, sch) && !pageOf(id).rifai) {
       const nx = nextTodo(k);
       return `<section class="wo-page" data-k="${k}">${head}
-        <section class="card wo-list">${c.ex.map((e) => `<div class="wo-row"><span><b>${esc(nameOf(e))}</b><small>Fatto oggi · ${summary(todayDoc(e).sets, unit(EX[e]))}</small></span><span class="wo-chev">✓</span></div>`).join('')}</section>
+        <section class="card wo-list">${c.ex.map((e) => `<div class="wo-row"><span><b>${esc(nameOf(e))}</b><small>Fatto oggi · ${summary(todayDoc(e).sets, tOf(e))}</small></span><span class="wo-chev">✓</span></div>`).join('')}</section>
         ${nx < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : ''}<button class="link-button" data-a="crifai">Rifai il circuito</button></section>`;
     }
     const rounds = Array.from({ length: st.giri }, (_, g) => `<i class="${g < st.cur ? 'ok' : g === st.cur ? 'cur' : ''}">${g < st.cur ? '✓' : `Giro ${g + 1}`}</i>`).join('');
     const rows = c.ex.map((e, j) => {
-      const t = unit(EX[e]), l = lastTime(e), pi = sch && sch.piano ? sch.piano[e] : null;
+      const t = tOf(e, sch), l = lastTime(e, t), pi = sch && sch.piano ? sch.piano[e] : null;
       const info = [pi && pi.s, l && `ultima volta ${summary(l.sets, t)}`].filter(Boolean).join(' · ');
       return `<div class="wo-cex"><span class="wo-cn">${j + 1}</span>${figSvg(e, 'sm')}<div class="wo-cname"><b>${esc(nameOf(e))}</b><small>${esc(info)}</small></div>
         <span class="wo-pm"><button data-a="cv-:${e}" aria-label="Meno">−</button><label class="wo-in"><input data-f="c:${e}" inputmode="numeric" value="${st.vals[e]}" aria-label="${esc(nameOf(e))}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${uShort(t)}</em></label><button data-a="cv+:${e}" aria-label="Più">+</button></span></div>`;
@@ -895,7 +907,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const s = runPlan[j];
     if (s.rest) return `<div class="wo-big-head wo-rest-head"><b>${restName(s)}</b><small>${restNext(s)}</small></div>
       <button class="timer-running wo-run-rest" data-r="next"><span>${mmss(s.pausa ? c.pausa : c.rec)}</span><small>tocca per saltare</small></button>`;
-    if (unit(EX[s.e]) !== 'sec') return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>${figSvg(s.e, 'run')}
+    if (tOf(s.e) !== 'sec') return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>${figSvg(s.e, 'run')}
       <button class="wo-run-reps" data-r="next">${st.vals[s.e]}<small>ripetizioni · fatto ✓</small></button>`;
     const total = st.vals[s.e];
     return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>${mmss(total)}${total < 60 ? '"' : ''}</small></div>${figSvg(s.e, 'run')}
@@ -991,7 +1003,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const st = pageOf(runId).circ;
     run.classList.remove('rest');
     run.innerHTML = `<div class="wo-run-done">✓</div><div class="wo-big-head"><b>Circuito fatto</b></div>
-      <div class="wo-run-sum">${c.ex.map((e) => `<div>${esc(nameOf(e))}<span>${summary(st.done[e].map((v) => ({ kg: 0, reps: v })), unit(EX[e]))}</span></div>`).join('')}</div>
+      <div class="wo-run-sum">${c.ex.map((e) => `<div>${esc(nameOf(e))}<span>${summary(st.done[e].map((v) => ({ kg: 0, reps: v })), tOf(e))}</span></div>`).join('')}</div>
       <button class="primary" data-r="close">Fine · salvato</button>`;
     circSave(runId);
   }
@@ -1050,7 +1062,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const ex = ui.list[k], e = EX[ex] || { n: ex, m: '' };
     const pg = pageOf(ex);
     const piano = sch && sch.piano ? sch.piano[ex] : null;
-    const t = unit(e);
+    const t = tOf(ex, sch);
     const done = todayDoc(ex);
     const saved = !!done && !pg.editing;
     if (!pg.sets) pg.sets = copy(done ? done.sets : (lastTime(ex) || { sets: primaVolta(piano) }).sets);
@@ -1228,7 +1240,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <input id="wo-q" class="plain wo-search" placeholder="Cerca un esercizio" value="${esc(ui.q)}" autocomplete="off">
       <div class="wo-groups"><button class="${ui.g ? '' : 'on'}" data-a="g:">Tutti</button>${groups.map((g) => `<button class="${ui.g === g ? 'on' : ''}" data-a="g:${esc(g)}">${esc(g)}</button>`).join('')}</div>
       <section class="card wo-list">${list.map((e) => {
-        const l = lastTime(e.id);
+        const l = lastTime(e.id, unit(e));
         return `<button class="wo-row" data-a="pick:${e.id}"><span><b>${esc(e.n)}</b><small>${esc(e.g)} · ${esc(e.m)}${l ? ` · ${summary(l.sets, unit(e))}` : ''}</small></span><span class="wo-chev">›</span></button>`;
       }).join('') || '<p class="wo-empty">Nessun esercizio</p>'}</section>
       <p class="footnote">Manca un esercizio? Aggiungilo da una scheda: ✎ → + Esercizi → Nuovo esercizio.</p>`;
@@ -1328,7 +1340,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   /** Pagina Esercizio (a tutto schermo): sopra quello che vale per tutte le schede, sotto quello di questa scheda. */
   function exedView() {
     const pe = ui.exed, ed = ui.ed;
-      const e = EX[pe.ex] || { n: pe.ex }, t = unit(e), pi = ed.piano[pe.ex] || {}, { n, r } = splitPlan(pi.s);
+      const e = EX[pe.ex] || { n: pe.ex }, t = tOf(pe.ex, ed), pi = ed.piano[pe.ex] || {}, { n, r } = splitPlan(pi.s);
       const gruppi = [...new Set([...GRUPPI, e.g].filter(Boolean))];
       const cambiato = pe.t0 && pe.t0 !== t && serie.some((a) => a.ex === pe.ex);
       const body = `
@@ -1339,10 +1351,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         <input id="wo-pl-m" class="plain wo-sh-in" value="${esc(e.m || '')}" placeholder="Per esempio Kettlebell, Macchina, Manubri" maxlength="40" autocomplete="off">
         <div class="wo-lbl">Gruppo</div>
         <div class="wo-groups wrap">${gruppi.map((g) => `<button class="${e.g === g ? 'on' : ''}" data-a="plg:${esc(g)}">${esc(g)}</button>`).join('')}</div>
+        <div class="wo-part loc">In questa scheda</div>
         <div class="wo-lbl">Come si segna</div>
         <div class="wo-sh-seg">${TIPI.map(([k, l]) => `<button class="${t === k ? 'on' : ''}" data-a="plt:${k}">${l}</button>`).join('')}</div>
-        ${cambiato ? `<p class="wo-warn">Prima era "${TIPI.find(([k]) => k === pe.t0)[1]}": le serie già fatte restano come erano, da ora si segna in questo modo. Vale in tutte le schede.</p>` : ''}
-        ${pe.back ? '' : `<div class="wo-part loc">In questa scheda</div>
+        ${cambiato ? `<p class="wo-warn">Prima era "${TIPI.find(([k]) => k === pe.t0)[1]}": le serie già fatte restano come erano, da ora in questa scheda si segna in questo modo.</p>` : ''}
+        ${pe.back ? '' : `
         <div class="wo-sh-step"><span class="wo-lbl">Serie</span><span class="wo-pm"><button data-a="pln-" aria-label="Una serie in meno">−</button><b>${n}</b><button data-a="pln+" aria-label="Una serie in più">+</button></span></div>
         <div class="wo-lbl">${t === 'sec' ? 'Durata' : t === 'm' ? 'Metri o minuti' : 'Ripetizioni'}</div>
         <div class="wo-sh-seg">${REPS[t].map((v) => `<button class="${v === r ? 'on' : ''}" data-a="plr:${esc(v)}">${esc(v)}</button>`).join('')}</div>
@@ -1368,7 +1381,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
              <div class="wo-sh-step"><span class="wo-lbl">Recupero tra i giri</span><span class="wo-pm"><button data-a="csr-" aria-label="15 secondi in meno">−</button><b>${mmss(c.rec)}${c.rec < 60 ? '"' : ''}</b><button data-a="csr+" aria-label="15 secondi in più">+</button></span></div>
              <div class="wo-sh-step"><span class="wo-lbl">Pausa tra gli esercizi</span><span class="wo-pm"><button data-a="csp-" aria-label="5 secondi in meno">−</button><b>${c.pausa ? `${c.pausa}"` : 'no'}</b><button data-a="csp+" aria-label="5 secondi in più">+</button></span></div>`}
         <div class="wo-lbl">Esercizi · ${c.lista ? 'ripetizioni' : 'ripetizioni o secondi per giro'}</div>
-        <div class="wo-sh-exs">${c.ex.map((e) => `<div class="wo-sh-ex"><button class="wo-sh-exn" data-a="csex:${e}">${esc((EX[e] || { n: e }).n)}</button><input data-csv="${e}" class="plain" value="${esc((ed.piano[e] || {}).s || '')}" placeholder="${unit(EX[e]) === 'sec' ? '30&quot;' : '10'}" maxlength="20" aria-label="${esc((EX[e] || { n: e }).n)}" autocomplete="off"><button class="wo-ed-x" data-a="csrm:${e}" aria-label="Togli">×</button></div>`).join('')}</div>
+        <div class="wo-sh-exs">${c.ex.map((e) => `<div class="wo-sh-ex"><button class="wo-sh-exn" data-a="csex:${e}">${esc((EX[e] || { n: e }).n)}</button><input data-csv="${e}" class="plain" value="${esc((ed.piano[e] || {}).s || '')}" placeholder="${tOf(e, ed) === 'sec' ? '30&quot;' : '10'}" maxlength="20" aria-label="${esc((EX[e] || { n: e }).n)}" autocomplete="off"><button class="wo-ed-x" data-a="csrm:${e}" aria-label="Togli">×</button></div>`).join('')}</div>
         <button class="link-button" data-a="csadd">+ Aggiungi esercizi al circuito</button>
       <button class="primary wo-exed-ok" data-a="back">Fatto</button>`;
   }
@@ -1489,20 +1502,23 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     else if (cmd === 'edplan') {
       const id = ed.ex[Number(arg)];
       if (id[0] === '@') Object.assign(ui, { cired: { cid: id.slice(1) }, view: 'cired' });
-      else Object.assign(ui, { exed: { ex: id, t0: unit(EX[id]) }, view: 'exed' });
+      else Object.assign(ui, { exed: { ex: id, t0: tOf(id, ed) }, view: 'exed' });
     } else if (cmd === 'shclose') ui.sheet = sh && sh.back ? sh.back : null; // dal circuito si torna al circuito
     else if (cmd === 'plg') saveCat(pe.ex, { g: arg });
-    else if (cmd === 'plt') saveCat(pe.ex, { t: arg });
+    else if (cmd === 'plt') { // come si segna: solo in questa scheda (se è come nel catalogo non serve scriverlo)
+      if (arg === unit(EX[pe.ex])) delete pi().t;
+      else pi().t = arg;
+    }
     else if (cmd === 'csp-' || cmd === 'csp+') {
       const p = Math.max(0, Math.min(60, (circ().pausa || 0) + (cmd === 'csp+' ? 5 : -5)));
       if (p) circ().pausa = p;
       else delete circ().pausa;
-    } else if (cmd === 'csex') Object.assign(ui, { exed: { ex: arg, t0: unit(EX[arg]), back: ui.cired }, view: 'exed' });
+    } else if (cmd === 'csex') Object.assign(ui, { exed: { ex: arg, t0: tOf(arg, ed), back: ui.cired }, view: 'exed' });
     else if (cmd === 'nbk') ui.sheet = { kind: 'newblock', lista: arg === 'lista' };
     else if (cmd === 'nbgo') { const l = sh.lista; ui.sheet = null; openPick(l ? 'listanew' : 'circnew'); }
     else if (cmd === 'pln-' || cmd === 'pln+') {
       const p = splitPlan(pi().s);
-      pi().s = joinPlan(Math.max(1, Math.min(10, p.n + (cmd === 'pln+' ? 1 : -1))), p.r || (unit(EX[pe.ex]) === 'sec' ? '30"' : '10'));
+      pi().s = joinPlan(Math.max(1, Math.min(10, p.n + (cmd === 'pln+' ? 1 : -1))), p.r || (tOf(pe.ex, ed) === 'sec' ? '30"' : '10'));
     } else if (cmd === 'plr') pi().s = joinPlan(splitPlan(pi().s).n, arg);
     else if (cmd === 'csg-' || cmd === 'csg+') circ().giri = Math.max(1, Math.min(8, circ().giri + (cmd === 'csg+' ? 1 : -1)));
     else if (cmd === 'csr-' || cmd === 'csr+') circ().rec = Math.max(15, Math.min(300, circ().rec + (cmd === 'csr+' ? 15 : -15)));
@@ -1772,8 +1788,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (cmd === 'fromlib') {
       const lib = liberiOggi(), piano = {};
       lib.forEach((a) => {
-        const r = a.sets[0].reps, t = unit(EX[a.ex]);
-        piano[a.ex] = { s: joinPlan(a.sets.length, t === 'sec' ? `${r}"` : String(r)) };
+        const r = a.sets[0].reps, t = a.t || unit(EX[a.ex]);
+        piano[a.ex] = { s: joinPlan(a.sets.length, t === 'sec' ? `${r}"` : String(r)), ...(t !== unit(EX[a.ex]) ? { t } : {}) };
       });
       openEditor({ name: '', ex: lib.map((a) => a.ex), piano }, true);
       return draw();
@@ -1818,12 +1834,12 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'o') {
       const k = Number(arg);
       P().open = P().open === k ? -1 : k;
-      if (unit(EX[ui.list[ui.i]]) === 'sec' && !tmr.end) tmr = { ...tmr, ex: ui.list[ui.i], j: k };
+      if (tOf(ui.list[ui.i]) === 'sec' && !tmr.end) tmr = { ...tmr, ex: ui.list[ui.i], j: k };
     } else if (/^[kr][+-]$/.test(cmd)) {
       const k = Number(arg), d = cmd[1] === '+' ? 1 : -1, sets = P().sets;
       if (cmd[0] === 'k') setKg(k, nextKg(sets[k].kg, d));
       else {
-        const t = unit(EX[ui.list[ui.i]]), step = uStep(t);
+        const t = tOf(ui.list[ui.i]), step = uStep(t);
         sets[k].reps = Math.max(step, Math.min(t === 'm' ? 20000 : 600, sets[k].reps + step * d));
       }
     } else if (cmd === 'mob' || cmd === 'moball') {
@@ -1841,7 +1857,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const st = P().circ;
       if (st) st.giri = Math.max(Math.max(1, st.cur), Math.min(8, st.giri + (cmd === 'cg+' ? 1 : -1)));
     } else if (cmd === 'cv-' || cmd === 'cv+') {
-      const st = P().circ, step = unit(EX[arg]) === 'sec' ? 5 : 1;
+      const st = P().circ, step = tOf(arg) === 'sec' ? 5 : 1;
       if (st) st.vals[arg] = Math.max(step, Math.min(600, st.vals[arg] + (cmd === 'cv+' ? step : -step)));
     } else if (cmd === 'cgiro') {
       const id = ui.list[ui.i];
@@ -1899,7 +1915,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (pg.open < 0 || !pg.sets) return;
     const v = Number(ev.target.value.replace(',', '.'));
     if (f === 'k') setKg(pg.open, v);
-    else if (v >= 1 && v <= (unit(EX[ui.list[ui.i]]) === 'm' ? 20000 : 600)) pg.sets[pg.open].reps = Math.round(v);
+    else if (v >= 1 && v <= (tOf(ui.list[ui.i]) === 'm' ? 20000 : 600)) pg.sets[pg.open].reps = Math.round(v);
     else return;
     draw();
   });
