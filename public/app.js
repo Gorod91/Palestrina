@@ -5,7 +5,7 @@ import { fakeState, fakeChat, fakePhoto } from './fake.js';
 import { createFbData } from './fbdata.js';
 import { makeZip } from './zip.js';
 import { createWorkout } from './allenamento.js';
-import { alF } from './genere.js';
+import { alF, kingTitle } from './genere.js';
 import { initSheetDrag } from './sheetdrag.js';
 import { showSudoReveal } from './sudoreveal.js';
 
@@ -392,6 +392,7 @@ function debugOn() {
 function render() {
   if (!state) return;
   const { me, week } = state;
+  showcase();
 
   const btn = $('btn-checkin');
   btn.disabled = me.checkedInToday;
@@ -1270,8 +1271,19 @@ async function enableNotifications() {
 
 function openNews(id) {
   if (!/^[\w-]+$/.test(String(id))) return;
-  $('news-frame').src = `news/${id}.html`;
+  // Novità di fine mese: davanti alle slide, l'incoronazione del Re di quel mese
+  const n = ((state && state.news) || []).find((x) => x.id === id);
+  const re = n && ((state && state.albo) || []).find((a) => a.key === n.month);
+  const q = re ? `?${new URLSearchParams({ re: (re.displays || re.names).join(' e '), titolo: kingTitle(re.names, isF), mese: re.label.split(' ')[0], punti: re.total })}` : '';
+  $('news-frame').src = `news/${id}.html${q}`;
   $('news').hidden = false;
+}
+/** Appena si apre l'app dopo il rilascio di fine mese: Re e novità a tutto schermo, una volta sola (poi dalla chat). */
+function showcase() {
+  const id = state && state.showcase;
+  if (!id || store.get('showcaseSeen') === id || !$('news').hidden) return;
+  store.set('showcaseSeen', id);
+  openNews(id);
 }
 function closeNews() {
   $('news').hidden = true;

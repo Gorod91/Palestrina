@@ -68,7 +68,7 @@
   .swap { display: flex; align-items: center; justify-content: center; gap: 22px; margin: 40px 0 34px; }
   .tabi { display: grid; justify-items: center; gap: 8px; font-size: 15px; font-weight: 700; color: var(--muted); }
   .tabi svg { width: 76px; height: 76px; }
-  .tabi.new { color: var(--lime); } .tabi.new svg { filter: drop-shadow(0 0 24px #a6ff0088); }
+  .tabi.new { color: var(--fg); } .tabi.new svg { filter: drop-shadow(0 0 22px #fa114f66); }
   .arrow { font-size: 40px; color: var(--muted); }
   .slide.on .tabi.old { animation: rise .8s cubic-bezier(.2, .8, .2, 1) .6s both, fade 1s ease 2.2s forwards; }
   @keyframes fade { to { opacity: .35; transform: scale(.85); } }
@@ -107,7 +107,7 @@
 
   <section class="slide">
     <p class="eyebrow" data-a style="--d:0">Apripista</p>
-    <h2 data-a style="--d:.1">Chiedete per primi.<br>Poi andate.</h2>
+    <h2 data-a style="--d:.1">Chi chiede per primo<br>prende 3 punti.</h2>
     <div class="scene">
       <p class="bubble" data-a style="--d:.7;--anim:left"><small>Voi</small>Chi va in palestra giovedì?</p>
       <p class="check" data-a style="--d:1.5;--anim:right"><span>✓</span>Giovedì · check-in alle 18:30</p>
@@ -123,7 +123,7 @@
     <div class="swap">
       <p class="tabi old"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13.5" r="8"/><path d="M12 13.5V9M9.5 2.5h5M19 6l1.5-1.5"/></svg>Timer</p>
       <p class="arrow" data-a style="--d:1.4">→</p>
-      <p class="tabi new" data-a style="--d:1.9;--anim:pop"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="2" y="11" width="20" height="2" rx="1"/><rect x="6.3" y="5" width="2.6" height="14" rx="1.3"/><rect x="15.1" y="5" width="2.6" height="14" rx="1.3"/><rect x="3.7" y="7.5" width="2" height="9" rx="1"/><rect x="18.3" y="7.5" width="2" height="9" rx="1"/><rect x="1.3" y="9.5" width="1.6" height="5" rx=".8"/><rect x="21.1" y="9.5" width="1.6" height="5" rx=".8"/></svg>Allenamento</p>
+      <p class="tabi new" data-a style="--d:1.9;--anim:pop"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="11" width="20" height="2" rx="1" fill="#c7c7cc"/><rect x="6.3" y="5" width="2.6" height="14" rx="1.3" fill="#fa114f"/><rect x="15.1" y="5" width="2.6" height="14" rx="1.3" fill="#fa114f"/><rect x="3.7" y="7.5" width="2" height="9" rx="1" fill="#a6ff00"/><rect x="18.3" y="7.5" width="2" height="9" rx="1" fill="#a6ff00"/><rect x="1.3" y="9.5" width="1.6" height="5" rx=".8" fill="#00d9ff"/><rect x="21.1" y="9.5" width="1.6" height="5" rx=".8" fill="#00d9ff"/></svg>Allenamento</p>
     </div>
     <p class="lead" data-a style="--d:2.6">Le vostre schede sempre in tasca. Il timer c'è ancora, ora sta lì dentro.</p>
   </section>
@@ -173,6 +173,8 @@
 
 <script type="module">
   import { bodySvg } from '../corpo.js';
+  import { kingSlide } from './re.js';
+  kingSlide(); // prima di tutto, l'incoronazione del Re di ottobre (quando la apre l'app)
   // muscoli disegnati come nella scelta degli esercizi
   document.getElementById('tiles').innerHTML = ['Petto', 'Schiena', 'Gambe'].map((g, k) => `<div data-a style="--d:${0.7 + k * 0.25};--anim:pop">${bodySvg(g, { crop: true })}${g}</div>`).join('');
   const slides = [...document.querySelectorAll('.slide')];

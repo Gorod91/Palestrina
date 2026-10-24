@@ -297,22 +297,46 @@ function computeRecap(from, to) {
   };
 }
 
-/** Ogni sera alle 21: se domani è il primo del mese, premiazioni del mese e Re del mese. */
+/** Ogni sera verso le 21 (di riserva: di solito ci pensa monthEndTick alle 21 in punto). */
 function eveningCheck() {
   try {
     releaseDueNews();
-    const today = dayString(new Date());
-    if (addDays(today, 1).slice(8) !== '01') return;
-    sendMonthlyRecap();
-    releaseNews(today.slice(0, 7)); // le novità si sbloccano subito dopo l'incoronazione del Re
+    monthEnd();
   } finally {
     pushChatIfChanged(); // eventi nuovi in chat: subito anche su Firebase
   }
 }
 
+/** L'ultimo giorno del mese dalle 21: premiazioni, Re del mese e novità, tutto insieme (una volta sola). */
+function monthEnd() {
+  const today = dayString(new Date());
+  if (addDays(today, 1).slice(8) !== '01') return;
+  sendMonthlyRecap();
+  releaseNews(today.slice(0, 7));
+}
+
+/** Ogni minuto (da codaTick): alle 21 in punto dell'ultimo giorno del mese fa partire monthEnd. */
+function monthEndTick() {
+  const now = new Date();
+  const today = dayString(now);
+  if (addDays(today, 1).slice(8) !== '01' || Number(Utilities.formatDate(now, TZ, 'H')) < 21) return;
+  const last = safeJson(props.getProperty('LAST_MONTHLY') || '{}') || {};
+  if (last.key === today.slice(0, 7) && NEWS.every((n) => n.month !== today.slice(0, 7) || releasedNews().includes(n.id))) return;
+  const lock = scriptLock();
+  if (!lock.tryLock(20000)) return;
+  try {
+    PROPS_SNAP = null; // dentro il lock: proprietà aggiornate (eveningCheck potrebbe averlo appena fatto)
+    forget('news');
+    monthEnd();
+    pushChatIfChanged();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // ---------- Novità dormienti ----------
 // Una novità resta invisibile finché non viene rilasciata: l'ultimo giorno di `month`, subito dopo le premiazioni
-// del mese (eveningCheck, verso le 21:05), con le slide in chat (public/news/<id>.html) e una notifica a tutti.
+// del mese (alle 21 in punto, monthEndTick), con le slide in chat (public/news/<id>.html) e una notifica a tutti.
 // I punti nuovi contano dal giorno `from`. In modalità prova si rilascia in anticipo e contano da subito.
 // Una novità con `at` (data e ora con il fuso) invece esce a quell'ora precisa, senza aspettare la fine del mese.
 const NEWS = [
@@ -1088,6 +1112,10 @@ function sharedState() {
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
+    // Novità di fine mese già uscite (per la slide del Re davanti alle loro slide) e quella da mostrare
+    // a tutti appena aprono l'app, nella prima settimana del mese nuovo
+    news: NEWS.filter((n) => n.month && releasedNews().includes(n.id)).map((n) => ({ id: n.id, month: n.month })),
+    showcase: (NEWS.filter((n) => n.month && n.from && releasedNews().includes(n.id) && today <= addDays(n.from, 6)).pop() || {}).id || '',
     // Per il pallino dei messaggi non letti: orario e autore dei messaggi recenti.
     chatMeta: chatRows()
       .filter((r) => r.type === 'msg' || r.type === 'poll' || r.type === 'event')
@@ -3560,6 +3588,11 @@ function passaggioTick() {
 
 /** Ogni minuto: azioni rimaste in coda (avviso perso) e stato del nuovo giorno. */
 function codaTick() {
+  try {
+    monthEndTick();
+  } catch (err) {
+    console.error('Fine mese non eseguita', err);
+  }
   try {
     passaggioTick();
   } catch (err) {
