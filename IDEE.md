@@ -9,6 +9,10 @@ Cose di cui abbiamo parlato ma che non sono ancora nell'app.
 - **Tasto del recupero più grande e più curato**: oggi è una riga piccola sotto "Fatto" (anello, "Recupero", − 1:30 ▸ +); da ingrandire, più facile da toccare con le mani sudate, e da rendere più bello (prima un prototipo).
 - **Salvare ogni modifica durante l'allenamento, anche prima di "Fatto"**: oggi chili e ripetizioni cambiati restano solo in memoria finché non si tocca "Fatto"; se nel frattempo si chiude l'app si perdono. Da salvare subito (sul telefono e poi su Firebase) e ritrovarli riaprendo.
 
+## Sudometro: da fare (segnato il 25/10)
+
+- **Confermare il selfie prima di usarlo**: dopo lo scatto, sia della foto di riferimento sia del selfie da sudato, mostrare la foto con "Usa questa" e "Rifai". Solo dopo "Usa questa" si calcola il punteggio (o si salva il riferimento); con "Rifai" si torna alla fotocamera.
+
 ## Sfide: fatte (novità di novembre 2026)
 
 In futuro: rivedere/ampliare l'elenco delle sfide (oggi Plank, Barchetta, Addominali, Squat, Affondi).
