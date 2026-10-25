@@ -889,7 +889,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return `<section class="wo-page" data-k="${k}">${head}
       <div class="wo-rounds"><button data-a="cg-" aria-label="Un giro in meno">−</button>${rounds}<button data-a="cg+" aria-label="Un giro in più">+</button></div>
       <div class="wo-cexs">${rows}</div>
-      <div class="wo-crec"><span>Recupero tra i giri</span><button data-a="crec-:${id}" aria-label="15 secondi in meno">−</button><b>${mmss(circRec(id, c))}${circRec(id, c) < 60 ? '"' : ''}</b><button data-a="crec+:${id}" aria-label="15 secondi in più">+</button></div>
+      <div class="wo-cex wo-crec"><svg class="wo-fig sm" viewBox="-4 -2 32 28" aria-hidden="true"><use href="#i-timer"/></svg><div class="wo-cname"><b>Recupero tra i giri</b><small>vale per questo circuito</small></div>
+        <span class="wo-pm"><button data-a="crec-:${id}" aria-label="15 secondi in meno">−</button><label class="wo-in"><input data-f="crec:${id}" inputmode="numeric" value="${circRec(id, c)}" aria-label="Recupero tra i giri in secondi, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>s</em></label><button data-a="crec+:${id}" aria-label="15 secondi in più">+</button></span></div>
       <button class="primary" data-a="cgiro">✓ Giro ${st.cur + 1} fatto</button>
       <button class="secondary wo-crun" data-a="crun">▶ Avvia circuito guidato</button>
       ${st.cur ? `<button class="link-button" data-a="csave">Salva con ${st.cur} ${st.cur === 1 ? 'giro' : 'giri'}</button>` : ''}
@@ -2064,6 +2065,12 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (!f || !page) return;
     ui.i = Number(page.dataset.k);
     const pg = P();
+    if (f.startsWith('crec:')) { // recupero tra i giri scritto a mano, in secondi
+      const v = Math.round(Number(ev.target.value.replace(',', '.'))), id = f.slice(5);
+      if (v >= 15 && v <= 300) recMap[id] = v;
+      writeDoc();
+      return draw();
+    }
     if (f.startsWith('c:')) { // valore di un esercizio del circuito
       const v = Math.round(Number(ev.target.value.replace(',', '.')));
       if (pg.circ && v >= 1 && v <= 600) pg.circ.vals[f.slice(2)] = v;
