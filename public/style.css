@@ -685,7 +685,7 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .wo-rest.on { outline: 2px solid rgba(0, 217, 255, .6); outline-offset: -2px; }
 .wo-rest.end { outline: 1.5px solid var(--exercise); outline-offset: -1.5px; }
 /* recupero: anello grande come il timer addominali, facile da toccare con le mani sudate */
-.wo-rest .wo-dial { width: min(152px, 42vw); border: 0; padding: 0; align-content: center; gap: 1px; font: inherit; }
+.wo-rest .wo-dial { grid-column: 2; width: min(152px, 42vw); border: 0; padding: 0; align-content: center; gap: 1px; font: inherit; }
 .wo-rest small { color: var(--stand); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
 .wo-rest b { font-size: 42px; line-height: 1.05; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .wo-rest em { font-style: normal; color: var(--muted); font-size: 12px; }
