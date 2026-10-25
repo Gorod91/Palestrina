@@ -1740,7 +1740,10 @@ window.addEventListener('offline', () => trace.log('rete', 'offline'));
 // Tastiera aperta: su iOS 26 con la tastiera si accorcia anche la finestra, quindi non basta confrontare
 // l'area visibile con innerHeight. Vale anche "c'è un campo di testo attivo" e il confronto con l'altezza
 // massima vista; la barra dei tab resta nascosta dietro la tastiera invece di salire sopra.
+// L'altezza massima vale per la larghezza attuale: girando il telefono si riparte, se no in orizzontale
+// l'app crede che la tastiera sia aperta e torna in verticale spostata (i tocchi finiscono più in basso).
 let fullHeight = 0;
+let fullWidth = 0;
 const TEXT_TYPES = ['text', 'search', 'number', 'email', 'tel', 'url', 'password'];
 function typingNow() {
   const a = document.activeElement;
@@ -1749,6 +1752,7 @@ function typingNow() {
 function fitViewport() {
   const vv = window.visualViewport;
   if (!vv) return;
+  if (window.innerWidth !== fullWidth) { fullWidth = window.innerWidth; fullHeight = 0; }
   if (!typingNow()) fullHeight = Math.max(fullHeight, window.innerHeight, Math.round(vv.height));
   const keyboard = typingNow() || vv.height < Math.max(window.innerHeight, fullHeight) - 120;
   document.documentElement.style.setProperty('--app-h', `${Math.round(vv.height)}px`);
@@ -1764,6 +1768,16 @@ if (window.visualViewport) {
   document.addEventListener('focusin', fitViewport);
   document.addEventListener('focusout', () => setTimeout(fitViewport, 60));
 }
+// Dopo una rotazione iPhone può lasciare la pagina scorsa di qualche pixel: si vede giusta ma i tocchi
+// arrivano spostati. Finita la rotazione si rimette la pagina a posto (lo scorrimento dei contenuti resta).
+function afterRotate() {
+  if (typingNow()) return;
+  fitViewport();
+  window.scrollTo(0, 0);
+  document.documentElement.scrollTop = document.body.scrollTop = 0;
+}
+window.addEventListener('orientationchange', () => [100, 400, 800].forEach((t) => setTimeout(afterRotate, t)));
+if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(afterRotate, 400));
 $('chat-input').addEventListener('focus', () => {
   setTimeout(() => ($('scroller').scrollTop = $('scroller').scrollHeight), 350);
 });
