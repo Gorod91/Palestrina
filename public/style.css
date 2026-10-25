@@ -15,6 +15,7 @@
   --stand-2: #64ecff;
   --ok: #30d158;
   --danger: #ff453a;
+  --down: #ff9f0a;
 }
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -1061,3 +1062,56 @@ html.ios.standalone .sr { top: var(--ios-top, 0px); }
 @keyframes sr-shake { 0% { transform: translate(0, 0); } 25% { transform: translate(-1.5px, 1px); } 50% { transform: translate(1.5px, -1px); } 75% { transform: translate(-1px, -1px); } 100% { transform: translate(0, 0); } }
 @keyframes sr-pop { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
 @keyframes sr-flash { 0% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Progressi: riquadro nella pagina dell'esercizio, grafico dell'esercizio e "I tuoi progressi" */
+.wo-pcard { display: grid; gap: 8px; width: 100%; margin-top: 12px; padding: 12px 16px; border: 0; color: var(--fg); text-align: left; font: inherit; }
+.wo-pcard-h { display: flex; justify-content: space-between; }
+.wo-pcard-h small { font-size: 13px; color: var(--muted); }
+.wo-pcard-h small:first-child { font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.wo-pcard-b { display: flex; align-items: flex-end; gap: 14px; }
+.wo-pcard-b > span { display: grid; gap: 2px; flex: none; }
+.wo-pcard-b b { font-size: 26px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.wo-pcard-b small { font-size: 13px; color: var(--muted); }
+.wo-pcard-b svg { flex: 1; min-width: 0; height: 56px; }
+.wo-ptitle { margin: 0 0 12px; font-size: 30px; font-weight: 800; letter-spacing: -.02em; }
+.wo-seg { display: flex; gap: 4px; padding: 3px; margin-bottom: 14px; border-radius: 12px; background: var(--card); }
+.wo-seg button { flex: 1; height: 36px; border: 0; border-radius: 9px; background: none; color: var(--muted); font: inherit; font-size: 15px; font-weight: 700; }
+.wo-seg button.on { background: #3a3a3c; color: var(--fg); }
+.wo-phero { display: grid; gap: 2px; margin-bottom: 12px; }
+.wo-phero b { font-size: 40px; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.wo-phero small { font-size: 15px; color: var(--muted); }
+.wo-chart { display: grid; gap: 6px; padding: 12px 10px 8px; }
+.wo-chart svg { width: 100%; height: auto; display: block; }
+.wo-chart text { font-size: 11px; fill: var(--muted); font-family: inherit; }
+.wo-ch-grid { stroke: var(--card-2); stroke-width: 1; }
+.wo-ch-sel { stroke: #636366; stroke-width: 1; stroke-dasharray: 3 3; }
+.wo-chips { display: flex; gap: 8px; margin: 12px 0 4px; }
+.wo-chips-s { overflow-x: auto; margin: 4px -16px 12px; padding: 0 16px; scrollbar-width: none; }
+.wo-chips-s::-webkit-scrollbar { display: none; }
+.wo-chips button { flex: none; height: 36px; padding: 0 16px; border: 0; border-radius: 99px; background: var(--card); color: var(--muted); font: inherit; font-size: 14px; font-weight: 700; white-space: nowrap; }
+.wo-chips button.on { background: var(--fg); color: #000; }
+.wo-prow2 { display: flex; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--line); font-size: 16px; }
+.wo-prow2:last-child { border-bottom: 0; }
+.wo-prow2 span { color: #d1d1d6; }
+.wo-prow2 b { font-weight: 600; font-variant-numeric: tabular-nums; text-align: right; }
+.wo-prog { grid-template-columns: 1fr 84px auto; }
+.wo-prog > span:first-child { grid-column: auto !important; min-width: 0; }
+.wo-prog small { font-variant-numeric: tabular-nums; }
+.wo-prog svg { width: 84px; height: 30px; }
+.wo-delta { min-width: 58px; padding: 5px 8px; border-radius: 99px; background: var(--card-2); color: var(--muted); font-size: 13px; font-weight: 800; text-align: center; font-variant-numeric: tabular-nums; }
+.wo-delta.up { background: rgba(166, 255, 0, .14); color: var(--exercise); }
+.wo-delta.down { background: rgba(255, 159, 10, .16); color: var(--down); }
+.wo-prog-ic { color: var(--exercise); }
+.wo-pnote { margin: 8px 4px 14px; font-size: 13px; line-height: 1.4; }
+
+.wo-tip { display: grid; gap: 1px; margin: 0 6px 2px; min-height: 44px; }
+.wo-tip b { font-size: 22px; font-weight: 800; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.wo-tip span { font-size: 14px; font-weight: 600; color: #d1d1d6; font-variant-numeric: tabular-nums; }
+#wo-ch { touch-action: pan-y; cursor: crosshair; user-select: none; -webkit-user-select: none; }
+.wo-ch-hint { margin: 0 6px; font-size: 12px; color: var(--muted); }
+.wo-ch-lab rect { fill: var(--fg); }
+.wo-chart .wo-ch-lab text { text-anchor: middle; fill: #000; }
+.wo-chart .wo-ch-lab .v { font-size: 13px; font-weight: 800; }
+.wo-chart .wo-ch-lab .d { font-size: 10px; font-weight: 600; fill: #3a3a3c; }
+.wo-ptitle2 { margin-bottom: 2px; }
+.wo-pex { margin: 0 0 12px; font-size: 17px; font-weight: 600; color: #d1d1d6; }

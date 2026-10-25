@@ -375,7 +375,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   // cosa si vede: lista, esercizio, catalogo (allenamento libero)
   // pg: pagina della scelta esercizi ('m:Petto' muscolo, 'f:Cardio' famiglia di attrezzi, 'a' tutti; '' la prima), pf: filtro lì dentro
   // ed: scheda in modifica; pickFor: il catalogo sceglie esercizi per la scheda ('edit'), un circuito nuovo ('circnew') o uno esistente ('circ:id')
-  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', pg: '', pf: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '', rotSheet: false, exed: null, cired: null };
+  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', pg: '', pf: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '', rotSheet: false, exed: null, cired: null, prog: null, progF: '' };
   let restEnd = 0;
   let restTotal = REST; // secondi del recupero in corso
   let serieSig = '';
@@ -545,7 +545,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   // Indietro trascinando dal bordo sinistro, come in Safari (dalla Home iOS non lo fa da solo):
   // la pagina segue il dito e sotto compare quella prima; oltre metà schermo o con uno scatto si torna lì.
-  const backView = () => (ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor && !ui.pickFor.startsWith('circ:') ? 'edit' : ui.view === 'newex' ? 'pick' : ui.view === 'prev' ? 'copy' : ui.view === 'exed' ? (ui.exed && ui.exed.back ? 'cired' : 'edit') : ui.view === 'cired' ? 'edit' : ui.view === 'pick' && ui.cired ? 'cired' : 'list');
+  const backView = () => (ui.view === 'prog' ? ui.prog.back : ui.view === 'progall' ? 'list' : ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor && !ui.pickFor.startsWith('circ:') ? 'edit' : ui.view === 'newex' ? 'pick' : ui.view === 'prev' ? 'copy' : ui.view === 'exed' ? (ui.exed && ui.exed.back ? 'cired' : 'edit') : ui.view === 'cired' ? 'edit' : ui.view === 'pick' && ui.cired ? 'cired' : 'list');
   function goBack(anim = 'wo-pop') {
     navAnim = anim ? 'wo-pop' : '';
     if (ui.view === 'pick' && ui.pg && !ui.q.trim()) { // da un muscolo o una famiglia: alla prima pagina della scelta
@@ -561,7 +561,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     ui.view = v;
   }
   function viewHtml(v) {
-    return v === 'ex' ? exView() : v === 'pick' ? pickView() : v === 'edit' ? editView() : v === 'newex' ? newExView() : v === 'copy' ? copyView() : v === 'prev' ? prevView() : v === 'exed' ? exedView() : v === 'cired' ? ciredView() : listView();
+    return v === 'ex' ? exView() : v === 'pick' ? pickView() : v === 'edit' ? editView() : v === 'newex' ? newExView() : v === 'copy' ? copyView() : v === 'prev' ? prevView() : v === 'exed' ? exedView() : v === 'cired' ? ciredView() : v === 'prog' ? progView() : v === 'progall' ? progAllView() : listView();
   }
   let edge = null;
   root.addEventListener('pointerdown', (ev) => {
@@ -632,7 +632,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let navAnim = 'wo-push'; // animazione del prossimo cambio di pagina ('' dopo il trascinamento dal bordo, che si anima da solo)
   /** Profondità delle pagine: entrando più in fondo la pagina arriva da destra, tornando su da sinistra. */
   const vkey = () => (ui.view === 'pick' && ui.pg && !ui.q.trim() ? 'pick:' + ui.pg : ui.view); // muscolo o attrezzo: pagina a sé
-  const depth = (v) => (v.startsWith('pick:') ? depth('pick') + 1 : null) ?? ({ list: 0, copy: 1, edit: 1, prev: 2, cired: 2, exed: 3, newex: 3 })[v] ?? (v === 'pick' ? (ui.pickFor ? 2 : 1) : v === 'ex' ? (ui.scheda ? 1 : 2) : 1);
+  const depth = (v) => (v.startsWith('pick:') ? depth('pick') + 1 : null) ?? ({ list: 0, copy: 1, edit: 1, progall: 1, prev: 2, cired: 2, exed: 3, newex: 3, prog: 3 })[v] ?? (v === 'pick' ? (ui.pickFor ? 2 : 1) : v === 'ex' ? (ui.scheda ? 1 : 2) : 1);
   const scrollMem = {};
   function draw() {
     if (!me) return;
@@ -725,6 +725,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       ${ui.rotSheet && ri ? rotSheetHtml(ri) : ''}
       <section class="card wo-list"><button class="wo-row wo-altri" data-a="copy"><span class="wo-altri-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14.5c2.4 0 4 1.5 4.5 4"/></svg></span>`
         + `<span><b>Schede degli altri</b><small>${esc(altri().names.join(', '))} · ${altri().n} schede</small></span><span class="wo-chev">›</span></button></section>
+      ${serie.length ? `<section class="card wo-list"><button class="wo-row wo-altri" data-a="progall"><span class="wo-altri-ic wo-prog-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg></span><span><b>I tuoi progressi</b><small>${progSub()}</small></span><span class="wo-chev">›</span></button></section>` : ''}
       <div class="wo-btns"><button class="secondary" data-a="nuova">+ Nuova scheda</button><button class="secondary" data-a="libero">Allenamento libero</button></div>
       <section class="card wo-list">${timer}</section>`;
   }
@@ -1155,8 +1156,223 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <div class="wo-sets">${rows}</div>
       ${btn}
       <div class="wo-rest" data-ex="${ex}">${restHtml(ex)}</div>
+      ${progCard(ex, t)}
     </section>`;
   }
+
+  // ---------- Progressi: per ogni esercizio il peso usato (o ripetizioni e secondi) e il volume, volta per volta ----------
+  const MESI = ['gen', 'feb', 'mar', 'apr', 'mag', 'giu', 'lug', 'ago', 'set', 'ott', 'nov', 'dic'];
+  const GIORNI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+  /** "gio 23 ott": il giorno della settimana aiuta a ricordarsi l'allenamento. */
+  const dayLong = (d) => `${GIORNI[new Date(d + 'T12:00:00Z').getUTCDay()]} ${dayShort(d)}`;
+  /** "26 ago"; con l'anno se è di più di dieci mesi fa ("26 ott 2025"). */
+  const dayShort = (d) => `${Number(d.slice(8))} ${MESI[Number(d.slice(5, 7)) - 1]}${daysAgo(d) > 300 ? ' ' + d.slice(0, 4) : ''}`;
+  const PERIODI = [['mese', 31, '1 mese'], ['3mesi', 92, '3 mesi'], ['6mesi', 183, '6 mesi']];
+  /** Un valore con la sua unità: "70 kg", "75"", "20 rip". */
+  const uVal = (t, v) => (t === 'kg' ? `${kgf(v)} kg` : t === 'sec' ? `${v}"` : t === 'm' ? `${v} m` : `${v} rip`); // come nel resto dell'app
+  const sgn = (d) => (d > 0 ? '+' : d < 0 ? '−' : '');
+  const uDelta = (t, d) => (t === 'kg' ? `${sgn(d)}${kgf(Math.abs(d))} kg` : t === 'sec' ? `${sgn(d)}${Math.abs(d)}"` : t === 'm' ? `${sgn(d)}${Math.abs(d)} m` : `${sgn(d)}${Math.abs(d)} rip`);
+  /** Colore della crescita: verde se è salito, arancione se è sceso, grigio se è uguale. */
+  const trendCol = (d) => (d > 0 ? 'var(--exercise)' : d < 0 ? 'var(--down)' : 'var(--muted)');
+
+  /** Le volte in cui ho fatto un esercizio segnato in un modo (t), dalla prima: giorno, valore migliore, volume, serie. */
+  function storia(ex, t) {
+    const by = {};
+    serie.filter((s) => (s.ex === ex || UNITI[s.ex] === ex) && (s.t || unit(EX[s.ex])) === t && s.sets && s.sets.length).forEach((s) => {
+      const best = Math.max(...s.sets.map((z) => (t === 'kg' ? z.kg : z.reps)));
+      const vol = s.sets.reduce((m, z) => m + (t === 'kg' ? z.kg * z.reps : z.reps), 0);
+      const rb = Math.max(...s.sets.filter((z) => (t === 'kg' ? z.kg : z.reps) === best).map((z) => z.reps)); // ripetizioni col peso migliore
+      if (!by[s.day] || best > by[s.day].best) by[s.day] = { day: s.day, sets: s.sets, best, rb, vol };
+    });
+    return Object.values(by).sort((a, b) => (a.day < b.day ? -1 : 1));
+  }
+
+  /** Esercizi fatti almeno due volte, con la crescita dalla prima all'ultima (i più cresciuti in alto). */
+  function tuttiProgressi() {
+    const seen = {};
+    serie.forEach((s) => {
+      const ex = UNITI[s.ex] || s.ex, t = s.t || unit(EX[s.ex]);
+      seen[ex + '|' + t] = { ex, t };
+    });
+    return Object.values(seen).map(({ ex, t }) => {
+      const h = storia(ex, t);
+      if (h.length < 2) return null;
+      const first = h[0].best, last = h[h.length - 1].best;
+      return { ex, t, h, first, last, d: last - first, pct: first ? (last - first) / first : last - first };
+    }).filter(Boolean).sort((a, b) => b.pct - a.pct || alpha(EX[a.ex] || { n: a.ex }, EX[b.ex] || { n: b.ex }));
+  }
+
+  const progSub = () => {
+    const n = tuttiProgressi().length;
+    return n ? `${n} ${n === 1 ? 'esercizio' : 'esercizi'} · i grafici di ogni esercizio` : 'Il grafico arriva dopo la seconda volta';
+  };
+
+  const kgv = (v) => v.toLocaleString('it-IT'); // volume: "1.200"
+
+  /** Linea piccola: i valori da sinistra a destra nel riquadro w × h. */
+  function sparkPath(vs, w, h, pad) {
+    if (vs.length > 16) { // tante volte: il migliore di ogni gruppo, così la linea resta leggibile
+      const k = vs.length / 16;
+      vs = Array.from({ length: 16 }, (_, i) => Math.max(...vs.slice(Math.floor(i * k), Math.max(Math.floor(i * k) + 1, Math.floor((i + 1) * k)))));
+    }
+    const mn = Math.min(...vs), mx = Math.max(...vs);
+    const y = (v) => (mx === mn ? h / 2 : h - pad - (v - mn) / (mx - mn) * (h - 2 * pad));
+    const pts = vs.map((v, i) => [pad + (vs.length === 1 ? 0 : i * (w - 2 * pad) / (vs.length - 1)), y(v)]);
+    return { d: pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' '), last: pts[pts.length - 1] };
+  }
+
+  /** Riquadro "Progressi" nella pagina dell'esercizio: quanto è cresciuto e la linea; un tocco apre il grafico. */
+  function progCard(ex, t) {
+    const h = storia(ex, t);
+    if (h.length < 2) return '';
+    const vs = h.map((p) => p.best), d = vs[vs.length - 1] - vs[0], sp = sparkPath(vs, 200, 56, 6);
+    const col = trendCol(d);
+    return `<button class="card wo-pcard" data-a="prog:${esc(ex)}"><span class="wo-pcard-h"><small>Progressi</small><small>Vedi ›</small></span>
+      <span class="wo-pcard-b"><span><b style="color:${col}">${d ? uDelta(t, d) : 'uguale'}</b><small>dal ${dayShort(h[0].day)}</small></span>
+      <svg viewBox="0 0 200 56" aria-hidden="true"><path d="${sp.d}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <circle cx="${sp.last[0].toFixed(1)}" cy="${sp.last[1].toFixed(1)}" r="4.5" fill="${col}" stroke="var(--card)" stroke-width="2"/></svg></span></button>`;
+  }
+
+  /** Grafico di un esercizio: Peso o Volume (solo per quelli coi chili), ultimo mese o tutto, un tocco su un punto lo mostra. */
+  function progView() {
+    const p = ui.prog, t = p.t, e = EX[p.ex] || { n: p.ex };
+    const all = storia(p.ex, t);
+    const back = `<button class="wo-back" data-a="back">‹ ${p.back === 'progall' ? 'I tuoi progressi' : esc(e.n)}</button>`;
+    chart = null;
+    if (!all.length) return `${back}<p class="wo-empty">Ancora nessuna serie salvata</p>`;
+    const vol = t === 'kg' && p.tab === 'volume';
+    // periodi da mostrare: solo quelli con almeno due volte e meno di tutte (altrimenti sarebbero uguali a "Tutto")
+    const per = PERIODI.filter(([, n]) => { const k = all.filter((q) => daysAgo(q.day) <= n).length; return k >= 2 && k < all.length; });
+    const range = per.some(([id]) => id === p.range) ? p.range : 'tutto';
+    const days = (PERIODI.find(([id]) => id === range) || [0, Infinity])[1];
+    const data = all.filter((q) => daysAgo(q.day) <= days);
+    const val = (q) => (vol ? q.vol : q.best);
+    const first = data[0], last = data[data.length - 1];
+    const meglio = vol ? last.vol - first.vol : last.best - first.best || (t === 'kg' ? last.rb - first.rb : 0);
+    const color = vol ? 'var(--stand)' : trendCol(meglio);
+    // scala con un passo "tondo" (1, 2, 2,5, 5 × 10^k): tre o quattro righe
+    const vs = data.map(val), mn = Math.min(...vs), mx = Math.max(...vs);
+    const raw = Math.max((mx - mn) / 3, vol ? 50 : t === 'kg' ? 2.5 : t === 'sec' ? 5 : t === 'm' ? 50 : 1), pow = Math.pow(10, Math.floor(Math.log10(raw)));
+    const step = [1, 2, 2.5, 5, 10].map((k) => k * pow).find((s) => s >= raw - 1e-9);
+    const lo = Math.max(0, Math.floor(mn / step) * step - (Math.abs(mn % step) < 1e-9 ? step : 0)), hi = Math.max(lo + step, Math.ceil(mx / step) * step);
+    const X0 = 42, X1 = 336, Y0 = 186, Y1 = 14;
+    // in orizzontale il tempo vero: le pause si vedono come tratti più lunghi
+    const ms = (d) => Date.parse(d + 'T12:00:00Z'), T0 = ms(first.day), T1 = ms(last.day);
+    const xt = (d) => X0 + (T1 === T0 ? (X1 - X0) / 2 : (ms(d) - T0) / (T1 - T0) * (X1 - X0));
+    const x = (i) => xt(data[i].day);
+    const y = (v) => Y0 - (v - lo) / (hi - lo) * (Y0 - Y1);
+    const sel = Math.min(p.sel ?? data.length - 1, data.length - 1);
+    let grid = '';
+    for (let v = lo; v <= hi + 1e-9; v += step) grid += `<line x1="34" x2="344" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="wo-ch-grid"/><text x="28" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${vol ? kgv(v) : t === 'kg' ? kgf(v) : v}</text>`;
+    // mesi sotto il grafico, all'inizio di ognuno (con tanti mesi uno sì e uno no, o uno ogni tre)
+    const firsts = [first.day]; // il mese della prima volta, poi l'inizio di ogni mese dopo
+    for (let y0 = Number(first.day.slice(0, 4)), m0 = Number(first.day.slice(5, 7)); ;) {
+      if (++m0 > 12) { m0 = 1; y0++; }
+      const f = `${y0}-${String(m0).padStart(2, '0')}-01`;
+      if (ms(f) > T1) break;
+      firsts.push(f);
+    }
+    const every = firsts.length > 8 ? 3 : firsts.length > 5 ? 2 : 1;
+    const months = firsts.filter((f, j) => !(j % every) && !(j && xt(f) - xt(firsts[0]) < 22))
+      .map((f) => `<text x="${Math.min(X1 - 14, Math.max(X0 - 6, xt(f) - 6)).toFixed(1)}" y="204">${MESI[Number(f.slice(5, 7)) - 1]}</text>`).join('');
+    const line = data.map((q, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ' ' + y(val(q)).toFixed(1)).join(' ');
+    const area = data.length > 1 ? `<path d="${line} L${x(data.length - 1).toFixed(1)} ${Y0} L${X0} ${Y0} Z" fill="${color}" opacity=".12"/>` : '';
+    const dots = data.length > 24 ? '' : data.map((q, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(val(q)).toFixed(1)}" r="3.5" fill="${color}" stroke="var(--card)" stroke-width="2"/>`).join(''); // con tanti punti solo la linea
+    const sets = (q) => summary(q.sets, t);
+    // per il dito che scorre sul grafico: posizione e testo di ogni punto, senza ridisegnare la pagina
+    chart = data.map((q, i) => ({ x: x(i), y: y(val(q)), c: color, d: dayShort(q.day), b: vol ? `${kgv(q.vol)} kg` : sets(q), s: vol ? `${dayLong(q.day)} · ${sets(q)}` : dayLong(q.day) }));
+    const sp = chart[sel];
+    const ranges = per.length ? `<div class="wo-chips">${[...per, ['tutto', 0, 'Tutto']].map(([id, , l]) => `<button class="${range === id ? 'on' : ''}" data-a="prange:${id}">${l}</button>`).join('')}</div>` : '';
+    const txt = (q) => (vol ? `${kgv(q.vol)} kg` : uVal(t, q.best));
+    const tabs = t === 'kg' ? `<div class="wo-seg">${[['peso', 'Peso'], ['volume', 'Volume']].map(([id, l]) => `<button class="${(vol ? 'volume' : 'peso') === id ? 'on' : ''}" data-a="ptab:${id}">${l}</button>`).join('')}</div>` : '';
+    const recent = all.slice(-4).reverse().map((q) => `<div class="wo-prow2"><span>${dayShort(q.day)}</span><b>${sets(q)}</b></div>`).join('');
+    return `${back}
+      <h1 class="wo-ptitle wo-ptitle2">Progressi</h1>
+      <p class="wo-sub wo-pex">${esc(e.n)}</p>
+      ${tabs}
+      <section class="card wo-chart"><div class="wo-tip"><b id="wo-tip-b">${sp.b}</b><span id="wo-tip-s">${sp.s}</span></div>
+        <svg viewBox="0 0 350 210" id="wo-ch" role="img" aria-label="Grafico: da ${txt(first)} a ${txt(last)}. Scorri col dito per leggere ogni volta">
+        ${grid}${months}${area}<line id="wo-ch-sel" x1="${sp.x.toFixed(1)}" x2="${sp.x.toFixed(1)}" y1="8" y2="${Y0}" class="wo-ch-sel"/>
+        <path d="${line}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>${dots}
+        <circle id="wo-ch-dot" cx="${sp.x.toFixed(1)}" cy="${sp.y.toFixed(1)}" r="6.5" fill="${sp.c}" stroke="var(--card)" stroke-width="2"/>
+        <g id="wo-ch-lab" class="wo-ch-lab" visibility="hidden"><rect rx="8" height="34"/><text class="v" y="15"></text><text class="d" y="28"></text></g></svg>
+        <small class="wo-ch-hint">Scorri col dito sul grafico</small></section>
+      ${ranges}
+      ${vol ? '<p class="wo-sub wo-pnote">Volume: tutti i chili sollevati in quell\'allenamento (chili × ripetizioni di ogni serie).</p>' : ''}
+      <h2 class="section">Ultime volte</h2>
+      <section class="card wo-list">${recent}</section>`;
+  }
+
+  // Dito sul grafico: il punto più vicino diventa quello scelto, il riquadro sopra dice giorno, serie e chili
+  let chart = null, scrub = false;
+  function chartAt(ev) {
+    const svg = root.querySelector('#wo-ch');
+    if (!svg || !chart) return;
+    const r = svg.getBoundingClientRect(), vx = (ev.clientX - r.left) / r.width * 350;
+    let k = 0;
+    chart.forEach((c, i) => { if (Math.abs(c.x - vx) < Math.abs(chart[k].x - vx)) k = i; });
+    const c = chart[k];
+    labelAt(c);
+    if (ui.prog.sel === k) return;
+    ui.prog.sel = k;
+    root.querySelector('#wo-tip-b').textContent = c.b;
+    root.querySelector('#wo-tip-s').textContent = c.s;
+    const ln = root.querySelector('#wo-ch-sel'), dot = root.querySelector('#wo-ch-dot');
+    ln.setAttribute('x1', c.x.toFixed(1));
+    ln.setAttribute('x2', c.x.toFixed(1));
+    dot.setAttribute('cx', c.x.toFixed(1));
+    dot.setAttribute('cy', c.y.toFixed(1));
+    dot.setAttribute('fill', c.c);
+  }
+  root.addEventListener('pointerdown', (ev) => {
+    if (!ev.target.closest('#wo-ch')) return;
+    scrub = true;
+    chartAt(ev);
+  });
+  /** Etichetta sopra il punto mentre il dito trascina (sotto se il punto è troppo in alto), dentro il grafico. */
+  function labelAt(c) {
+    const g = root.querySelector('#wo-ch-lab');
+    if (!g) return;
+    const [v, d] = g.querySelectorAll('text');
+    v.textContent = c.b;
+    d.textContent = c.d;
+    const w = Math.max(v.getComputedTextLength(), d.getComputedTextLength()) + 20;
+    const lx = Math.max(2, Math.min(348 - w, c.x - w / 2)), ly = c.y > 62 ? c.y - 58 : c.y + 14; // un po' più su: il dito copre il punto
+    g.setAttribute('transform', `translate(${lx.toFixed(1)} ${ly.toFixed(1)})`);
+    g.querySelector('rect').setAttribute('width', w.toFixed(1));
+    v.setAttribute('x', (w / 2).toFixed(1));
+    d.setAttribute('x', (w / 2).toFixed(1));
+    g.setAttribute('visibility', 'visible');
+  }
+  const scrubEnd = () => {
+    scrub = false;
+    root.querySelector('#wo-ch-lab')?.setAttribute('visibility', 'hidden');
+  };
+  root.addEventListener('pointermove', (ev) => { if (scrub) chartAt(ev); });
+  document.addEventListener('pointerup', scrubEnd);
+  document.addEventListener('pointercancel', scrubEnd);
+
+  /** "I tuoi progressi": tutti gli esercizi fatti almeno due volte, i più cresciuti in alto; filtro per scheda. */
+  function progAllView() {
+    const f = ui.progF || '';
+    const mie = (schede || []).filter((s) => tuttiProgressi().some((r) => inScheda(s, r.ex)));
+    const rows = tuttiProgressi().filter((r) => !f || inScheda((schede || []).find((s) => s.id === f), r.ex)).map((r) => {
+      const sp = sparkPath(r.h.map((q) => q.best), 84, 30, 3);
+      return `<button class="wo-row wo-prog" data-a="pex:${esc(r.ex)}|${r.t}"><span><b>${esc(nameOf(r.ex))}</b><small>da ${uVal(r.t, r.first)} a ${uVal(r.t, r.last)}</small></span>
+        <svg viewBox="0 0 84 30" aria-hidden="true"><path d="${sp.d}" fill="none" stroke="${trendCol(r.d)}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="wo-delta${r.d > 0 ? ' up' : r.d < 0 ? ' down' : ''}">${r.d ? uDelta(r.t, r.d) : 'uguale'}</span></button>`;
+    }).join('');
+    const chips = mie.length > 1 ? `<div class="wo-chips wo-chips-s">${[['', 'Tutte'], ...mie.map((s) => [s.id, s.name])].map(([id, l]) => `<button class="${f === id ? 'on' : ''}" data-a="pfil:${esc(id)}">${esc(l)}</button>`).join('')}</div>` : '';
+    return `<button class="wo-back" data-a="back">‹ Allenamento</button>
+      <h1 class="wo-ptitle">I tuoi progressi</h1>
+      <p class="wo-sub">Gli esercizi che sono cresciuti di più in alto</p>
+      ${chips}
+      ${rows ? `<section class="card wo-list">${rows}</section>
+        <p class="wo-sub wo-pnote">Peso per gli esercizi con i chili, ripetizioni o secondi per quelli a corpo libero. Tocca un esercizio per il grafico.</p>`
+        : '<p class="wo-empty">Il grafico arriva quando avrai fatto lo stesso esercizio almeno due volte</p>'}`;
+  }
+  /** L'esercizio è nella scheda, anche dentro un circuito. */
+  const inScheda = (s, ex) => !!s && s.ex.some((id) => id === ex || (circIn(s, id) && circIn(s, id).ex.includes(ex)));
 
   /** Il primo esercizio non ancora fatto oggi dopo quello aperto (poi si ricomincia dall'inizio), -1 se fatti tutti. */
   function nextTodo(from = ui.i) {
@@ -1939,6 +2155,24 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }
     if (cmd === 'eddup' && ui.ed) {
       dupInto(arg);
+      return draw();
+    }
+    if (cmd === 'prog' || cmd === 'pex') { // grafico di un esercizio: dalla sua pagina o da "I tuoi progressi"
+      const [ex, t] = cmd === 'pex' ? arg.split('|') : [arg, tOf(arg)];
+      ui.prog = { ex, t, tab: 'peso', range: 'tutto', sel: null, back: ui.view === 'progall' ? 'progall' : 'ex' };
+      ui.view = 'prog';
+      return draw();
+    }
+    if (cmd === 'progall') {
+      ui.view = 'progall';
+      return draw();
+    }
+    if (cmd === 'pfil') {
+      ui.progF = arg;
+      return draw();
+    }
+    if (cmd === 'ptab' || cmd === 'prange') { // ("psel" no: è la spunta del catalogo)
+      Object.assign(ui.prog, { [cmd === 'ptab' ? 'tab' : 'range']: arg, sel: null });
       return draw();
     }
     if (ui.ed && editCmd(cmd, arg)) return draw();
