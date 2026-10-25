@@ -889,7 +889,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return `<section class="wo-page" data-k="${k}">${head}
       <div class="wo-rounds"><button data-a="cg-" aria-label="Un giro in meno">−</button>${rounds}<button data-a="cg+" aria-label="Un giro in più">+</button></div>
       <div class="wo-cexs">${rows}</div>
-      <div class="wo-cex wo-crec"><svg class="wo-fig sm" viewBox="-4 -2 32 28" aria-hidden="true"><use href="#i-timer"/></svg><div class="wo-cname"><b>Recupero tra i giri</b><small>vale per questo circuito</small></div>
+      <div class="wo-cex wo-crec"><svg class="wo-fig sm" viewBox="-7.25 -1 39 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13.5" r="8"/><path d="M12 13.5V9M9.5 2.5h5M19 6l1.5-1.5"/></svg><div class="wo-cname"><b>Recupero tra i giri</b><small>vale per questo circuito</small></div>
         <span class="wo-pm"><button data-a="crec-:${id}" aria-label="15 secondi in meno">−</button><label class="wo-in"><input data-f="crec:${id}" inputmode="numeric" value="${circRec(id, c)}" aria-label="Recupero tra i giri in secondi, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>s</em></label><button data-a="crec+:${id}" aria-label="15 secondi in più">+</button></span></div>
       <button class="primary" data-a="cgiro">✓ Giro ${st.cur + 1} fatto</button>
       <button class="secondary wo-crun" data-a="crun">▶ Avvia circuito guidato</button>

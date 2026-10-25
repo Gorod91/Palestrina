@@ -764,7 +764,7 @@ body.keyboard .wo-bar { display: none; }
 .wo-rounds { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
 /* recupero tra i giri del circuito: una riga come quelle degli esercizi, sotto di loro */
 .wo-crec { margin: 8px 0 12px; }
-.wo-crec .wo-fig { padding: 4px 0; color: var(--stand); }
+.wo-crec .wo-fig { padding: 5px 0; color: var(--stand); }
 /* "s" largo come "rip": − e + restano in colonna con quelli degli esercizi */
 .wo-crec .wo-in em { min-width: 1.25em; text-align: left; }
 .wo-rounds i { flex: 1; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--card); color: var(--muted); font-style: normal; font-size: 14px; font-weight: 700; }
