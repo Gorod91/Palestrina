@@ -1174,12 +1174,13 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const sch = curSch(), pi = sch && sch.piano ? sch.piano[ex] : null;
     return recMap[ex] || (pi && pi.rec) || REST;
   };
+  /** Recupero: anello grande da toccare per partire e per fermare, con − e + ai lati (15 secondi). */
   function restHtml(ex) {
-    if (!restEnd) {
-      return `${dial(1)}<b>Recupero</b><span class="wo-recpm"><button class="wo-recb" data-a="rec-:${ex}" aria-label="15 secondi in meno">−</button>`
-        + `<button class="wo-chip" data-a="rest">${mmss(restOf(ex))} ▸</button><button class="wo-recb" data-a="rec+:${ex}" aria-label="15 secondi in più">+</button></span>`;
-    }
-    return `${dial(0)}<span><small>Recupero</small><b class="wo-rest-left">${mmss(restTotal)}</b></span><button class="wo-chip" data-a="stop">Stop</button>`;
+    const t = restEnd ? restTotal : restOf(ex);
+    const ring = `<small>Recupero</small><b class="wo-rest-left">${mmss(t)}</b><em>${restEnd ? 'tocca per fermare' : 'tocca per partire'}</em>`;
+    return `<button class="wo-recb" data-a="rec-:${ex}" aria-label="15 secondi in meno">−</button>`
+      + `<button class="wo-dial" style="--p:0" data-a="${restEnd ? 'stop' : 'rest'}">${ring}</button>`
+      + `<button class="wo-recb" data-a="rec+:${ex}" aria-label="15 secondi in più">+</button>`;
   }
 
   function tmrHtml(ex, sets) {
