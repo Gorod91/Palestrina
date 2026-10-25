@@ -1145,7 +1145,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return `<section class="wo-page" data-k="${k}">
       <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(piano.s)}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
       ${figSvg(ex, 'card')}
-      ${last ? `<section class="card wo-last"><small>${PREV_ICON}La volta scorsa, ${ago} · ${shortDay(last.day)}</small><b>${summary(last.sets, t)}</b></section>` : ''}
+      ${last ? `<p class="wo-last">${PREV_ICON}La volta scorsa, ${ago} · ${shortDay(last.day)}</p>` : ''}
       ${t === 'sec' && !saved ? `<div class="wo-tmr" data-ex="${ex}">${tmrHtml(ex, sets)}</div>` : ''}
       <div class="wo-sets">${rows}</div>
       ${btn}
