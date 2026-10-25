@@ -46,6 +46,42 @@ export function popCount(el, txt) {
   if (el.animate) el.animate([{ transform: 'scale(1.25)', opacity: 0.4 }, { transform: 'scale(1)', opacity: 1, offset: 0.3 }, { transform: 'scale(1)', opacity: 1 }], { duration: 1000, easing: 'ease-out' });
 }
 
+// ---------- Lampeggio fermato muovendo il telefono (timer addominali e timer dell'allenamento) ----------
+// Su iPhone il permesso al movimento si chiede con un tocco: lo chiediamo quando si fa partire un timer.
+let motionOk = typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission !== 'function';
+export function askMotion() {
+  if (motionOk || typeof DeviceMotionEvent === 'undefined' || !DeviceMotionEvent.requestPermission) return;
+  DeviceMotionEvent.requestPermission().then((r) => (motionOk = r === 'granted')).catch(() => {});
+}
+/** Basta muovere il telefono (sollevarlo, girarlo, scuoterlo) per fermare il lampeggio: si confronta l'accelerazione con
+ *  la sua media degli ultimi istanti. Il primo secondo non conta, per la vibrazione di fine. */
+export function shakeToStop(alarm) {
+  if (!motionOk) return;
+  const from = Date.now() + 1000;
+  let avg = null;
+  const off = () => {
+    window.removeEventListener('devicemotion', on);
+    obs.disconnect();
+  };
+  const on = (ev) => {
+    const a = ev.accelerationIncludingGravity;
+    if (!a || a.x == null) return;
+    if (!avg || Date.now() < from) {
+      avg = { x: a.x, y: a.y, z: a.z };
+      return;
+    }
+    if (Math.abs(a.x - avg.x) + Math.abs(a.y - avg.y) + Math.abs(a.z - avg.z) > 3.5) {
+      off();
+      if (!alarm.hidden) alarm.click();
+      return;
+    }
+    avg = { x: avg.x * 0.9 + a.x * 0.1, y: avg.y * 0.9 + a.y * 0.1, z: avg.z * 0.9 + a.z * 0.1 };
+  };
+  const obs = new MutationObserver(() => alarm.hidden && off()); // fermato col dito: smetto di ascoltare
+  obs.observe(alarm, { attributes: true, attributeFilter: ['hidden'] });
+  window.addEventListener('devicemotion', on);
+}
+
 export function setTimerAccount(name, serverSeconds, save) {
   if (account && account.name === name) return; // già impostato: non sovrascrive le modifiche in corso
   account = { name, save };
@@ -98,6 +134,7 @@ function releaseAwake() {
 }
 
 function start() {
+  askMotion();
   if (!account || !account.name) touched = true;
   saveLocal();
   if (account && account.save) account.save(seconds); // ultimo tempo usato, anche su altri telefoni
@@ -140,6 +177,7 @@ function finish() {
   deadline = null;
   render();
   $('timer-alarm').hidden = false;
+  shakeToStop($('timer-alarm'));
 }
 
 function stopAlarm() {
