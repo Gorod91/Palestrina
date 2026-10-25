@@ -351,8 +351,6 @@ function agoText(d) {
   const n = daysAgo(d), w = Math.round(n / 7), m = Math.round(n / 30);
   return n <= 0 ? 'oggi' : n === 1 ? 'ieri' : n < 14 ? `${n} giorni fa` : n < 30 ? `${w} settimane fa` : m <= 1 ? '1 mese fa' : `${m} mesi fa`;
 }
-/** Il simbolo della volta scorsa (freccia che torna indietro attorno a un orologio). */
-const PREV_ICON = '<svg class="wo-prev-ic" viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 8a5.5 5.5 0 1 0 1.6-3.9M3.6 1.8v2.6h2.6M8 5v3.2l2 1.3"/></svg>';
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const copy = (sets) => sets.map((s) => ({ kg: s.kg, reps: s.reps }));
 
@@ -1118,10 +1116,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const ref = last ? last.sets : null;
     const ago = last ? agoText(last.day) : '';
     const rows = sets.map((s, j) => {
-      // accanto a ogni numero quello della stessa serie la volta scorsa; più alto verde, più basso arancione
+      // accanto a ogni numero, in rosso, quello della stessa serie la volta scorsa; più alto verde, più basso arancione
       const r = ref && ref[j];
       const tone = (a, b) => (saved || !r || a === b ? '' : a > b ? ' up' : ' down');
-      const was = (v) => (ref ? `<span class="wo-was">${PREV_ICON}${r ? v : '–'}</span>` : '');
+      const was = (v) => (ref ? `<span class="wo-was">${r ? v : '–'}</span>` : '');
       const kgCell = t === 'kg' ? `<span class="c"><span class="v${tone(s.kg, r && r.kg)}">${kgf(s.kg)}<small>kg</small></span>${was(r && kgf(r.kg))}</span>` : '<span></span>';
       const row = `<button class="wo-set${saved ? ' done' : ''}${pg.open === j ? ' open' : ''}" data-a="o:${j}"><span class="n">${j + 1}</span>${kgCell}<span class="c"><span class="v${tone(s.reps, r && r.reps)}">${s.reps}<small>${uShort(t)}</small></span>${was(r && r.reps)}</span><span class="n">${saved ? (done.pending ? '…' : '✓') : '›'}</span></button>`;
       if (pg.open !== j || saved) return row;
@@ -1134,7 +1132,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const prevTxt = !ref ? '' : !r ? 'Serie nuova: la volta scorsa non c\'era'
         : (t !== 'kg' || s.kg === r.kg) && s.reps === r.reps ? 'Come la volta scorsa'
         : `${ago[0].toUpperCase() + ago.slice(1)}: ${t === 'kg' ? `${kgf(r.kg)} kg × ${r.reps}` : `${r.reps} ${uShort(t)}`}`;
-      return `${row}<div class="wo-edit"><div class="wo-pms">${kgEdit}${repEdit}</div>${prevTxt ? `<p class="wo-hint wo-hint-prev">${PREV_ICON}${prevTxt}</p>` : ''}<p class="wo-hint">Tocca il numero per scriverlo a mano</p></div>`;
+      return `${row}<div class="wo-edit"><div class="wo-pms">${kgEdit}${repEdit}</div>${prevTxt ? `<p class="wo-hint wo-hint-prev">${prevTxt}</p>` : ''}<p class="wo-hint">Tocca il numero per scriverlo a mano</p></div>`;
     }).join('');
     const nx = nextTodo(k);
     const btn = saved
@@ -1144,7 +1142,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     return `<section class="wo-page" data-k="${k}">
       <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(piano.s)}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
       ${figSvg(ex, 'card')}
-      ${last ? `<p class="wo-last">${PREV_ICON}La volta scorsa, ${ago}</p>` : ''}
+      ${last ? `<p class="wo-last">In <b>rosso</b> la volta scorsa, ${ago}</p>` : ''}
       ${t === 'sec' && !saved ? `<div class="wo-tmr" data-ex="${ex}">${tmrHtml(ex, sets)}</div>` : ''}
       <div class="wo-sets">${rows}</div>
       ${btn}
