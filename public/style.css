@@ -776,6 +776,7 @@ body.keyboard .wo-bar { display: none; }
 .wo-cn { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--card-2); color: var(--muted); font-size: 12px; font-weight: 800; }
 .wo-cname b { display: block; font-size: 16px; }
 .wo-cname small { display: block; color: var(--muted); font-size: 12px; }
+.wo-cname .wo-was { display: inline; font-size: 12px; }
 .wo-crun { color: var(--stand); margin-top: 8px; }
 
 /* Allenamento: circuito guidato a tutto schermo */

@@ -880,14 +880,18 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         ${nx < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : ''}<button class="link-button" data-a="crifai">Rifai il circuito</button></section>`;
     }
     const rounds = Array.from({ length: st.giri }, (_, g) => `<i class="${g < st.cur ? 'ok' : g === st.cur ? 'cur' : ''}">${g < st.cur ? '✓' : `Giro ${g + 1}`}</i>`).join('');
+    // come negli esercizi: la volta scorsa in rosso, e sopra da quanto tempo
+    let lastDay = '';
     const rows = c.ex.map((e, j) => {
       const t = tOf(e, sch), l = lastTime(e, t), pi = sch && sch.piano ? sch.piano[e] : null;
-      const info = [pi && pi.s, l && `ultima volta ${summary(l.sets, t)}`].filter(Boolean).join(' · ');
-      return `<div class="wo-cex"><span class="wo-cn">${j + 1}</span>${figSvg(e, 'sm')}<div class="wo-cname"><b>${esc(nameOf(e))}</b><small>${esc(info)}</small></div>
+      if (l && l.day > lastDay) lastDay = l.day;
+      const info = [pi && esc(pi.s), l && `<span class="wo-was">${esc(summary(l.sets, t))}</span>`].filter(Boolean).join(' · ');
+      return `<div class="wo-cex"><span class="wo-cn">${j + 1}</span>${figSvg(e, 'sm')}<div class="wo-cname"><b>${esc(nameOf(e))}</b><small>${info}</small></div>
         <span class="wo-pm"><button data-a="cv-:${e}" aria-label="Meno">−</button><label class="wo-in"><input data-f="c:${e}" inputmode="numeric" value="${st.vals[e]}" aria-label="${esc(nameOf(e))}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${uShort(t)}</em></label><button data-a="cv+:${e}" aria-label="Più">+</button></span></div>`;
     }).join('');
     return `<section class="wo-page" data-k="${k}">${head}
       <div class="wo-rounds"><button data-a="cg-" aria-label="Un giro in meno">−</button>${rounds}<button data-a="cg+" aria-label="Un giro in più">+</button></div>
+      ${lastDay ? `<p class="wo-last">In <b>rosso</b> la volta scorsa, ${agoText(lastDay)}</p>` : ''}
       <div class="wo-cexs">${rows}</div>
       <div class="wo-cex wo-crec"><svg class="wo-fig sm" viewBox="-7.25 -1 39 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13.5" r="8"/><path d="M12 13.5V9M9.5 2.5h5M19 6l1.5-1.5"/></svg><div class="wo-cname"><b>Recupero tra i giri</b><small>vale per questo circuito</small></div>
         <span class="wo-pm"><button data-a="crec-:${id}" aria-label="15 secondi in meno">−</button><label class="wo-in"><input data-f="crec:${id}" inputmode="numeric" value="${circRec(id, c)}" aria-label="Recupero tra i giri in secondi, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>s</em></label><button data-a="crec+:${id}" aria-label="15 secondi in più">+</button></span></div>
