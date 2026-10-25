@@ -57,6 +57,8 @@ export function askMotion() {
  *  la sua media degli ultimi istanti. Il primo secondo non conta, per la vibrazione di fine. */
 export function shakeToStop(alarm) {
   if (!motionOk) return;
+  const hint = alarm.querySelector('p:last-child');
+  if (hint) hint.textContent = 'Tocca o scuoti il telefono per fermare';
   const from = Date.now() + 1000;
   let avg = null;
   const off = () => {
