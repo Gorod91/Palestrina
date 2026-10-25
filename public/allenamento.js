@@ -392,6 +392,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     key = k;
     me = user;
     pfx = test ? 'prova_' : '';
+    loadDraft();
     draw();
     try {
       x = await fbSignIn(user, getToken);
@@ -663,6 +664,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       pager.addEventListener('scroll', onPagerScroll, { passive: true });
     }
     glide = null;
+    saveDraft();
     setupAll();
     setupDrag();
     sheetTouch();
@@ -776,6 +778,32 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let pages = {};
   const pageOf = (ex) => (pages[ex] ||= { sets: null, open: -1, editing: false });
   const P = () => pageOf(ui.list[ui.i]);
+
+  // Bozza sul telefono: chili e ripetizioni cambiati (e giri del circuito già fatti) si salvano a ogni tocco,
+  // anche prima di "Fatto"; chiudendo e riaprendo l'app il giorno stesso si ritrovano, sull'esercizio dov'eri.
+  const draftKey = () => `woDraft|${key}`;
+  function saveDraft() {
+    if (!key) return;
+    const keep = {};
+    Object.entries(pages).forEach(([ex, pg]) => {
+      const circ = pg.circ && pg.circ.cur > 0 ? pg.circ : null;
+      if ((pg.dirty && pg.sets) || circ) keep[ex] = { sets: pg.dirty ? pg.sets : null, editing: !!pg.editing, dirty: !!pg.dirty, ...(circ ? { circ } : {}) };
+    });
+    try {
+      if (!Object.keys(keep).length) localStorage.removeItem(draftKey());
+      else localStorage.setItem(draftKey(), JSON.stringify({ day: today(), scheda: ui.scheda, list: ui.list, i: ui.i, view: ui.view, pages: keep }));
+    } catch (err) {} // senza spazio o in navigazione privata: resta solo in memoria come prima
+  }
+  function loadDraft() {
+    let d = null;
+    try {
+      d = JSON.parse(localStorage.getItem(draftKey()) || 'null');
+    } catch (err) {}
+    if (!d || d.day !== today() || !d.pages || !Array.isArray(d.list) || !d.list.length) return;
+    pages = {};
+    Object.entries(d.pages).forEach(([ex, p]) => (pages[ex] = { open: -1, ...p }));
+    Object.assign(ui, { scheda: d.scheda || '', list: d.list, i: Math.min(d.i || 0, d.list.length - 1), view: d.view === 'ex' ? 'ex' : ui.view });
+  }
 
   /** Esercizi della scheda come pagine affiancate: si trascinano col dito, come le schermate della Home di iPhone. */
   function exView() {
@@ -1863,9 +1891,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (cmd === 'go' || cmd === 'sch') {
       const s = schede.find((y) => y.id === arg);
       if (!s) return;
+      if (s.id !== ui.scheda) pages = {}; // la stessa scheda di prima: restano le serie cambiate e non ancora salvate
       ui.scheda = s.id;
       ui.list = s.ex.slice();
-      pages = {};
       const k = s.ex.findIndex((e) => !isDone(e, s));
       openEx(cmd === 'go' && k >= 0 ? k : 0);
     } else if (cmd === 'libero') {
@@ -1889,23 +1917,25 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       openEx(Number(arg), ui.view === 'ex' && !ev.target.closest('.wo-sheet') ? ui.i : null); // dalla griglia senza scorrimento
     } else if (cmd === 'ok') {
       save(ui.list[ui.i], P().sets);
-      Object.assign(P(), { editing: false, open: -1, sets: null });
+      Object.assign(P(), { editing: false, open: -1, sets: null, dirty: false });
       const nx = nextTodo(ui.i); // un solo tocco: si passa subito al prossimo esercizio da fare
       if (nx >= 0) openEx(nx, ui.i);
     } else if (cmd === 'edit') {
-      Object.assign(P(), { editing: true, sets: copy(todayDoc(ui.list[ui.i]).sets) });
+      Object.assign(P(), { editing: true, dirty: true, sets: copy(todayDoc(ui.list[ui.i]).sets) });
     } else if (cmd === 'add') {
       const sets = P().sets;
       sets.push({ ...sets[sets.length - 1] });
+      P().dirty = true;
     } else if (cmd === 'del') {
       if (P().sets.length > 1) P().sets.pop();
-      P().open = -1;
+      Object.assign(P(), { open: -1, dirty: true });
     } else if (cmd === 'o') {
       const k = Number(arg);
       P().open = P().open === k ? -1 : k;
       if (tOf(ui.list[ui.i]) === 'sec' && !tmr.end) tmr = { ...tmr, ex: ui.list[ui.i], j: k };
     } else if (/^[kr][+-]$/.test(cmd)) {
       const k = Number(arg), d = cmd[1] === '+' ? 1 : -1, sets = P().sets;
+      P().dirty = true;
       if (cmd[0] === 'k') setKg(k, nextKg(sets[k].kg, d));
       else {
         const t = tOf(ui.list[ui.i]), step = uStep(t);
@@ -1986,6 +2016,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (f === 'k') setKg(pg.open, v);
     else if (v >= 1 && v <= (tOf(ui.list[ui.i]) === 'm' ? 20000 : 600)) pg.sets[pg.open].reps = Math.round(v);
     else return;
+    pg.dirty = true;
     draw();
   });
   // Invio sulla tastiera: conferma il numero e chiude la tastiera

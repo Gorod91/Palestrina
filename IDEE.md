@@ -5,9 +5,7 @@ Cose di cui abbiamo parlato ma che non sono ancora nell'app.
 ## Allenamento: da fare (segnato il 25/10)
 
 - **Fermare con l'accelerometro i timer finiti**: quando un timer (recupero o esercizio a tempo) è finito e lo schermo pulsa, basta muovere o scuotere il telefono per fermarlo, senza toccarlo. Su iPhone serve un tocco una volta sola per dare il permesso al movimento.
-- **Il recupero cambiato durante l'allenamento si salva?** Dal codice sì: con − / + si salva subito, per quell'esercizio e in tutte le schede (`recMap`, in `schede/<uid>`). Da provare sul telefono: cambiarlo, chiudere l'app, riaprirla.
 - **Tasto del recupero più grande e più curato**: oggi è una riga piccola sotto "Fatto" (anello, "Recupero", − 1:30 ▸ +); da ingrandire, più facile da toccare con le mani sudate, e da rendere più bello (prima un prototipo).
-- **Salvare ogni modifica durante l'allenamento, anche prima di "Fatto"**: oggi chili e ripetizioni cambiati restano solo in memoria finché non si tocca "Fatto"; se nel frattempo si chiude l'app si perdono. Da salvare subito (sul telefono e poi su Firebase) e ritrovarli riaprendo.
 
 ## Sudometro: da fare (segnato il 25/10)
 
