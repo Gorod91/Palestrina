@@ -762,6 +762,11 @@ body.keyboard .wo-bar { display: none; }
 
 /* Allenamento: circuito (pagina) */
 .wo-rounds { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
+/* recupero tra i giri del circuito: riga piccola sotto i giri */
+.wo-crec { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding: 6px 6px 6px 14px; border-radius: 12px; background: var(--card); }
+.wo-crec span { flex: 1; min-width: 0; color: var(--muted); font-size: 14px; font-weight: 600; }
+.wo-crec b { min-width: 3.2ch; text-align: center; color: var(--stand); font-size: 17px; font-variant-numeric: tabular-nums; }
+.wo-crec button { width: 32px; height: 32px; flex: none; border: 0; border-radius: 50%; background: var(--card-2); color: var(--stand); font-size: 19px; font-weight: 800; }
 .wo-rounds i { flex: 1; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--card); color: var(--muted); font-style: normal; font-size: 14px; font-weight: 700; }
 .wo-rounds i.ok { background: rgba(166, 255, 0, .16); color: var(--exercise); }
 .wo-rounds i.cur { background: var(--fg); color: #000; }

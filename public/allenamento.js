@@ -492,6 +492,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   }
   /** Circuito di una scheda ("@nome"), oppure null per un esercizio normale. */
   const circIn = (sch, id) => (id[0] === '@' && sch && sch.circuiti ? sch.circuiti[id.slice(1)] || null : null);
+  /** Recupero tra i giri di un circuito: quello scelto da me con − + (in recMap, chiave '@id'), altrimenti quello della scheda. */
+  const circRec = (id, c) => recMap[id] || c.rec;
   const curSch = () => (schede || []).find((s) => s.id === ui.scheda);
   /** Come si segna un esercizio in una scheda: quello scelto lì, altrimenti quello del catalogo. */
   const tOf = (ex, sch = curSch()) => (sch && sch.piano && sch.piano[ex] && sch.piano[ex].t) || unit(EX[ex]);
@@ -870,7 +872,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const id = ui.list[k], c = circIn(sch, id);
     if (c.lista) return listaHtml(k, sch, c);
     const st = circState(id, c, sch);
-    const head = `<div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${st.giri} giri</span><span class="wo-pill">recupero ${mmss(c.rec)}${c.rec < 60 ? '"' : ''}</span>${c.pausa ? `<span class="wo-pill">pausa ${c.pausa}"</span>` : ''}</div>`;
+    const head = `<div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${st.giri} giri</span>${c.pausa ? `<span class="wo-pill">pausa ${c.pausa}"</span>` : ''}</div>`;
     if (isDone(id, sch) && !pageOf(id).rifai) {
       const nx = nextTodo(k);
       return `<section class="wo-page" data-k="${k}">${head}
@@ -886,6 +888,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }).join('');
     return `<section class="wo-page" data-k="${k}">${head}
       <div class="wo-rounds"><button data-a="cg-" aria-label="Un giro in meno">−</button>${rounds}<button data-a="cg+" aria-label="Un giro in più">+</button></div>
+      <div class="wo-crec"><span>Recupero tra i giri</span><button data-a="crec-:${id}" aria-label="15 secondi in meno">−</button><b>${mmss(circRec(id, c))}${circRec(id, c) < 60 ? '"' : ''}</b><button data-a="crec+:${id}" aria-label="15 secondi in più">+</button></div>
       <div class="wo-cexs">${rows}</div>
       <button class="primary" data-a="cgiro">✓ Giro ${st.cur + 1} fatto</button>
       <button class="secondary wo-crun" data-a="crun">▶ Avvia circuito guidato</button>
@@ -951,7 +954,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (j >= runPlan.length) return `<div class="wo-run-done">✓</div><div class="wo-big-head"><b>Fine circuito</b><small>lascia qui per salvare</small></div>`;
     const s = runPlan[j];
     if (s.rest) return `<div class="wo-big-head wo-rest-head"><b>${restName(s)}</b><small>${restNext(s)}</small></div>
-      <button class="timer-running wo-run-rest" data-r="next"><span>${mmss(s.pausa ? c.pausa : c.rec)}</span><small>tocca per saltare</small></button>`;
+      <button class="timer-running wo-run-rest" data-r="next"><span>${mmss(s.pausa ? c.pausa : circRec(runId, c))}</span><small>tocca per saltare</small></button>`;
     if (tOf(s.e) !== 'sec') return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>${figSvg(s.e, 'run')}
       <button class="wo-run-reps" data-r="next">${st.vals[s.e]}<small>ripetizioni · fatto ✓</small></button>`;
     const total = st.vals[s.e];
@@ -1019,7 +1022,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (!s || !(s.rest || s.started)) return;
     const c = circIn(curSch(), runId), st = pageOf(runId).circ;
     const page = run.querySelector(`.wo-run-page[data-j="${runAt}"]`);
-    const total = s.rest ? (s.pausa ? c.pausa : c.rec) : st.vals[s.e];
+    const total = s.rest ? (s.pausa ? c.pausa : circRec(runId, c)) : st.vals[s.e];
     run.classList.toggle('rest', !!s.rest);
     page.innerHTML = `<div class="wo-big-head${s.rest ? ' wo-rest-head' : ''}"><b>${s.rest ? restName(s) : esc(nameOf(s.e))}</b><small>${s.rest ? restNext(s) : ''}</small></div>
       <button class="timer-running${s.rest ? ' wo-run-rest' : ''}" data-r="next"><span></span><small>tocca per saltare</small></button>`;
@@ -2028,6 +2031,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       tmr = { ex, j, go, end: go + sec * 1000, total: sec };
     } else if (cmd === 'tstop') {
       tmr.end = 0;
+    } else if (cmd === 'crec-' || cmd === 'crec+') { // come il recupero degli esercizi: si ricorda per il circuito
+      const c = circIn(curSch(), arg);
+      if (c) recMap[arg] = Math.max(15, Math.min(300, circRec(arg, c) + (cmd === 'crec+' ? 15 : -15)));
+      writeDoc();
     } else if (cmd === 'rec-' || cmd === 'rec+') { // si ricorda per l'esercizio, in tutte le schede
       recMap[arg] = Math.max(15, Math.min(600, restOf(arg) + (cmd === 'rec+' ? 15 : -15)));
       writeDoc();
