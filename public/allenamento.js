@@ -6,7 +6,7 @@
 import { fbSignIn, fbUid } from './fbchat.js';
 import { figSvg } from './figure.js';
 import { bodySvg, ICONE } from './corpo.js';
-import { popCount } from './timer.js';
+import { popCount, askMotion, shakeToStop } from './timer.js';
 
 // Catalogo: gli esercizi delle schede che abbiamo; gli esercizi nuovi si aggiungono dall'app ("Nuovo esercizio").
 // t: 'kg' (peso e ripetizioni, se manca), 'rip' (solo ripetizioni, a corpo libero), 'sec' (a tempo, in secondi), 'm' (metri)
@@ -1283,41 +1283,6 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       shakeToStop(alarm);
     }
     tickRest();
-  }
-
-  // ---------- Lampeggio fermato muovendo il telefono ----------
-  // Su iPhone il permesso al movimento si chiede con un tocco: lo chiediamo quando si fa partire un timer.
-  let motionOk = typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission !== 'function';
-  function askMotion() {
-    if (motionOk || typeof DeviceMotionEvent === 'undefined' || !DeviceMotionEvent.requestPermission) return;
-    DeviceMotionEvent.requestPermission().then((r) => (motionOk = r === 'granted')).catch(() => {});
-  }
-  /** Due scossoni in mezzo secondo fermano il lampeggio (dopo la vibrazione di fine, che non conta). */
-  function shakeToStop(alarm) {
-    if (!motionOk) return;
-    const from = Date.now() + 800;
-    let prev = null, hit = 0;
-    const off = () => {
-      window.removeEventListener('devicemotion', on);
-      obs.disconnect();
-    };
-    const on = (ev) => {
-      const a = ev.accelerationIncludingGravity;
-      if (!a || a.x == null) return;
-      const now = Date.now();
-      if (prev && now > from && Math.abs(a.x - prev.x) + Math.abs(a.y - prev.y) + Math.abs(a.z - prev.z) > 12) {
-        if (hit && now - hit < 500) {
-          off();
-          if (!alarm.hidden) alarm.click();
-          return;
-        }
-        hit = now;
-      }
-      prev = { x: a.x, y: a.y, z: a.z };
-    };
-    const obs = new MutationObserver(() => alarm.hidden && off()); // fermato col dito: smetto di ascoltare
-    obs.observe(alarm, { attributes: true, attributeFilter: ['hidden'] });
-    window.addEventListener('devicemotion', on);
   }
 
   // Tornando nell'app dopo la fine di un timer: il lampeggio parte subito
