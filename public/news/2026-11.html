@@ -91,6 +91,18 @@
   .copy em { font-style: normal; display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px 3px 3px; border-radius: 99px; background: #2c2c2e; font-size: 13px; color: #d1d1d6; }
   .copy em i { display: grid; place-items: center; width: 20px; height: 20px; border-radius: 50%; background: var(--cyan); color: #000; font-style: normal; font-size: 11px; font-weight: 900; }
   .hint { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 16px); text-align: center; font-size: 14px; color: var(--muted); }
+  .chart { margin: 28px 0 24px; padding: 16px 16px 12px; border-radius: 24px; background: #1c1c1e; }
+  .chart .tip { display: flex; justify-content: space-between; align-items: baseline; font-size: 15px; color: var(--muted); }
+  .chart .tip b { font-size: 22px; font-weight: 800; color: var(--fg); }
+  .chart .tip .d { font-weight: 800; color: var(--lime); }
+  .chart svg { display: block; width: 100%; height: auto; margin-top: 10px; overflow: visible; }
+  .chart .ln { fill: none; stroke: var(--lime); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 400; stroke-dashoffset: 400; }
+  .slide.on .chart .ln { animation: draw 1.6s .9s cubic-bezier(.4, 0, .2, 1) forwards; }
+  .chart .ar { fill: url(#pg); opacity: 0; }
+  .slide.on .chart .ar { animation: show .6s 2.2s forwards; }
+  .chart .mo { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+  @keyframes show { to { opacity: 1; } }
 </style>
 </head>
 <body>
@@ -145,6 +157,23 @@
     <div class="tiles" id="tiles"></div>
     <p class="copy" data-a style="--d:1.8;--anim:right">Upper <em><i>R</i>Rizzo</em></p>
     <p class="lead" data-a style="--d:2.4">Chi ha già mandato le proprie schede le trova pronte. Scegliete gli esercizi per muscolo o per attrezzo e decidete serie e ripetizioni. Se un amico ha una scheda che vi piace, la copiate con un tocco.</p>
+  </section>
+
+  <section class="slide">
+    <p class="eyebrow" data-a style="--d:0">Progressi</p>
+    <h2 data-a style="--d:.1">Guardate quanto state migliorando.</h2>
+    <div class="chart" data-a style="--d:.5">
+      <p class="tip"><span>Panca piana</span><span class="d" data-a style="--d:2.3;--anim:pop">+12,5 kg</span></p>
+      <p class="tip"><b>3 × 8 · 72,5 kg</b></p>
+      <svg viewBox="0 0 300 130" aria-hidden="true">
+        <defs><linearGradient id="pg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#a6ff00" stop-opacity=".3"/><stop offset="1" stop-color="#a6ff00" stop-opacity="0"/></linearGradient></defs>
+        <path class="ar" d="M4 112 L40 104 L72 106 L104 90 L136 84 L168 86 L200 66 L232 58 L264 40 L296 22 L296 130 L4 130 Z"/>
+        <path class="ln" d="M4 112 L40 104 L72 106 L104 90 L136 84 L168 86 L200 66 L232 58 L264 40 L296 22"/>
+        <circle cx="296" cy="22" r="6" fill="#a6ff00" data-a style="--d:2.4;--anim:pop;transform-origin:296px 22px"/>
+      </svg>
+      <p class="mo"><span>giu</span><span>ago</span><span>set</span><span>ott</span></p>
+    </div>
+    <p class="lead" data-a style="--d:2.8">Per ogni esercizio un grafico del peso e del volume. Scorrete col dito per rivedere ogni allenamento.</p>
   </section>
 
   <section class="slide">
