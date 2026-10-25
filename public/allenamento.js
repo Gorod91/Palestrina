@@ -1374,9 +1374,37 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <div class="wo-lbl">Esercizi${ed.ex.length > 1 ? ' · tieni premuto per spostarli' : ''}</div>
       ${rows ? `<section class="wo-ed-list">${rows}</section>` : '<p class="wo-empty">Ancora nessun esercizio</p>'}
       <div class="wo-btns"><button class="secondary" data-a="edadd">+ Esercizi</button><button class="secondary" data-a="edcirc">+ Blocco</button></div>
+      ${dupHtml()}
       <button class="primary" data-a="edsave">Salva</button>
       ${ed.isNew ? '' : '<button class="link-button wo-danger" data-a="eddel">Elimina scheda</button>'}
       ${ui.sheet ? sheetHtml() : ''}`;
+  }
+
+  /** Scheda nuova ancora vuota: si può partire da una delle mie, che viene duplicata. */
+  function dupHtml() {
+    const ed = ui.ed;
+    if (!ed.isNew || ed.ex.length || !(schede || []).length) return '';
+    const row = (s) => `<button class="wo-row" data-a="eddup:${esc(s.id)}"><span><b>${esc(s.name)}${diBadge(s)}</b><small>${s.ex.length} ${s.ex.length === 1 ? 'esercizio' : 'esercizi'}</small></span><span class="wo-chev">›</span></button>`;
+    return `<div class="wo-lbl">Oppure parti da una delle tue</div><section class="card wo-list wo-dup">${schede.map(row).join('')}</section>`;
+  }
+
+  /** Riempie la scheda nuova con esercizi, serie e blocchi di una delle mie (i blocchi con id nuovi). */
+  function dupInto(id) {
+    const sc = (schede || []).find((y) => y.id === id), ed = ui.ed;
+    if (!sc) return;
+    const ids = {};
+    Object.keys(sc.circuiti || {}).forEach((cid) => { ids[cid] = newId('c'); });
+    ed.ex = sc.ex.map((e) => (e[0] === '@' && ids[e.slice(1)] ? '@' + ids[e.slice(1)] : e));
+    ed.circuiti = {};
+    Object.entries(sc.circuiti || {}).forEach(([cid, c]) => {
+      ed.circuiti[ids[cid]] = clone(c);
+      if (recMap[cid]) recMap[ids[cid]] = recMap[cid]; // il recupero che avevo scelto per il blocco
+    });
+    ed.piano = clone(sc.piano || {});
+    if (!ed.name.trim()) ed.name = `${sc.name} (copia)`.slice(0, 40);
+    ed.di = sc.di || '';
+    ed.mod = !!sc.mod;
+    toast(`Copiati gli esercizi di ${sc.name}`);
   }
 
   // scelte rapide per serie × ripetizioni, secondo come si segna l'esercizio
@@ -1857,6 +1885,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         piano[a.ex] = { s: joinPlan(a.sets.length, t === 'sec' ? `${r}"` : String(r)), ...(t !== unit(EX[a.ex]) ? { t } : {}) };
       });
       openEditor({ name: '', ex: lib.map((a) => a.ex), piano }, true);
+      return draw();
+    }
+    if (cmd === 'eddup' && ui.ed) {
+      dupInto(arg);
       return draw();
     }
     if (ui.ed && editCmd(cmd, arg)) return draw();
