@@ -21,27 +21,9 @@
     // App aperta dalla Home: serve allo stile per usare l'altezza vera dello schermo.
     if (navigator.standalone || matchMedia('(display-mode: standalone)').matches) document.documentElement.classList.add('standalone');
     if ('standalone' in navigator) document.documentElement.classList.add('ios');
-    // iPhone non permette di bloccare la rotazione: col telefono in orizzontale copriamo l'app con un avviso.
-    // Si guarda l'orientamento dello schermo (non la finestra), così la tastiera aperta non lo fa scattare.
-    (function () {
-      var phone = Math.min(screen.width, screen.height) < 600;
-      function check() {
-        var t = screen.orientation && screen.orientation.type;
-        var land = t ? t.indexOf('landscape') === 0 : Math.abs(window.orientation || 0) === 90;
-        document.documentElement.classList.toggle('landscape', phone && land);
-      }
-      check();
-      if (screen.orientation) screen.orientation.addEventListener('change', check);
-      addEventListener('orientationchange', check);
-      addEventListener('resize', check);
-    })();
   </script>
 </head>
 <body>
-  <div id="ruota" aria-hidden="true">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg>
-    <p>Gira il telefono in verticale</p>
-  </div>
   <!-- Icone (stile SF Symbols), usate con <svg><use href="#i-..."/></svg> -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-rings" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
