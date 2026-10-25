@@ -681,11 +681,14 @@ html.ios.standalone .chat-top { padding-top: var(--ios-chat, calc(env(safe-area-
 .wo-in:focus-within { box-shadow: 0 0 0 3px rgba(0, 217, 255, .25); }
 .wo-in em { font-style: normal; color: var(--muted); font-size: 12px; font-weight: 600; }
 .wo-hint { margin: 0; color: var(--muted); font-size: 13px; text-align: center; }
-.wo-rest { cursor: pointer; display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 10px 14px; border-radius: 16px; background: var(--card); }
-.wo-rest.on { outline: 1.5px solid rgba(0, 217, 255, .6); outline-offset: -1.5px; }
+.wo-rest { cursor: pointer; display: grid; grid-template-columns: auto 1fr auto; align-items: center; justify-items: center; gap: 8px; margin-top: 16px; padding: 16px 12px; border-radius: 22px; background: var(--card); }
+.wo-rest.on { outline: 2px solid rgba(0, 217, 255, .6); outline-offset: -2px; }
 .wo-rest.end { outline: 1.5px solid var(--exercise); outline-offset: -1.5px; }
-.wo-rest small { display: block; color: var(--muted); font-size: 12px; }
-.wo-rest b { font-size: 17px; font-variant-numeric: tabular-nums; }
+/* recupero: anello grande come il timer addominali, facile da toccare con le mani sudate */
+.wo-rest .wo-dial { grid-column: 2; width: min(152px, 42vw); border: 0; padding: 0; align-content: center; gap: 1px; font: inherit; }
+.wo-rest small { color: var(--stand); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
+.wo-rest b { font-size: 42px; line-height: 1.05; font-weight: 800; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.wo-rest em { font-style: normal; color: var(--muted); font-size: 12px; }
 .wo-chip { margin-left: auto; padding: 8px 14px; border: 0; border-radius: 99px; background: var(--card-2); color: var(--fg); font-size: 15px; font-weight: 700; white-space: nowrap; }
 .wo-search { margin: 0 0 10px; }
 .wo-groups { display: flex; gap: 6px; overflow-x: auto; margin: 0 0 12px; padding-bottom: 2px; scrollbar-width: none; }
@@ -755,10 +758,15 @@ body.keyboard .wo-bar { display: none; }
 /* recupero in azzurro (gli esercizi restano verdi come il timer addominali) */
 .wo-big.rest .timer-running { background: radial-gradient(closest-side, var(--bg) 87%, transparent 88%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0); }
 .wo-big.rest .wo-big-head b { color: var(--stand); }
-.wo-rest .wo-dial { background: radial-gradient(closest-side, var(--card) 80%, transparent 81%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0); }
+.wo-rest .wo-dial { background: radial-gradient(closest-side, var(--card) 86%, transparent 87%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0); }
 
 /* Allenamento: circuito (pagina) */
 .wo-rounds { display: flex; gap: 6px; align-items: center; margin-bottom: 10px; }
+/* recupero tra i giri del circuito: una riga come quelle degli esercizi, sotto di loro */
+.wo-crec { margin: 8px 0 12px; }
+.wo-crec .wo-fig { padding: 5px 0; color: var(--stand); }
+/* "s" largo come "rip": − e + restano in colonna con quelli degli esercizi */
+.wo-crec .wo-in em { min-width: 1.25em; text-align: left; }
 .wo-rounds i { flex: 1; height: 38px; border-radius: 12px; display: grid; place-items: center; background: var(--card); color: var(--muted); font-style: normal; font-size: 14px; font-weight: 700; }
 .wo-rounds i.ok { background: rgba(166, 255, 0, .16); color: var(--exercise); }
 .wo-rounds i.cur { background: var(--fg); color: #000; }
@@ -768,6 +776,7 @@ body.keyboard .wo-bar { display: none; }
 .wo-cn { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: var(--card-2); color: var(--muted); font-size: 12px; font-weight: 800; }
 .wo-cname b { display: block; font-size: 16px; }
 .wo-cname small { display: block; color: var(--muted); font-size: 12px; }
+.wo-cname .wo-was { display: inline; font-size: 12px; }
 .wo-crun { color: var(--stand); margin-top: 8px; }
 
 /* Allenamento: circuito guidato a tutto schermo */
@@ -858,9 +867,7 @@ body.keyboard .wo-bar { display: none; }
 .wo-srow .wo-row { border-bottom: 0; flex: 1; min-width: 0; }
 .wo-pen { flex: none; width: 36px; height: 36px; display: grid; place-items: center; border: 0; border-radius: 50%; background: var(--card-2); color: var(--stand); }
 .wo-pen svg { width: 17px; height: 17px; }
-.wo-recpm { margin-left: auto; display: flex; align-items: center; gap: 6px; }
-.wo-recpm .wo-chip { margin: 0; }
-.wo-recb { width: 32px; height: 32px; flex: none; border: 0; border-radius: 50%; background: var(--card-2); color: var(--stand); font-size: 19px; font-weight: 800; }
+.wo-recb { width: 58px; height: 58px; flex: none; border: 0; border-radius: 50%; background: var(--card-2); color: var(--stand); font-size: 26px; font-weight: 800; }
 .wo-ed-title { margin: 4px 0 12px; font-size: 26px; letter-spacing: -.02em; }
 .wo-lbl { display: block; margin: 14px 2px 6px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
 .wo-ed-name { margin: 0; font-size: 19px; font-weight: 700; outline: 1.5px solid var(--stand); outline-offset: -1.5px; }

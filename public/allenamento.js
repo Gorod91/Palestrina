@@ -492,6 +492,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   }
   /** Circuito di una scheda ("@nome"), oppure null per un esercizio normale. */
   const circIn = (sch, id) => (id[0] === '@' && sch && sch.circuiti ? sch.circuiti[id.slice(1)] || null : null);
+  /** Recupero tra i giri di un circuito: quello scelto da me con − + (in recMap, chiave '@id'), altrimenti quello della scheda. */
+  const circRec = (id, c) => recMap[id] || c.rec;
   const curSch = () => (schede || []).find((s) => s.id === ui.scheda);
   /** Come si segna un esercizio in una scheda: quello scelto lì, altrimenti quello del catalogo. */
   const tOf = (ex, sch = curSch()) => (sch && sch.piano && sch.piano[ex] && sch.piano[ex].t) || unit(EX[ex]);
@@ -870,7 +872,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const id = ui.list[k], c = circIn(sch, id);
     if (c.lista) return listaHtml(k, sch, c);
     const st = circState(id, c, sch);
-    const head = `<div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${st.giri} giri</span><span class="wo-pill">recupero ${mmss(c.rec)}${c.rec < 60 ? '"' : ''}</span>${c.pausa ? `<span class="wo-pill">pausa ${c.pausa}"</span>` : ''}</div>`;
+    const head = `<div class="wo-ex"><div class="wo-ex-name">${esc(c.n)}</div><span class="wo-pill wo-plan">${st.giri} giri</span>${c.pausa ? `<span class="wo-pill">pausa ${c.pausa}"</span>` : ''}</div>`;
     if (isDone(id, sch) && !pageOf(id).rifai) {
       const nx = nextTodo(k);
       return `<section class="wo-page" data-k="${k}">${head}
@@ -878,15 +880,21 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         ${nx < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : ''}<button class="link-button" data-a="crifai">Rifai il circuito</button></section>`;
     }
     const rounds = Array.from({ length: st.giri }, (_, g) => `<i class="${g < st.cur ? 'ok' : g === st.cur ? 'cur' : ''}">${g < st.cur ? '✓' : `Giro ${g + 1}`}</i>`).join('');
+    // come negli esercizi: la volta scorsa in rosso, e sopra da quanto tempo
+    let lastDay = '';
     const rows = c.ex.map((e, j) => {
       const t = tOf(e, sch), l = lastTime(e, t), pi = sch && sch.piano ? sch.piano[e] : null;
-      const info = [pi && pi.s, l && `ultima volta ${summary(l.sets, t)}`].filter(Boolean).join(' · ');
-      return `<div class="wo-cex"><span class="wo-cn">${j + 1}</span>${figSvg(e, 'sm')}<div class="wo-cname"><b>${esc(nameOf(e))}</b><small>${esc(info)}</small></div>
+      if (l && l.day > lastDay) lastDay = l.day;
+      const info = [pi && esc(pi.s), l && `<span class="wo-was">${esc(summary(l.sets, t))}</span>`].filter(Boolean).join(' · ');
+      return `<div class="wo-cex"><span class="wo-cn">${j + 1}</span>${figSvg(e, 'sm')}<div class="wo-cname"><b>${esc(nameOf(e))}</b><small>${info}</small></div>
         <span class="wo-pm"><button data-a="cv-:${e}" aria-label="Meno">−</button><label class="wo-in"><input data-f="c:${e}" inputmode="numeric" value="${st.vals[e]}" aria-label="${esc(nameOf(e))}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${uShort(t)}</em></label><button data-a="cv+:${e}" aria-label="Più">+</button></span></div>`;
     }).join('');
     return `<section class="wo-page" data-k="${k}">${head}
       <div class="wo-rounds"><button data-a="cg-" aria-label="Un giro in meno">−</button>${rounds}<button data-a="cg+" aria-label="Un giro in più">+</button></div>
+      ${lastDay ? `<p class="wo-last">In <b>rosso</b> la volta scorsa, ${agoText(lastDay)}</p>` : ''}
       <div class="wo-cexs">${rows}</div>
+      <div class="wo-cex wo-crec"><svg class="wo-fig sm" viewBox="-7.25 -1 39 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13.5" r="8"/><path d="M12 13.5V9M9.5 2.5h5M19 6l1.5-1.5"/></svg><div class="wo-cname"><b>Recupero tra i giri</b><small>vale per questo circuito</small></div>
+        <span class="wo-pm"><button data-a="crec-:${id}" aria-label="15 secondi in meno">−</button><label class="wo-in"><input data-f="crec:${id}" inputmode="numeric" value="${circRec(id, c)}" aria-label="Recupero tra i giri in secondi, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>s</em></label><button data-a="crec+:${id}" aria-label="15 secondi in più">+</button></span></div>
       <button class="primary" data-a="cgiro">✓ Giro ${st.cur + 1} fatto</button>
       <button class="secondary wo-crun" data-a="crun">▶ Avvia circuito guidato</button>
       ${st.cur ? `<button class="link-button" data-a="csave">Salva con ${st.cur} ${st.cur === 1 ? 'giro' : 'giri'}</button>` : ''}
@@ -951,7 +959,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (j >= runPlan.length) return `<div class="wo-run-done">✓</div><div class="wo-big-head"><b>Fine circuito</b><small>lascia qui per salvare</small></div>`;
     const s = runPlan[j];
     if (s.rest) return `<div class="wo-big-head wo-rest-head"><b>${restName(s)}</b><small>${restNext(s)}</small></div>
-      <button class="timer-running wo-run-rest" data-r="next"><span>${mmss(s.pausa ? c.pausa : c.rec)}</span><small>tocca per saltare</small></button>`;
+      <button class="timer-running wo-run-rest" data-r="next"><span>${mmss(s.pausa ? c.pausa : circRec(runId, c))}</span><small>tocca per saltare</small></button>`;
     if (tOf(s.e) !== 'sec') return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>${figSvg(s.e, 'run')}
       <button class="wo-run-reps" data-r="next">${st.vals[s.e]}<small>ripetizioni · fatto ✓</small></button>`;
     const total = st.vals[s.e];
@@ -1019,7 +1027,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (!s || !(s.rest || s.started)) return;
     const c = circIn(curSch(), runId), st = pageOf(runId).circ;
     const page = run.querySelector(`.wo-run-page[data-j="${runAt}"]`);
-    const total = s.rest ? (s.pausa ? c.pausa : c.rec) : st.vals[s.e];
+    const total = s.rest ? (s.pausa ? c.pausa : circRec(runId, c)) : st.vals[s.e];
     run.classList.toggle('rest', !!s.rest);
     page.innerHTML = `<div class="wo-big-head${s.rest ? ' wo-rest-head' : ''}"><b>${s.rest ? restName(s) : esc(nameOf(s.e))}</b><small>${s.rest ? restNext(s) : ''}</small></div>
       <button class="timer-running${s.rest ? ' wo-run-rest' : ''}" data-r="next"><span></span><small>tocca per saltare</small></button>`;
@@ -1174,12 +1182,13 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const sch = curSch(), pi = sch && sch.piano ? sch.piano[ex] : null;
     return recMap[ex] || (pi && pi.rec) || REST;
   };
+  /** Recupero: anello grande con − e + ai lati (15 secondi); un tocco nel riquadro lo fa partire, mentre conta lo ferma. */
   function restHtml(ex) {
-    if (!restEnd) {
-      return `${dial(1)}<b>Recupero</b><span class="wo-recpm"><button class="wo-recb" data-a="rec-:${ex}" aria-label="15 secondi in meno">−</button>`
-        + `<button class="wo-chip" data-a="rest">${mmss(restOf(ex))} ▸</button><button class="wo-recb" data-a="rec+:${ex}" aria-label="15 secondi in più">+</button></span>`;
-    }
-    return `${dial(0)}<span><small>Recupero</small><b class="wo-rest-left">${mmss(restTotal)}</b></span><button class="wo-chip" data-a="stop">Stop</button>`;
+    const t = restEnd ? restTotal : restOf(ex);
+    const ring = `<button class="wo-dial" style="--p:0" data-a="${restEnd ? 'stop' : 'rest'}"><small>Recupero</small><b class="wo-rest-left">${mmss(t)}</b><em>${restEnd ? 'tocca per fermare' : 'tocca per partire'}</em></button>`;
+    if (restEnd) return ring; // mentre conta niente − e +: tutto il riquadro ferma
+    return `<button class="wo-recb" data-a="rec-:${ex}" aria-label="15 secondi in meno">−</button>${ring}`
+      + `<button class="wo-recb" data-a="rec+:${ex}" aria-label="15 secondi in più">+</button>`;
   }
 
   function tmrHtml(ex, sets) {
@@ -1269,8 +1278,46 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     const alarm = document.getElementById('timer-alarm'); // lo stesso lampeggio del timer addominali
-    if (alarm) alarm.hidden = false;
+    if (alarm) {
+      alarm.hidden = false;
+      shakeToStop(alarm);
+    }
     tickRest();
+  }
+
+  // ---------- Lampeggio fermato muovendo il telefono ----------
+  // Su iPhone il permesso al movimento si chiede con un tocco: lo chiediamo quando si fa partire un timer.
+  let motionOk = typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission !== 'function';
+  function askMotion() {
+    if (motionOk || typeof DeviceMotionEvent === 'undefined' || !DeviceMotionEvent.requestPermission) return;
+    DeviceMotionEvent.requestPermission().then((r) => (motionOk = r === 'granted')).catch(() => {});
+  }
+  /** Due scossoni in mezzo secondo fermano il lampeggio (dopo la vibrazione di fine, che non conta). */
+  function shakeToStop(alarm) {
+    if (!motionOk) return;
+    const from = Date.now() + 800;
+    let prev = null, hit = 0;
+    const off = () => {
+      window.removeEventListener('devicemotion', on);
+      obs.disconnect();
+    };
+    const on = (ev) => {
+      const a = ev.accelerationIncludingGravity;
+      if (!a || a.x == null) return;
+      const now = Date.now();
+      if (prev && now > from && Math.abs(a.x - prev.x) + Math.abs(a.y - prev.y) + Math.abs(a.z - prev.z) > 12) {
+        if (hit && now - hit < 500) {
+          off();
+          if (!alarm.hidden) alarm.click();
+          return;
+        }
+        hit = now;
+      }
+      prev = { x: a.x, y: a.y, z: a.z };
+    };
+    const obs = new MutationObserver(() => alarm.hidden && off()); // fermato col dito: smetto di ascoltare
+    obs.observe(alarm, { attributes: true, attributeFilter: ['hidden'] });
+    window.addEventListener('devicemotion', on);
   }
 
   // Tornando nell'app dopo la fine di un timer: il lampeggio parte subito
@@ -1845,8 +1892,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   root.addEventListener('click', (ev) => {
     let a = ev.target.closest('[data-a]')?.dataset.a;
-    // il recupero parte toccando la barra in qualsiasi punto (fermo; mentre conta c'è il tasto Stop)
-    if (!a && ev.target.closest('.wo-rest') && !restEnd) a = 'rest';
+    // il recupero parte toccando il riquadro in qualsiasi punto, e mentre conta si ferma allo stesso modo
+    if (!a && ev.target.closest('.wo-rest')) a = restEnd ? 'stop' : 'rest';
     if (!a) return;
     const page = ev.target.closest('.wo-page');
     if (page) ui.i = Number(page.dataset.k); // i tasti valgono per la pagina in cui sono
@@ -1981,6 +2028,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'crifai') {
       Object.assign(P(), { circ: null, rifai: true }); // si rifà da capo; i giri salvati restano finché non si salvano i nuovi
     } else if (cmd === 'tgo') {
+      askMotion();
       const ex = ui.list[ui.i], sets = P().sets || [];
       const j = Math.max(0, Math.min(Number(arg) || 0, sets.length - 1));
       const sec = (sets[j] || {}).reps || 30;
@@ -1988,10 +2036,15 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       tmr = { ex, j, go, end: go + sec * 1000, total: sec };
     } else if (cmd === 'tstop') {
       tmr.end = 0;
+    } else if (cmd === 'crec-' || cmd === 'crec+') { // come il recupero degli esercizi: si ricorda per il circuito
+      const c = circIn(curSch(), arg);
+      if (c) recMap[arg] = Math.max(15, Math.min(300, circRec(arg, c) + (cmd === 'crec+' ? 15 : -15)));
+      writeDoc();
     } else if (cmd === 'rec-' || cmd === 'rec+') { // si ricorda per l'esercizio, in tutte le schede
       recMap[arg] = Math.max(15, Math.min(600, restOf(arg) + (cmd === 'rec+' ? 15 : -15)));
       writeDoc();
     } else if (cmd === 'rest') {
+      askMotion();
       restTotal = restOf(ui.list[ui.i]);
       restEnd = Date.now() + restTotal * 1000;
     } else if (cmd === 'stop') {
@@ -2016,6 +2069,12 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (!f || !page) return;
     ui.i = Number(page.dataset.k);
     const pg = P();
+    if (f.startsWith('crec:')) { // recupero tra i giri scritto a mano, in secondi
+      const v = Math.round(Number(ev.target.value.replace(',', '.'))), id = f.slice(5);
+      if (v >= 15 && v <= 300) recMap[id] = v;
+      writeDoc();
+      return draw();
+    }
     if (f.startsWith('c:')) { // valore di un esercizio del circuito
       const v = Math.round(Number(ev.target.value.replace(',', '.')));
       if (pg.circ && v >= 1 && v <= 600) pg.circ.vals[f.slice(2)] = v;
