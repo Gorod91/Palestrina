@@ -59,9 +59,9 @@ export function preload() {
  * Apre la fotocamera frontale a tutto schermo e restituisce un canvas con lo scatto,
  * oppure null se l'utente annulla. Solo foto dal vivo: niente galleria.
  * Con `live` (utenti debug) mostra i parametri del Sudometro in tempo reale,
- * confrontati con `reference` se c'è.
+ * confrontati con `reference` se c'è. Con `confirm` lo scatto va confermato ("Usa questa" / "Rifai").
  */
-export async function takeSelfie(hint, { live = false, reference = null } = {}) {
+export async function takeSelfie(hint, { live = false, reference = null, confirm = true } = {}) {
   const $ = (id) => document.getElementById(id);
   const stream = await navigator.mediaDevices.getUserMedia({
     video: { facingMode: 'user', width: { ideal: 720 }, height: { ideal: 960 } },
@@ -78,10 +78,30 @@ export async function takeSelfie(hint, { live = false, reference = null } = {}) 
   let open = true;
   if (live) liveLoop(video, reference, () => open);
 
+  // Dopo lo scatto la foto resta ferma con "Usa questa" e "Rifai": si usa solo quella confermata.
+  const choose = (confirming) => {
+    $('camera-hint').textContent = confirming ? 'Va bene questa foto?' : hint;
+    $('camera-confirm').hidden = !confirming;
+    $('btn-shoot').closest('.camera-actions').hidden = confirming;
+  };
+  choose(false);
   const result = await new Promise((resolve) => {
-    $('btn-shoot').onclick = () => resolve(capture(video, 960)); // più grande: dopo il ritaglio sul viso resta nitida
+    let shot = null;
+    $('btn-shoot').onclick = () => {
+      shot = capture(video, 960); // più grande: dopo il ritaglio sul viso resta nitida
+      if (!confirm) return resolve(shot);
+      video.pause();
+      choose(true);
+    };
+    $('btn-retake').onclick = () => {
+      shot = null;
+      choose(false);
+      video.play().catch(() => {});
+    };
+    $('btn-use').onclick = () => resolve(shot);
     $('btn-cancel').onclick = () => resolve(null);
   });
+  choose(false);
 
   open = false;
   stream.getTracks().forEach((t) => t.stop());
