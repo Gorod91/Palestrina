@@ -345,7 +345,6 @@ function nextKg(v, d) {
 const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' });
 const today = () => dayFmt.format(new Date());
 const daysAgo = (d) => Math.round((Date.parse(today() + 'T12:00:00Z') - Date.parse(d + 'T12:00:00Z')) / 86400000);
-const shortDay = (d) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'short', day: 'numeric' });
 const kgf = (v) => String(v).replace('.', ',');
 /** Quanto tempo fa, a parole: ieri, 3 giorni fa, 2 settimane fa, 1 mese fa. */
 function agoText(d) {
