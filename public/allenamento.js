@@ -888,8 +888,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }).join('');
     return `<section class="wo-page" data-k="${k}">${head}
       <div class="wo-rounds"><button data-a="cg-" aria-label="Un giro in meno">−</button>${rounds}<button data-a="cg+" aria-label="Un giro in più">+</button></div>
-      <div class="wo-crec"><span>Recupero tra i giri</span><button data-a="crec-:${id}" aria-label="15 secondi in meno">−</button><b>${mmss(circRec(id, c))}${circRec(id, c) < 60 ? '"' : ''}</b><button data-a="crec+:${id}" aria-label="15 secondi in più">+</button></div>
       <div class="wo-cexs">${rows}</div>
+      <div class="wo-crec"><span>Recupero tra i giri</span><button data-a="crec-:${id}" aria-label="15 secondi in meno">−</button><b>${mmss(circRec(id, c))}${circRec(id, c) < 60 ? '"' : ''}</b><button data-a="crec+:${id}" aria-label="15 secondi in più">+</button></div>
       <button class="primary" data-a="cgiro">✓ Giro ${st.cur + 1} fatto</button>
       <button class="secondary wo-crun" data-a="crun">▶ Avvia circuito guidato</button>
       ${st.cur ? `<button class="link-button" data-a="csave">Salva con ${st.cur} ${st.cur === 1 ? 'giro' : 'giri'}</button>` : ''}
