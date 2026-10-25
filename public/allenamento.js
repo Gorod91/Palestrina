@@ -1269,8 +1269,46 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
     const alarm = document.getElementById('timer-alarm'); // lo stesso lampeggio del timer addominali
-    if (alarm) alarm.hidden = false;
+    if (alarm) {
+      alarm.hidden = false;
+      shakeToStop(alarm);
+    }
     tickRest();
+  }
+
+  // ---------- Lampeggio fermato muovendo il telefono ----------
+  // Su iPhone il permesso al movimento si chiede con un tocco: lo chiediamo quando si fa partire un timer.
+  let motionOk = typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission !== 'function';
+  function askMotion() {
+    if (motionOk || typeof DeviceMotionEvent === 'undefined' || !DeviceMotionEvent.requestPermission) return;
+    DeviceMotionEvent.requestPermission().then((r) => (motionOk = r === 'granted')).catch(() => {});
+  }
+  /** Due scossoni in mezzo secondo fermano il lampeggio (dopo la vibrazione di fine, che non conta). */
+  function shakeToStop(alarm) {
+    if (!motionOk) return;
+    const from = Date.now() + 800;
+    let prev = null, hit = 0;
+    const off = () => {
+      window.removeEventListener('devicemotion', on);
+      obs.disconnect();
+    };
+    const on = (ev) => {
+      const a = ev.accelerationIncludingGravity;
+      if (!a || a.x == null) return;
+      const now = Date.now();
+      if (prev && now > from && Math.abs(a.x - prev.x) + Math.abs(a.y - prev.y) + Math.abs(a.z - prev.z) > 12) {
+        if (hit && now - hit < 500) {
+          off();
+          if (!alarm.hidden) alarm.click();
+          return;
+        }
+        hit = now;
+      }
+      prev = { x: a.x, y: a.y, z: a.z };
+    };
+    const obs = new MutationObserver(() => alarm.hidden && off()); // fermato col dito: smetto di ascoltare
+    obs.observe(alarm, { attributes: true, attributeFilter: ['hidden'] });
+    window.addEventListener('devicemotion', on);
   }
 
   // Tornando nell'app dopo la fine di un timer: il lampeggio parte subito
@@ -1981,6 +2019,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (cmd === 'crifai') {
       Object.assign(P(), { circ: null, rifai: true }); // si rifà da capo; i giri salvati restano finché non si salvano i nuovi
     } else if (cmd === 'tgo') {
+      askMotion();
       const ex = ui.list[ui.i], sets = P().sets || [];
       const j = Math.max(0, Math.min(Number(arg) || 0, sets.length - 1));
       const sec = (sets[j] || {}).reps || 30;
@@ -1992,6 +2031,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       recMap[arg] = Math.max(15, Math.min(600, restOf(arg) + (cmd === 'rec+' ? 15 : -15)));
       writeDoc();
     } else if (cmd === 'rest') {
+      askMotion();
       restTotal = restOf(ui.list[ui.i]);
       restEnd = Date.now() + restTotal * 1000;
     } else if (cmd === 'stop') {
