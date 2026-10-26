@@ -1,5 +1,5 @@
 import * as sudometro from './sudometro.js';
-import { initTimer, setTimerAccount } from './timer.js';
+import { initTimer, setTimerAccount, shakeEnabled, setShakeEnabled } from './timer.js';
 import { createChat, answersList, bicep } from './chat.js';
 import { fakeState, fakeChat, fakePhoto } from './fake.js';
 import { createFbData } from './fbdata.js';
@@ -1684,6 +1684,9 @@ $('debug-mode').addEventListener('change', (e) => {
   render();
   chat.redraw();
 });
+
+$('shake-stop').checked = shakeEnabled();
+$('shake-stop').addEventListener('change', (e) => setShakeEnabled(e.target.checked));
 
 $('chat-notify').addEventListener('change', async (e) => {
   try {

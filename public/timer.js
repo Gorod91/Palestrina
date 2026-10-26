@@ -47,25 +47,35 @@ export function popCount(el, txt) {
 }
 
 // ---------- Lampeggio fermato muovendo il telefono (timer addominali e timer dell'allenamento) ----------
-// Su iPhone il permesso al movimento si chiede con un tocco: lo chiediamo quando si fa partire un timer.
+// Si attiva nelle impostazioni (spento di default): su iPhone il permesso al movimento va richiesto con un tocco
+// e alle app sulla Home iOS lo richiede a ogni riapertura, quindi lo chiediamo solo a chi l'ha acceso.
+const SHAKE_KEY = 'palestrina.shakeStop';
+export function shakeEnabled() {
+  try { return localStorage.getItem(SHAKE_KEY) === 'true'; } catch { return false; }
+}
+export function setShakeEnabled(on) {
+  try { localStorage.setItem(SHAKE_KEY, String(on)); } catch { /* storage non disponibile */ }
+  if (on) askMotion();
+}
 let motionOk = typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission !== 'function';
 export function askMotion() {
-  if (motionOk || typeof DeviceMotionEvent === 'undefined' || !DeviceMotionEvent.requestPermission) return;
+  if (!shakeEnabled() || motionOk || typeof DeviceMotionEvent === 'undefined' || !DeviceMotionEvent.requestPermission) return;
   DeviceMotionEvent.requestPermission().then((r) => (motionOk = r === 'granted')).catch(() => {});
 }
 /** Basta muovere il telefono (sollevarlo, girarlo, scuoterlo) per fermare il lampeggio: si confronta l'accelerazione con
  *  la sua media degli ultimi istanti. Il primo secondo non conta, per la vibrazione di fine. */
 export function shakeToStop(alarm) {
-  if (!motionOk) return;
+  const on = motionOk && shakeEnabled();
   const hint = alarm.querySelector('p:last-child');
-  if (hint) hint.textContent = 'Tocca o scuoti il telefono per fermare';
+  if (hint) hint.textContent = on ? 'Tocca o scuoti il telefono per fermare' : 'Tocca per fermare';
+  if (!on) return;
   const from = Date.now() + 1000;
   let avg = null;
   const off = () => {
-    window.removeEventListener('devicemotion', on);
+    window.removeEventListener('devicemotion', onMotion);
     obs.disconnect();
   };
-  const on = (ev) => {
+  const onMotion = (ev) => {
     const a = ev.accelerationIncludingGravity;
     if (!a || a.x == null) return;
     if (!avg || Date.now() < from) {
@@ -81,7 +91,7 @@ export function shakeToStop(alarm) {
   };
   const obs = new MutationObserver(() => alarm.hidden && off()); // fermato col dito: smetto di ascoltare
   obs.observe(alarm, { attributes: true, attributeFilter: ['hidden'] });
-  window.addEventListener('devicemotion', on);
+  window.addEventListener('devicemotion', onMotion);
 }
 
 export function setTimerAccount(name, serverSeconds, save) {
