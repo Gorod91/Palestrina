@@ -617,6 +617,10 @@ export const WEIGHTS4 = {
   base: 26, // punteggio con riflessi uguali al riferimento
   perPoint: 3.25, // punti per ogni punto di aumento medio dei riflessi
   zoneCap: 20, // una zona conta al massimo ±20 (una sola zona molto lucida non decide da sola)
+  // Selfie molto più chiaro del riferimento: i riflessi non si possono confrontare (Rizzo 15/10 prendeva 48 col voto 0,
+  // Michy 25/10 prendeva 0 col voto 50). Oltre +6 di luce contano sempre meno, a +14 non contano più (resta la base).
+  lightFrom: 6,
+  lightZero: 14,
 };
 
 /** Sudometro 4: stesse misure del 3 (zones3), solo i riflessi. */
@@ -624,8 +628,10 @@ export function scoreV4(rest, sweat) {
   const keys = Object.keys(sweat.zones3 || {});
   const cap = (v) => Math.max(-WEIGHTS4.zoneCap, Math.min(WEIGHTS4.zoneCap, v));
   const hl = keys.length ? keys.reduce((t, k) => t + cap(sweat.zones3[k] - ((rest.zones3 || {})[k] || 0)), 0) / keys.length : 0;
-  const total = Math.max(0, Math.min(100, Math.round(WEIGHTS4.base + WEIGHTS4.perPoint * hl)));
-  return { score: total, title: TITLES.find(([min]) => total >= min)[1], details: { shine: round(hl), light: round(sweat.L - rest.L) } };
+  const dL = sweat.L - rest.L;
+  const lf = Math.max(0, Math.min(1, (WEIGHTS4.lightZero - dL) / (WEIGHTS4.lightZero - WEIGHTS4.lightFrom)));
+  const total = Math.max(0, Math.min(100, Math.round(WEIGHTS4.base + WEIGHTS4.perPoint * hl * lf)));
+  return { score: total, title: TITLES.find(([min]) => total >= min)[1], details: { shine: round(hl), light: round(dL), lf: round(lf) } };
 }
 
 export const RETAKE_HINT = {
