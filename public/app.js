@@ -8,6 +8,7 @@ import { createWorkout } from './allenamento.js';
 import { alF, kingTitle } from './genere.js';
 import { initSheetDrag } from './sheetdrag.js';
 import { showSudoReveal } from './sudoreveal.js';
+import { releaseNotesHtml } from './note.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -1666,6 +1667,13 @@ $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
 $('btn-points-info').addEventListener('click', () => ($('points-info').hidden = false));
 $('points-info').addEventListener('click', (e) => {
   if (e.target === $('points-info') || e.target.closest('.sheet-close')) $('points-info').hidden = true;
+});
+$('btn-notes').addEventListener('click', () => {
+  $('release-notes-list').innerHTML = releaseNotesHtml(state);
+  $('release-notes').hidden = false;
+});
+$('release-notes').addEventListener('click', (e) => {
+  if (e.target === $('release-notes') || e.target.closest('.sheet-close')) $('release-notes').hidden = true;
 });
 $('btn-reref').addEventListener('click', () => {
   if (state.me.reference && !confirm('Rifare la foto di riferimento? Quella vecchia verrà sostituita.')) return;
