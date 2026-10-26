@@ -340,6 +340,9 @@
           </section>
         </div>
 
+        <h2 class="section">Informazioni</h2>
+        <section class="card list"><button id="btn-notes" class="row">Note di rilascio</button></section>
+
         <section class="card list" style="margin-top:20px">
           <button id="btn-logout" class="row destructive">Esci</button>
         </section>
@@ -432,6 +435,14 @@
       <h4>Re del mese</h4>
       <p class="muted">L'ultimo giorno del mese alle 21 chi ha più punti diventa Re del mese: annuncio in chat e notifica a tutti, poi il suo nome entra nell'albo d'oro.</p>
       <p class="muted">L'albo d'oro è in fondo alla Classifica.</p>
+    </div>
+  </div>
+
+  <!-- Note di rilascio (public/note.js): solo le novità già rilasciate -->
+  <div id="release-notes" class="sheet" hidden>
+    <div class="sheet-card" role="dialog" aria-labelledby="release-notes-title">
+      <div class="sheet-head"><h3 id="release-notes-title">Note di rilascio</h3><button class="sheet-close" aria-label="Chiudi">×</button></div>
+      <div id="release-notes-list"></div>
     </div>
   </div>
 
