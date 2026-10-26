@@ -282,7 +282,8 @@ function testOn() {
 // può restare appesa per sempre, e chi la aspetta (es. la chat) non riproverebbe più.
 const READ_TIMEOUT = { chat: 20000, state: 20000, photos: 30000 };
 
-async function realApi(action, data = {}) {
+/** `real`: sempre sui dati veri, anche in modalità prova. */
+async function realApi(action, data = {}, { real = false } = {}) {
   const ms = READ_TIMEOUT[action];
   const ctrl = ms && typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = ctrl && setTimeout(() => ctrl.abort(), ms);
@@ -294,7 +295,7 @@ async function realApi(action, data = {}) {
     const res = await fetch(cfg.appsScriptUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify({ action, code: session && session.code, ver: APP_VERSION, ...(testOn() ? { test: true, actAs: store.get('actAs') || undefined } : {}), ...data }),
+      body: JSON.stringify({ action, code: session && session.code, ver: APP_VERSION, ...(testOn() && !real ? { test: true, actAs: store.get('actAs') || undefined } : {}), ...data }),
       signal: ctrl ? ctrl.signal : undefined,
     });
     out = await res.json();
@@ -1366,7 +1367,8 @@ $('btn-admin').addEventListener('click', openAdmin);
 $('btn-photos-zip').addEventListener('click', photosZip);
 
 // ---------- Admin: tutte le foto del Sudometro in uno zip ----------
-// Primo tocco: prepara lo zip (foto da sudato, riferimenti e dati.json con punteggi e misure).
+// Primo tocco: prepara lo zip (foto da sudato, riferimenti e dati.json con punteggi e misure). Sempre con i dati
+// veri: in modalità prova la tabella di prova è una copia vecchia e mancherebbero i Sudometro fatti dopo.
 // Secondo tocco: lo condivide o lo salva (iPhone vuole un tocco "fresco" per aprire la condivisione).
 let zipReady = null; // { blob, name, count }
 const ZIP_LABEL = $('btn-photos-zip').textContent;
@@ -1378,7 +1380,7 @@ async function photosZip() {
   const label = (t) => (btn.innerHTML = `${bicep()}${t}`);
   try {
     label('Preparo l\'elenco…');
-    const { rows, refs } = await realApi('adminPhotos');
+    const { rows, refs } = await realApi('adminPhotos', {}, { real: true });
     const safe = (t) => String(t).normalize('NFD').replace(/[^A-Za-z0-9 _-]/g, '').trim().replace(/\s+/g, '_') || 'x';
     const names = new Map(); // id foto → nome nel file zip
     rows.forEach((r) => {
@@ -1394,7 +1396,7 @@ async function photosZip() {
     const files = [];
     for (let i = 0; i < ids.length; i += 8) {
       label(`Scarico le foto… ${i}/${ids.length}`);
-      const { photos } = await realApi('adminPhotos', { ids: ids.slice(i, i + 8) });
+      const { photos } = await realApi('adminPhotos', { ids: ids.slice(i, i + 8) }, { real: true });
       Object.entries(photos || {}).forEach(([id, p]) => files.push({ name: names.get(id), data: Uint8Array.from(atob(p.data), (c) => c.charCodeAt(0)) }));
     }
     const data = {
@@ -1404,7 +1406,7 @@ async function photosZip() {
     };
     files.push({ name: 'dati.json', data: new TextEncoder().encode(JSON.stringify(data, null, 2)) });
     const day = new Date().toLocaleDateString('en-CA');
-    zipReady = { blob: makeZip(files), name: `sudometro-${day}${testOn() ? '-prova' : ''}.zip`, count: files.length - 1 };
+    zipReady = { blob: makeZip(files), name: `sudometro-${day}.zip`, count: files.length - 1 };
     const missing = ids.length - zipReady.count;
     btn.textContent = `Zip pronto (${zipReady.count} foto): tocca per salvarlo o inviarlo`;
     if (missing) toast(`${missing} foto non trovate: sono nello zip le altre`);
