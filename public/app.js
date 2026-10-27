@@ -809,24 +809,28 @@ function renderSudometro() {
     return;
   }
 
-  // 2) Sudometro di oggi già fatto
-  if (me.sudometroToday) {
+  // 2) Sudometro di oggi già fatto (o in attesa di rete sul telefono)
+  const waiting = !me.sudometroToday && sudoWaiting();
+  const sameDay = waiting && new Date(waiting.takenAt).toDateString() === new Date().toDateString();
+  const sudoToday = me.sudometroToday || (sameDay && { score: waiting.data.score, title: waiting.data.title, photoId: '' });
+  if (sudoToday) {
     el.innerHTML = `
       <div class="sudo-result">
-        <div class="ring">${ring(me.sudometroToday.score / 100, ...COLORS.stand, { size: 112, width: 16 })}</div>
+        <div class="ring">${ring(sudoToday.score / 100, ...COLORS.stand, { size: 112, width: 16 })}</div>
         <div>
-          <p class="metric stand">${me.sudometroToday.score}<small>/100</small></p>
+          <p class="metric stand">${sudoToday.score}<small>/100</small></p>
           <p class="sudo-title"></p>
           <p class="sudo-text">Il Sudometro di oggi è fatto. Domani si replica.</p>
         </div>
       </div>`;
-    el.querySelector('.sudo-title').textContent = alF(clean(me.sudometroToday.title), isF(me.name));
-    if (me.sudometroToday.saving) el.insertAdjacentHTML('beforeend', `<p class="saving-line">${bicep()}<span>Pubblico la foto…</span></p>`);
-    if (me.sudometroToday.photoId) {
-      const t = me.sudometroToday;
+    el.querySelector('.sudo-title').textContent = alF(clean(sudoToday.title), isF(me.name));
+    if (sameDay) el.insertAdjacentHTML('beforeend', `<p class="saving-line">${bicep()}<span>Senza rete: la foto parte appena torna la connessione</span></p>`);
+    if (sudoToday.saving) el.insertAdjacentHTML('beforeend', `<p class="saving-line">${bicep()}<span>Pubblico la foto…</span></p>`);
+    if (sudoToday.photoId) {
+      const t = sudoToday;
       el.append(photoPair(t.photoId, t.refId || (me.reference && me.reference.photoId), `${me.display} · ${t.score} · ${alF(clean(t.title), isF(me.name))}`, true, isF(me.name)));
     }
-    if (debugOn()) {
+    if (debugOn() && !sameDay) {
       el.insertAdjacentHTML('beforeend', '<button id="btn-redo" class="secondary" style="margin-top:14px">Rifai e sovrascrivi (debug)</button>');
       el.querySelector('#btn-redo').onclick = () => takeSweat(false, true);
     }
@@ -1029,9 +1033,16 @@ async function takeSweat(debug, overwrite = false) {
         state = before; // non è andato: torna com'era
         optimistic--;
         before = null;
+        // Senza rete la foto resta sul telefono e parte da sola appena torna la connessione (entro un'ora)
+        if (netError(err) && keepSudo({ score: shown.score, title: shown.title, details: { ...result.details, v2: compactV2(v2), v3: compactV3(v2), v4: v2.res4 ? { score: v2.res4.score, ...v2.res4.details } : { err: v2.error || 'non calcolato' } }, photo })) return null;
       }
       throw err;
     });
+    if (!r) {
+      toast('Niente rete: la foto resta sul telefono e parte da sola appena torna la connessione (entro un\'ora)', 6000);
+      renderSudometro();
+      return;
+    }
     if (before) {
       optimistic--;
       // Con Firebase la foto si vede appena il server la accetta, senza aspettare il nuovo stato
@@ -1059,6 +1070,69 @@ async function takeSweat(debug, overwrite = false) {
   }
   renderSudometro(); // anche se l'aggiornamento non è riuscito, toglie il bicipite
 }
+
+// ---------- Sudometro senza rete ----------
+// Se il selfie non parte per mancanza di rete, punteggio e foto restano sul telefono e si reinviano da soli
+// (al ritorno della rete, riaprendo l'app o ogni 30 secondi) fino a un'ora dallo scatto; poi si scartano.
+// Il server lo conta nel giorno dello scatto.
+const SUDO_WAIT_MS = 60 * 60000;
+const NET_ERRORS = /offline|connessione|non risponde|non ha risposto|firebase|troppo tardi|unavailable|fetch|load failed|network/i;
+const netError = (err) => !navigator.onLine || NET_ERRORS.test(String((err && err.message) || err));
+let sudoSending = false;
+
+/** Salva sul telefono il Sudometro non partito; false se non c'è spazio (resta l'errore di prima). */
+function keepSudo(data) {
+  store.set('sudoWaiting', { name: state.me.name, test: testOn(), takenAt: Date.now(), data });
+  return !!store.get('sudoWaiting');
+}
+
+/** Il mio Sudometro in attesa di rete (scartato dopo un'ora). */
+function sudoWaiting() {
+  const w = store.get('sudoWaiting');
+  if (!w) return null;
+  if (Date.now() - w.takenAt > SUDO_WAIT_MS) {
+    store.set('sudoWaiting', null);
+    toast('La foto del Sudometro non è partita entro un\'ora dallo scatto: scartata', 6000);
+    return null;
+  }
+  return state && state.me && w.name === state.me.name && w.test === testOn() ? w : null;
+}
+
+async function sendWaitingSudo() {
+  if (sudoSending || !session || !state || !state.me) return;
+  const idle = () => !$('sudo-body').querySelector('.loading'); // non durante un altro selfie
+  const had = store.get('sudoWaiting');
+  const w = sudoWaiting();
+  if (!w) {
+    if (had && !store.get('sudoWaiting') && idle()) renderSudometro(); // appena scartato
+    return;
+  }
+  if (!navigator.onLine) return;
+  sudoSending = true;
+  let changed = true;
+  try {
+    const r = await api('sudometro', { ...w.data, takenAt: w.takenAt });
+    store.set('sudoWaiting', null);
+    if (new Date(w.takenAt).toDateString() === new Date().toDateString()) {
+      state = { ...state, me: { ...state.me, sudometroToday: { score: w.data.score, title: w.data.title, photoId: r.photoId || '', refId: r.refId || '' } } };
+    }
+    toast('Foto del Sudometro inviata');
+    refresh();
+  } catch (err) {
+    if (netError(err)) {
+      changed = false; // si riprova
+      return;
+    }
+    store.set('sudoWaiting', null); // rifiutata dal server: inutile riprovare
+    if (!/già fatto/.test(err.message)) toast(`Foto del Sudometro non inviata: ${err.message}`, 6000);
+    refresh();
+  } finally {
+    sudoSending = false;
+    if (changed && idle()) renderSudometro();
+  }
+}
+setInterval(sendWaitingSudo, 30000);
+window.addEventListener('online', () => setTimeout(sendWaitingSudo, 2000));
 
 // ---------- Sudometro 2 ----------
 // Si analizzano le foto così come vengono salvate (ritaglio del viso, 480 px): il riferimento si rilegge dalla sua
@@ -1634,6 +1708,7 @@ async function home() {
   selectTab(fromUrl || store.get('tab'));
   if (state) chat.preload(); // la chat si aggiorna di nascosto mentre arrivano i dati, non dopo
   await refresh();
+  sendWaitingSudo(); // selfie rimasto sul telefono senza rete
   chat.preload(); // primo avvio: la chat si carica di nascosto, così il tab si apre già pieno
   updateNotifyCard();
   sudometro.preload();
@@ -1737,7 +1812,7 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState !== 'visible') return trace.flush();
   checkUpdate();
   syncDay();
-  if (session && state) refresh().then(() => chat.preload());
+  if (session && state) refresh().then(() => chat.preload()).then(sendWaitingSudo);
 });
 
 // Diagnostica: errori e stato della rete (registrati solo se il server la accende per questo account).
