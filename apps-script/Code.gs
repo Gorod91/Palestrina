@@ -958,14 +958,16 @@ function saveSudometro(user, req) {
   if (!getReference(user)) return { error: 'Prima fai la foto di riferimento' };
   // Un Sudometro al giorno. Le prove degli utenti debug non contano, non avvisano nessuno e si possono ripetere.
   const debug = user.debug && req.debug === true;
-  const today = dayString(new Date());
+  // Selfie rimasto sul telefono senza rete e reinviato (entro un'ora): conta nel giorno e all'ora dello scatto
+  const taken = Number(req.takenAt);
+  const now = taken > 0 && taken <= Date.now() + 60000 && Date.now() - taken < 70 * 60000 ? new Date(Math.min(taken, Date.now())) : new Date();
+  const today = dayString(now);
   const done = !debug && rows('sudometro').some((r) => r.day === today && r.name === user.name);
   if (done && user.debug && req.overwrite === true) return overwriteSudometro(user, req, today);
   if (done) return { error: 'Il Sudometro di oggi è già fatto' };
   const score = Math.max(0, Math.min(100, Math.round(Number(req.score) || 0)));
   const saved = savePhoto(user, req.photo, `sudato ${score}${debug ? ' debug' : ''}`, req.photoId);
   const refId = getReference(user).photoId || ''; // il riferimento di oggi: domani se ne farà un altro
-  const now = new Date();
   sheet('sudometro').appendRow([
     dayString(now),
     Utilities.formatDate(now, TZ, 'HH:mm'),

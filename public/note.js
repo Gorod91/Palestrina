@@ -18,8 +18,9 @@ const VERSIONS = [
   },
   {
     v: '1.5',
-    date: '23 – 26 ottobre 2026',
+    date: '23 – 27 ottobre 2026',
     items: [
+      'Sudometro: senza rete il selfie resta sul telefono e viene inviato da solo appena torna la connessione, entro un\'ora dallo scatto',
       'Sudometro: conferma del selfie dopo lo scatto, con le opzioni "Usa questa" e "Rifai"',
       'Sudometro: punteggio mostrato con l\'animazione del termometro',
       'Timer: arresto dell\'allarme muovendo il telefono, attivabile dalle Impostazioni',
