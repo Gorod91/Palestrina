@@ -2508,28 +2508,37 @@ function computePointsRaw(month) {
   const mondays = [];
   for (let d = monthStart; inMonth(d); d = addDays(d, 1)) if (weekKey(d) === d) mondays.push(d);
 
+  const dn = {};
+  users.forEach((x) => (dn[x.name] = x.display || x.name));
+  const sinceCambio = (c) => String(c.at).slice(11, 16);
+
   const table = users.map((u) => {
     const items = [];
-    const add = (key, label, pts, achievement) => items.push({ key, label, pts, achievement: !!achievement });
+    // day e note: quando e perché, per il dettaglio della classifica
+    const add = (key, label, pts, achievement, day, note) => items.push({ key, label, pts, achievement: !!achievement, day: day || '', note: note || '' });
     const mine = pres.filter((r) => r.name === u.name).sort((a, b) => (a.day < b.day ? -1 : 1));
     let friends = 0;
     let early = 0;
+    let earlyDay = '';
+    let friendsDay = '';
     mine.forEach((r, i) => {
       if (!inMonth(r.day)) return;
-      add('presenza', 'Presenze', P.presenza);
+      add('presenza', 'Presenze', P.presenza, false, r.day, `Check-in alle ${r.time}`);
       const prev = mine[i - 1];
-      if (prev && (parseDay(r.day) - parseDay(prev.day)) / 86400000 > P.rientroDopoGiorni) add('rientro', 'Rientro (vale doppio)', P.presenza);
-      if (pres.some((o) => o.name !== u.name && o.day === r.day && Math.abs(minutes(o.time) - minutes(r.time)) <= P.amiciMinuti)) {
-        add('amici', 'Bonus amici', P.amici);
-        friends++;
+      const gap = prev ? Math.round((parseDay(r.day) - parseDay(prev.day)) / 86400000) : 0;
+      if (prev && gap > P.rientroDopoGiorni) add('rientro', 'Rientro (vale doppio)', P.presenza, false, r.day, `Dopo ${gap} giorni senza palestra`);
+      const mates = pres.filter((o) => o.name !== u.name && o.day === r.day && Math.abs(minutes(o.time) - minutes(r.time)) <= P.amiciMinuti);
+      if (mates.length) {
+        add('amici', 'Bonus amici', P.amici, false, r.day, 'Con ' + mates.map((o) => `${dn[o.name] || o.name} (${o.time})`).join(', '));
+        if (++friends === P.brancoVolte) friendsDay = r.day;
       }
-      if (r.time && r.time < P.mattinieroPrima) early++;
+      if (r.time && r.time < P.mattinieroPrima && ++early === P.mattinieroVolte) earlyDay = r.day;
     });
-    sudo.filter((r) => r.name === u.name).forEach((r) => add('sudometro', 'Sudometro', r.score > 66 ? 3 : r.score > 33 ? 2 : 1));
+    sudo.filter((r) => r.name === u.name).forEach((r) => add('sudometro', 'Sudometro', r.score > 66 ? 3 : r.score > 33 ? 2 : 1, false, r.day, r.title ? `${r.score} · ${r.title}` : String(r.score)));
     if (featureOn('apripista')) {
       const from = featureFrom('apripista');
       allPolls().forEach((q) => {
-        if (q.name === u.name && inMonth(q.day) && q.day >= from && first[u.name + '|' + q.day]) add('apripista', 'Apripista', P.apripista);
+        if (q.name === u.name && inMonth(q.day) && q.day >= from && first[u.name + '|' + q.day]) add('apripista', 'Apripista', P.apripista, false, q.day, 'Primo a chiedere "chi va in palestra?"');
       });
     }
     // Settimane di fila: il bonus arriva nel giorno in cui si raggiunge l'obiettivo
@@ -2538,24 +2547,24 @@ function computePointsRaw(month) {
       if (days.length < u.goal || !inMonth(days[u.goal - 1])) continue;
       let n = 1;
       while (countInWeek(pres, u.name, addDays(w, -7 * n)) >= u.goal) n++;
-      if (n > 1) add('serie', 'Settimane di fila', Math.min(P.seriePerSettimana * (n - 1), P.serieMax));
+      if (n > 1) add('serie', 'Settimane di fila', Math.min(P.seriePerSettimana * (n - 1), P.serieMax), false, days[u.goal - 1], `${n}ª settimana di fila con l'obiettivo`);
     }
     // Sfide: +5 a chi vince, +2 agli altri partecipanti
     if (featureOn('sfide')) {
       const from = featureFrom('sfide');
       sfide().forEach((x) => {
         const pts = x.state === 'conclusa' && inMonth(x.day) && x.day >= from && x.data.result ? x.data.result.points[u.name] : 0;
-        if (pts === P.sfidaVinta) add('sfidaVinta', 'Sfide vinte', pts);
-        else if (pts) add('sfida', 'Sfide', pts);
+        if (pts === P.sfidaVinta) add('sfidaVinta', 'Sfide vinte', pts, false, x.day, 'Sfida vinta');
+        else if (pts) add('sfida', 'Sfide', pts, false, x.day, 'Sfida');
       });
     }
     // Penalità (da quando esistono)
     const today = dayString(new Date());
     const penFrom = penaltiesFrom();
     const penalties = [];
-    const pen = (key, label, pts, day) => {
+    const pen = (key, label, pts, day, note, shownDay) => {
       if (condoned[`${key}|${u.name}|${day}`]) return;
-      add(key, label, pts);
+      add(key, label, pts, false, shownDay || day, note);
       penalties.push({ key, label, pts, day });
     };
     const myCambi = cambi.filter((c) => c.name === u.name);
@@ -2564,37 +2573,39 @@ function computePointsRaw(month) {
       const plan = piani[day + '|' + u.name];
       const came = first[u.name + '|' + day];
       if (!came) {
-        if (day < today && plan && plan.choice === 'si') pen('bidone', 'Bidone', P.bidone, day);
+        if (day < today && plan && plan.choice === 'si') pen('bidone', 'Bidone', P.bidone, day, `Avevi detto "Ci sono"${plan.time ? ` per le ${plan.time}` : ''}, nessun check-in`);
         else {
           // Cambio all'ultimo: da "ci sono" ad altro a meno di 4 ore dall'orario (senza orario: dalle 14 di quel giorno).
           // Conta solo se la risposta finale non è più "ci sono": un ripensamento subito annullato non vale.
-          const late = !(plan && plan.choice === 'si') && myCambi.some((c) => c.day === day && c.from === 'si' && c.to !== 'si' && c.at >= `${day} ${c.timeBefore ? hhmmMinus(c.timeBefore, P.cambioOre * 60) : P.cambioSenzaOrario}`);
-          if (late) pen('cambio', 'Cambio all\'ultimo', P.cambioUltimo, day);
+          const late = !(plan && plan.choice === 'si') && myCambi.find((c) => c.day === day && c.from === 'si' && c.to !== 'si' && c.at >= `${day} ${c.timeBefore ? hhmmMinus(c.timeBefore, P.cambioOre * 60) : P.cambioSenzaOrario}`);
+          const to = late && ({ forse: '"Forse"', no: '"No"' }[late.to] || 'nessuna risposta');
+          if (late) pen('cambio', 'Cambio all\'ultimo', P.cambioUltimo, day, `Da "Ci sono" a ${to} alle ${sinceCambio(late)}${late.timeBefore ? ` (orario ${late.timeBefore})` : ''}`);
         }
         continue;
       }
-      if (plan && plan.choice === 'si' && plan.time && minutes(came.time) > minutes(plan.time) + P.ritardoMinuti) pen('ritardo', 'Ritardo', P.ritardo, day);
+      if (plan && plan.choice === 'si' && plan.time && minutes(came.time) > minutes(plan.time) + P.ritardoMinuti) pen('ritardo', 'Ritardo', P.ritardo, day, `Avevi detto ${plan.time}, check-in alle ${came.time}`);
       const limit = `${day} ${hhmmMinus(came.time, P.avvisoMinuti)}`;
       const told = myCambi.filter((c) => c.day === day && (c.to === 'si' || c.to === 'forse')).map((c) => c.at).sort()[0];
-      if (!told || told > limit) pen('avviso', 'Check-in senza avvisare', P.senzaAvviso, day);
+      if (!told || told > limit) pen('avviso', 'Check-in senza avvisare', P.senzaAvviso, day, told && told.slice(0, 10) === day ? `Risposta alle ${String(told).slice(11, 16)}, meno di un'ora prima del check-in (${came.time})` : `Nessuna risposta prima del check-in (${came.time})`);
     }
     // Settimana a vuoto: settimane finite (domenica nel mese) senza presenze, per chi c'era già
     const firstEver = mine.length ? mine[0].day : null;
     for (let w = weekKey(monthStart); w <= addDays(monthStart, 31); w = addDays(w, 7)) {
       const sunday = addDays(w, 6);
       if (!inMonth(sunday) || sunday >= today || w < penFrom || !firstEver || firstEver >= w) continue;
-      if (countInWeek(pres, u.name, w) === 0) pen('vuota', 'Settimana a vuoto', P.settimanaVuota, w);
+      if (countInWeek(pres, u.name, w) === 0) pen('vuota', 'Settimana a vuoto', P.settimanaVuota, w, `Nessuna presenza da lunedì ${Number(w.slice(8))} a domenica ${Number(sunday.slice(8))}`, sunday);
     }
-    if (early >= P.mattinieroVolte) add('mattiniero', u.f ? 'Mattiniera' : 'Mattiniero', P.mattiniero, true);
-    if (friends >= P.brancoVolte) add('branco', 'Branco', P.branco, true);
-    if (mondays.length && mondays.every((w) => countInWeek(pres, u.name, w) >= u.goal)) add('maiSaltato', 'Mai saltato', P.maiSaltato, true);
+    if (early >= P.mattinieroVolte) add('mattiniero', u.f ? 'Mattiniera' : 'Mattiniero', P.mattiniero, true, earlyDay, `${P.mattinieroVolte}° check-in prima delle ${Number(P.mattinieroPrima.slice(0, 2))}`);
+    if (friends >= P.brancoVolte) add('branco', 'Branco', P.branco, true, friendsDay, `${P.brancoVolte}° bonus amici del mese`);
+    if (mondays.length && mondays.every((w) => countInWeek(pres, u.name, w) >= u.goal)) add('maiSaltato', 'Mai saltato', P.maiSaltato, true, '', 'Obiettivo raggiunto in ogni settimana del mese');
     return { name: u.name, display: u.display, items, penalties };
   });
 
   const top = sudo.reduce((m, r) => Math.max(m, r.score), -1);
   if (top >= 0) {
     table.forEach((t) => {
-      if (sudo.some((r) => r.name === t.name && r.score === top)) t.items.push({ key: 'pomodoro', label: 'Pomodoro del mese', pts: POINTS.pomodoro, achievement: true });
+      const best = sudo.find((r) => r.name === t.name && r.score === top);
+      if (best) t.items.push({ key: 'pomodoro', label: 'Pomodoro del mese', pts: POINTS.pomodoro, achievement: true, day: best.day, note: `Sudometro più alto del mese (${top})` });
     });
   }
 
@@ -2603,9 +2614,10 @@ function computePointsRaw(month) {
       // Dettaglio raggruppato: "Presenze 8 × 10 = 80"
       const groups = {};
       t.items.forEach((it) => {
-        const g = groups[it.key] || (groups[it.key] = { key: it.key, label: it.label, count: 0, pts: 0, achievement: it.achievement });
+        const g = groups[it.key] || (groups[it.key] = { key: it.key, label: it.label, count: 0, pts: 0, achievement: it.achievement, items: [] });
         g.count++;
         g.pts += it.pts;
+        g.items.push({ day: it.day, note: it.note, pts: it.pts });
       });
       const detail = Object.keys(groups).map((k) => groups[k]);
       return { name: t.name, display: t.display, total: detail.reduce((a, g) => a + g.pts, 0), detail, penalties: t.penalties };

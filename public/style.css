@@ -434,6 +434,17 @@ body.chat-mode #scroller { background: none; }
 .points li.open .detail { display: block; }
 .points .detail-row { display: flex; justify-content: space-between; padding: 3px 0; }
 .points .detail-row b { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.points .detail-row.tap { cursor: pointer; align-items: center; gap: 8px; }
+.points .detail-row.tap span { flex: 1; display: flex; align-items: center; gap: 6px; }
+.points .detail-row.tap span::before { content: ""; flex: none; width: 6px; height: 6px; margin-right: 2px; border-right: 1.6px solid var(--muted); border-bottom: 1.6px solid var(--muted); transform: rotate(-45deg); transition: transform .2s; }
+.points .detail-row.tap.open span::before { transform: rotate(45deg) translate(-1px, -1px); }
+.points .entries { margin: 2px 0 8px 14px; padding-left: 10px; border-left: 1.5px solid var(--card-2); }
+.points .entry { display: grid; grid-template-columns: 52px 1fr auto; gap: 8px; align-items: baseline; padding: 3px 0; font-size: 13px; }
+.points .entry .d { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.points .entry .n { min-width: 0; }
+.points .entry .p { color: var(--fg); font-weight: 600; font-variant-numeric: tabular-nums; }
+.points .entry.minus .d, .points .entry.minus .p { color: var(--danger); }
+.points .entry.ach .p { color: #ffd60a; }
 
 /* Pulsante "i" e scheda di punti e medaglie */
 .section.with-info { display: flex; align-items: center; gap: 10px; }

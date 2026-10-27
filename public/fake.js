@@ -49,6 +49,10 @@ export function fakeState(real) {
     return d;
   };
 
+  // Giorni e motivi finti per il dettaglio dei punti: un elemento per volta, a ritroso da oggi
+  const NOTE = { presenza: 'Check-in alle 18:30', amici: 'Con Giulia (18:15)', sudometro: '72 · Pomodoro maturo', serie: 'Settimana di fila con l\'obiettivo', rientro: 'Dopo 12 giorni senza palestra', bidone: 'Avevi detto "Ci sono" per le 18:30, nessun check-in', avviso: 'Nessuna risposta prima del check-in (19:10)' };
+  const fakeItems = (g) => Array.from({ length: g.count }, (_, k) => ({ day: daysAgo(Math.min(k * 2 + (g.key.length % 3), now.getDate() - 1)), note: NOTE[g.key] || g.label, pts: Math.round(g.pts / g.count) }));
+
   return {
     ...real,
     me: {
@@ -104,7 +108,7 @@ export function fakeState(real) {
       month,
       ranking: people
         .map((p, i) => {
-          const d = detail(i);
+          const d = detail(i).map((g) => ({ ...g, items: fakeItems(g) }));
           return { name: p.name, display: p.display, total: d.reduce((a, g) => a + g.pts, 0), detail: d };
         })
         .sort((a, b) => b.total - a.total),

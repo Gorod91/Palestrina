@@ -20,6 +20,7 @@ const VERSIONS = [
     v: '1.5',
     date: '23 – 27 ottobre 2026',
     items: [
+      'Classifica a punti: ogni voce del dettaglio si apre e mostra i giorni in cui sono arrivati punti e penalità, con il motivo',
       'Sudometro: senza rete il selfie resta sul telefono e viene inviato da solo appena torna la connessione, entro un\'ora dallo scatto',
       'Sudometro: conferma del selfie dopo lo scatto, con le opzioni "Usa questa" e "Rifai"',
       'Sudometro: punteggio mostrato con l\'animazione del termometro',

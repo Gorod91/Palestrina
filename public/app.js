@@ -498,6 +498,13 @@ const sudato = () => (state && state.me && isF(state.me.name) ? 'sudata' : 'suda
 const riposato = () => (state && state.me && isF(state.me.name) ? 'riposata' : 'riposato');
 
 const openPoints = new Set(); // dettagli aperti nella classifica a punti
+const openPointGroups = new Set(); // voci aperte nel dettaglio: "nome|voce"
+const GIORNI_BREVI = ['dom', 'lun', 'mar', 'mer', 'gio', 'ven', 'sab'];
+/** "2026-10-27" → "mar 27" */
+function shortDay(day) {
+  const [y, m, d] = day.split('-').map(Number);
+  return `${GIORNI_BREVI[new Date(y, m - 1, d).getDay()]} ${d}`;
+}
 
 function renderPoints() {
   const pts = state.points;
@@ -518,14 +525,45 @@ function renderPoints() {
     li.querySelector('.sub').textContent = ach.length ? ach.map((g) => g.label).join(' · ') : 'Nessuna medaglia';
     const detail = li.querySelector('.detail');
     if (!r.detail.length) detail.textContent = 'Ancora nessun punto questo mese.';
+    const sign = (n) => (n < 0 ? `${n}` : `+${n}`);
     r.detail.forEach((g) => {
       const row = document.createElement('div');
       row.className = 'detail-row';
       row.innerHTML = '<span></span><b></b>';
       row.querySelector('span').textContent = g.achievement ? `Medaglia: ${g.label}` : g.count > 1 ? `${g.label} × ${g.count}` : g.label;
-      row.querySelector('b').textContent = g.pts < 0 ? `${g.pts}` : `+${g.pts}`;
+      row.querySelector('b').textContent = sign(g.pts);
       if (g.pts < 0) row.classList.add('minus');
       detail.append(row);
+      // Tocco sulla voce: i giorni in cui sono arrivati i punti, con il motivo
+      const items = (g.items || []).filter((it) => it.day || it.note);
+      if (!items.length) return;
+      const key = `${r.name}|${g.key}`;
+      row.classList.add('tap');
+      row.classList.toggle('open', openPointGroups.has(key));
+      const list = document.createElement('div');
+      list.className = 'entries';
+      list.hidden = !openPointGroups.has(key);
+      items
+        .slice()
+        .sort((a, b) => (a.day < b.day ? 1 : a.day > b.day ? -1 : 0))
+        .forEach((it) => {
+          const e = document.createElement('div');
+          e.className = `entry${it.pts < 0 ? ' minus' : g.achievement ? ' ach' : ''}`;
+          e.innerHTML = '<span class="d"></span><span class="n"></span><span class="p"></span>';
+          e.querySelector('.d').textContent = it.day ? shortDay(it.day) : 'mese';
+          e.querySelector('.n').textContent = it.note;
+          e.querySelector('.p').textContent = sign(it.pts);
+          list.append(e);
+        });
+      row.onclick = (ev) => {
+        ev.stopPropagation();
+        if (openPointGroups.has(key)) openPointGroups.delete(key);
+        else openPointGroups.add(key);
+        row.classList.toggle('open');
+        list.hidden = !list.hidden;
+      };
+      list.onclick = (ev) => ev.stopPropagation();
+      detail.append(list);
     });
     li.onclick = () => {
       if (openPoints.has(r.name)) openPoints.delete(r.name);
