@@ -1098,6 +1098,8 @@ html.ios.standalone .sr { top: var(--ios-top, 0px); }
 .wo-chart svg { width: 100%; height: auto; display: block; }
 .wo-chart text { font-size: 11px; fill: var(--muted); font-family: inherit; }
 .wo-ch-grid { stroke: var(--card-2); stroke-width: 1; }
+.wo-ch-zero { stroke: var(--exercise); stroke-width: 1; stroke-dasharray: 4 3; opacity: .7; } /* zero = senza aiuto, negli esercizi con i chili di aiuto */
+.wo-chart text.wo-ch-zt { fill: var(--exercise); font-weight: 700; }
 .wo-ch-sel { stroke: #636366; stroke-width: 1; stroke-dasharray: 3 3; }
 .wo-chips { display: flex; gap: 8px; margin: 12px 0 4px; }
 .wo-chips-s { overflow-x: auto; margin: 4px -16px 12px; padding: 0 16px; scrollbar-width: none; }
