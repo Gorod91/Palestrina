@@ -203,7 +203,7 @@ SCHEDE_ESEMPIO.push({
     'goblet-box': { s: '3 × 8', kg: 12, nota: 'box + 2 dischi', rec: 60 },
     'pekdek-or': { s: '3 × 8-10', kg: 35 },
     'rematore-armstrong': { s: '3 × 8-10', kg: 25 },
-    'eps-trazioni': { s: '3 × 8-10', kg: 50, nota: 'in superserie col pek dek verticale; in alternativa tirate al cavo basso (ercolina) 25 kg' },
+    'eps-trazioni': { s: '3 × 8-10', kg: -50, nota: 'in superserie col pek dek verticale; in alternativa tirate al cavo basso (ercolina) 25 kg' },
     'pekdek-vert': { s: '3 × 8-10', kg: 20, nota: 'in superserie con le trazioni; in alternativa dips all\'EPS 50 kg' },
   },
 });
@@ -281,6 +281,8 @@ const AGGIORNAMENTI = [
   ...['r-upper', 'r-lower', 'r-davanti', 'r-dietro'].map((sc, i) => ({ id: 9 + i, op: 'sostituisci', scheda: sc, ex: 'situps-tempo', con: 'situps', t: 'sec' })),
   { id: 13, op: 'sostituisci', scheda: 'g-a', ex: 'russian-twist-rip', con: 'russian-twist', t: 'rip' },
   { id: 14, op: 'sostituisci', scheda: 'g-a', ex: 'v-sit-rip', con: 'v-sit', t: 'rip' },
+  // 30/10: pesi sotto lo zero, l'EPS aiuta con 50 kg
+  { id: 15, op: 'piano', scheda: 'c-ceppo', ex: 'eps-trazioni', set: { kg: -50 } },
 ];
 
 /** Applica un aggiornamento all'elenco di schede (già copiato); quello che non trova lo salta. */
@@ -341,11 +343,20 @@ function nextKg(v, d) {
   if (v <= 20) return Math.max(0, Math.ceil(v) - 1);
   return Math.max(20, Math.ceil(v / 2.5 - 1e-9) * 2.5 - 2.5);
 }
+/** Anche sotto lo zero (chili di aiuto: contrappeso, elastico), con gli stessi passi al contrario: 0 → −1 → … → −20 → −22,5. */
+const nextKgS = (v, d) => (v > 0 || (v === 0 && d > 0) ? nextKg(v, d) : -nextKg(-v, -d) || 0);
+/** Chili scritti a mano: col meno sono di aiuto; senza, restano dalla parte dello zero dov'erano (su iPhone il tastierino non ha il meno). */
+function readKg(txt, was) {
+  const raw = String(txt).trim().replace(',', '.').replace(/^[−–]/, '-');
+  const v = Number(raw);
+  if (raw === '' || !Number.isFinite(v)) return NaN;
+  return raw.startsWith('-') || !(was < 0) ? v : -Math.abs(v);
+}
 
 const dayFmt = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit' });
 const today = () => dayFmt.format(new Date());
 const daysAgo = (d) => Math.round((Date.parse(today() + 'T12:00:00Z') - Date.parse(d + 'T12:00:00Z')) / 86400000);
-const kgf = (v) => String(v).replace('.', ',');
+const kgf = (v) => String(v).replace('.', ',').replace('-', '−');
 /** Quanto tempo fa, a parole: ieri, 3 giorni fa, 2 settimane fa, 1 mese fa. */
 function agoText(d) {
   const n = daysAgo(d), w = Math.round(n / 7), m = Math.round(n / 30);
@@ -353,6 +364,9 @@ function agoText(d) {
 }
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 const copy = (sets) => sets.map((s) => ({ kg: s.kg, reps: s.reps }));
+// Esercizi con la macchina che aiuta (EPS): prima dei pesi sotto lo zero i chili di aiuto si segnavano in positivo
+const SOLO_AIUTO = ['eps-trazioni'];
+const assistito = (s) => (SOLO_AIUTO.includes(s.ex) && s.sets ? { ...s, sets: s.sets.map((z) => ({ ...z, kg: -Math.abs(z.kg) || 0 })) } : s);
 
 function summary(sets, t = 'kg') {
   const r = sets.map((s) => s.reps);
@@ -409,7 +423,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const { fs, db } = x;
     unsubs.push(
       fs.onSnapshot(fs.query(fs.collection(db, pfx + 'serie'), fs.where('name', '==', me.name)), { includeMetadataChanges: true }, (snap) => {
-        const list = snap.docs.map((d) => ({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }), pending: d.metadata.hasPendingWrites }));
+        const list = snap.docs.map((d) => assistito({ id: d.id, ...d.data({ serverTimestamps: 'estimate' }), pending: d.metadata.hasPendingWrites }));
         const sig = JSON.stringify(list.map((s) => [s.id, s.sets, s.pending]));
         serie = list;
         if (ready && sig === serieSig) return; // solo metadati cambiati: ridisegnare farebbe perdere tocchi e tastiera
@@ -1141,7 +1155,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const prevTxt = !ref ? '' : !r ? 'Serie nuova: la volta scorsa non c\'era'
         : (t !== 'kg' || s.kg === r.kg) && s.reps === r.reps ? 'Come la volta scorsa'
         : `${ago[0].toUpperCase() + ago.slice(1)}: ${t === 'kg' ? `${kgf(r.kg)} kg × ${r.reps}` : `${r.reps} ${uShort(t)}`}`;
-      return `${row}<div class="wo-edit"><div class="wo-pms">${kgEdit}${repEdit}</div>${prevTxt ? `<p class="wo-hint wo-hint-prev">${prevTxt}</p>` : ''}<p class="wo-hint">Tocca il numero per scriverlo a mano</p></div>`;
+      return `${row}<div class="wo-edit"><div class="wo-pms">${kgEdit}${repEdit}</div>${prevTxt ? `<p class="wo-hint wo-hint-prev">${prevTxt}</p>` : ''}<p class="wo-hint">${t === 'kg' && s.kg < 0 ? 'Sotto lo zero: i chili che ti aiutano (contrappeso, elastico)' : 'Tocca il numero per scriverlo a mano'}</p></div>`;
     }).join('');
     const nx = nextTodo(k);
     const btn = saved
@@ -1198,7 +1212,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const h = storia(ex, t);
       if (h.length < 2) return null;
       const first = h[0].best, last = h[h.length - 1].best;
-      return { ex, t, h, first, last, d: last - first, pct: first ? (last - first) / first : last - first };
+      return { ex, t, h, first, last, d: last - first, pct: first ? (last - first) / Math.abs(first) : last - first };
     }).filter(Boolean).sort((a, b) => b.pct - a.pct || alpha(EX[a.ex] || { n: a.ex }, EX[b.ex] || { n: b.ex }));
   }
 
@@ -1240,7 +1254,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const back = `<button class="wo-back" data-a="back">‹ ${p.back === 'progall' ? 'I tuoi progressi' : esc(e.n)}</button>`;
     chart = null;
     if (!all.length) return `${back}<p class="wo-empty">Ancora nessuna serie salvata</p>`;
-    const vol = t === 'kg' && p.tab === 'volume';
+    const aiuto = t === 'kg' && all.some((q) => q.sets.some((z) => z.kg < 0)); // chili di aiuto: niente volume, e lo zero in vista
+    const vol = t === 'kg' && !aiuto && p.tab === 'volume';
     // periodi da mostrare: solo quelli con almeno due volte e meno di tutte (altrimenti sarebbero uguali a "Tutto")
     const per = PERIODI.filter(([, n]) => { const k = all.filter((q) => daysAgo(q.day) <= n).length; return k >= 2 && k < all.length; });
     const range = per.some(([id]) => id === p.range) ? p.range : 'tutto';
@@ -1251,10 +1266,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const meglio = vol ? last.vol - first.vol : last.best - first.best || (t === 'kg' ? last.rb - first.rb : 0);
     const color = vol ? 'var(--stand)' : trendCol(meglio);
     // scala con un passo "tondo" (1, 2, 2,5, 5 × 10^k): tre o quattro righe
-    const vs = data.map(val), mn = Math.min(...vs), mx = Math.max(...vs);
+    const vs = data.map(val), mn = Math.min(...vs), mx = Math.max(...vs, ...(aiuto ? [0] : []));
     const raw = Math.max((mx - mn) / 3, vol ? 50 : t === 'kg' ? 2.5 : t === 'sec' ? 5 : t === 'm' ? 50 : 1), pow = Math.pow(10, Math.floor(Math.log10(raw)));
     const step = [1, 2, 2.5, 5, 10].map((k) => k * pow).find((s) => s >= raw - 1e-9);
-    const lo = Math.max(0, Math.floor(mn / step) * step - (Math.abs(mn % step) < 1e-9 ? step : 0)), hi = Math.max(lo + step, Math.ceil(mx / step) * step);
+    const lo = Math.max(aiuto ? -Infinity : 0, Math.floor(mn / step) * step - (Math.abs(mn % step) < 1e-9 ? step : 0)), hi = Math.max(lo + step, Math.ceil(mx / step) * step);
     const X0 = 42, X1 = 336, Y0 = 186, Y1 = 14;
     // in orizzontale il tempo vero: le pause si vedono come tratti più lunghi
     const ms = (d) => Date.parse(d + 'T12:00:00Z'), T0 = ms(first.day), T1 = ms(last.day);
@@ -1263,7 +1278,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const y = (v) => Y0 - (v - lo) / (hi - lo) * (Y0 - Y1);
     const sel = Math.min(p.sel ?? data.length - 1, data.length - 1);
     let grid = '';
-    for (let v = lo; v <= hi + 1e-9; v += step) grid += `<line x1="34" x2="344" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="wo-ch-grid"/><text x="28" y="${(y(v) + 4).toFixed(1)}" text-anchor="end">${vol ? kgv(v) : t === 'kg' ? kgf(v) : v}</text>`;
+    for (let v = lo; v <= hi + 1e-9; v += step) {
+      const zero = aiuto && Math.abs(v) < 1e-9; // con l'aiuto lo zero è il traguardo: senza aiuto
+      grid += `<line x1="34" x2="344" y1="${y(v).toFixed(1)}" y2="${y(v).toFixed(1)}" class="${zero ? 'wo-ch-zero' : 'wo-ch-grid'}"/><text x="28" y="${(y(v) + 4).toFixed(1)}" text-anchor="end"${zero ? ' class="wo-ch-zt"' : ''}>${vol ? kgv(v) : t === 'kg' ? kgf(Math.round(v * 100) / 100) : v}</text>`;
+      if (zero) grid += `<text x="340" y="${(y(v) - 5).toFixed(1)}" text-anchor="end" class="wo-ch-zt">senza aiuto</text>`;
+    }
     // mesi sotto il grafico, all'inizio di ognuno (con tanti mesi uno sì e uno no, o uno ogni tre)
     const firsts = [first.day]; // il mese della prima volta, poi l'inizio di ogni mese dopo
     for (let y0 = Number(first.day.slice(0, 4)), m0 = Number(first.day.slice(5, 7)); ;) {
@@ -1284,7 +1303,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const sp = chart[sel];
     const ranges = per.length ? `<div class="wo-chips">${[...per, ['tutto', 0, 'Tutto']].map(([id, , l]) => `<button class="${range === id ? 'on' : ''}" data-a="prange:${id}">${l}</button>`).join('')}</div>` : '';
     const txt = (q) => (vol ? `${kgv(q.vol)} kg` : uVal(t, q.best));
-    const tabs = t === 'kg' ? `<div class="wo-seg">${[['peso', 'Peso'], ['volume', 'Volume']].map(([id, l]) => `<button class="${(vol ? 'volume' : 'peso') === id ? 'on' : ''}" data-a="ptab:${id}">${l}</button>`).join('')}</div>` : '';
+    const tabs = t === 'kg' && !aiuto ? `<div class="wo-seg">${[['peso', 'Peso'], ['volume', 'Volume']].map(([id, l]) => `<button class="${(vol ? 'volume' : 'peso') === id ? 'on' : ''}" data-a="ptab:${id}">${l}</button>`).join('')}</div>` : '';
     const recent = all.slice(-4).reverse().map((q) => `<div class="wo-prow2"><span>${dayShort(q.day)}</span><b>${sets(q)}</b></div>`).join('');
     return `${back}
       <h1 class="wo-ptitle wo-ptitle2">Progressi</h1>
@@ -2093,8 +2112,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   }
 
   function setKg(k, v) {
-    if (!(v >= 0) || v > 500) return;
-    v = Math.round(v * 4) / 4;
+    if (!(v >= -200) || v > 500) return;
+    v = Math.round(v * 4) / 4 || 0;
     const sets = P().sets;
     for (let j = k; j < sets.length; j++) sets[j].kg = v; // cambia anche le serie dopo, come succede di solito
   }
@@ -2224,7 +2243,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (/^[kr][+-]$/.test(cmd)) {
       const k = Number(arg), d = cmd[1] === '+' ? 1 : -1, sets = P().sets;
       P().dirty = true;
-      if (cmd[0] === 'k') setKg(k, nextKg(sets[k].kg, d));
+      if (cmd[0] === 'k') setKg(k, nextKgS(sets[k].kg, d));
       else {
         const t = tOf(ui.list[ui.i]), step = uStep(t);
         sets[k].reps = Math.max(step, Math.min(t === 'm' ? 20000 : 600, sets[k].reps + step * d));
@@ -2291,8 +2310,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       return saveCat(ui.exed.ex, { m: v.slice(0, 40) });
     }
     if (ev.target.id === 'wo-pl-kg' && ui.ed && ui.exed) { // peso iniziale di questa scheda
-      const v = Number(ev.target.value.replace(',', '.')), pi = (ui.ed.piano[ui.exed.ex] ||= {});
-      if (v > 0 && v <= 500) pi.kg = Math.round(v * 4) / 4;
+      const pi = (ui.ed.piano[ui.exed.ex] ||= {}), v = readKg(ev.target.value, pi.kg);
+      if (v && v >= -200 && v <= 500) pi.kg = Math.round(v * 4) / 4;
       else delete pi.kg;
       return;
     }
@@ -2313,7 +2332,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }
     if (pg.open < 0 || !pg.sets) return;
     const v = Number(ev.target.value.replace(',', '.'));
-    if (f === 'k') setKg(pg.open, v);
+    if (f === 'k') setKg(pg.open, readKg(ev.target.value, pg.sets[pg.open].kg));
     else if (v >= 1 && v <= (tOf(ui.list[ui.i]) === 'm' ? 20000 : 600)) pg.sets[pg.open].reps = Math.round(v);
     else return;
     pg.dirty = true;
