@@ -3137,7 +3137,7 @@ function togliPianiDoppi() {
   return removed;
 }
 
-const COPIA_TABELLE_RICHIESTA = '2026-10-31c'; // cambiarlo per rifare la copia al prossimo minuto
+const COPIA_TABELLE_RICHIESTA = '2026-10-31d'; // cambiarlo per rifare la copia al prossimo minuto
 
 function copiaTabelleNelFoglio() {
   TEST = false;
@@ -3155,6 +3155,13 @@ function copiaTabelleNelFoglio() {
     sh.getRange(1, 1, values.length, w).setNumberFormat('@').setValues(values);
     done.push(`${key} (${values.length - 1})`);
   });
+  // Punti di ottobre voce per voce (con il giorno), per la classifica di fine mese
+  const pts = [['name', 'display', 'key', 'label', 'pts', 'day', 'note']];
+  computePoints('2026-10').forEach((r) => r.detail.forEach((g) => g.items.forEach((it) => pts.push([r.name, r.display, g.key, g.label, it.pts, it.day, it.note]))));
+  const shp = ss.getSheetByName('FB Punti') || ss.insertSheet('FB Punti');
+  shp.clearContents();
+  shp.getRange(1, 1, pts.length, 7).setNumberFormat('@').setValues(pts.map((r) => r.map((v) => (v === undefined || v === null ? '' : String(v)))));
+  done.push(`punti (${pts.length - 1})`);
   Logger.log('Tabelle copiate nel foglio: ' + done.join(', '));
   return done;
 }
