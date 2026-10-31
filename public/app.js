@@ -1391,7 +1391,10 @@ function openNews(id) {
   // Novità di fine mese: davanti alle slide, l'incoronazione del Re di quel mese
   const n = ((state && state.news) || []).find((x) => x.id === id);
   const re = n && ((state && state.albo) || []).find((a) => a.key === n.month);
-  const q = re ? `?${new URLSearchParams({ re: (re.displays || re.names).join(' e '), titolo: kingTitle(re.names, isF), mese: re.label.split(' ')[0], punti: re.total })}` : '';
+  const p = re && { re: (re.displays || re.names).join(' e '), titolo: kingTitle(re.names, isF), mese: re.label.split(' ')[0], punti: re.total, m: re.key };
+  // Classifica completa del mese (slide prima dell'incoronazione): [nome, punti, 1 se sono io]
+  if (re && re.ranking && re.ranking.length) p.classifica = JSON.stringify(re.ranking.map((r) => [r.display || r.name, r.total, r.name === state.me.name ? 1 : 0]));
+  const q = re ? `?${new URLSearchParams(p)}` : '';
   $('news-frame').src = `news/${id}.html${q}`;
   $('news').hidden = false;
 }

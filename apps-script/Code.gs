@@ -513,7 +513,8 @@ function sendMonthlyRecap() {
   const king = best ? { names: points.filter((t) => t.total === best).map((t) => t.name), total: best } : null;
   if (king) {
     const albo = getAlbo();
-    albo.push({ key: m.key, label: m.label, names: king.names, total: king.total });
+    // Con la classifica completa del mese, per la slide della classifica prima dell'incoronazione
+    albo.push({ key: m.key, label: m.label, names: king.names, total: king.total, ranking: points.map((t) => ({ name: t.name, total: t.total })) });
     props.setProperty('ALBO', JSON.stringify(albo));
   }
   props.setProperty('LAST_MONTHLY', JSON.stringify(m));
@@ -1155,7 +1156,7 @@ function sharedState() {
     features: { apripista: featureOn('apripista'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn(), firebaseTutto: !TEST && fbAllOn(), provaTutto: TEST && fbAllOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
-    albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn) })),
+    albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn), ranking: (a.ranking || []).map((r) => ({ ...r, display: dn(r.name) })) })),
     // Novità di fine mese già uscite (per la slide del Re davanti alle loro slide) e quella da mostrare
     // a tutti appena aprono l'app, nella prima settimana del mese nuovo
     news: NEWS.filter((n) => n.month && releasedNews().includes(n.id)).map((n) => ({ id: n.id, month: n.month })),
