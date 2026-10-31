@@ -391,7 +391,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   // cosa si vede: lista, esercizio, catalogo (allenamento libero)
   // pg: pagina della scelta esercizi ('m:Petto' muscolo, 'f:Cardio' famiglia di attrezzi, 'a' tutti; '' la prima), pf: filtro lì dentro
   // ed: scheda in modifica; pickFor: il catalogo sceglie esercizi per la scheda ('edit'), un circuito nuovo ('circnew') o uno esistente ('circ:id')
-  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', pg: '', pf: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '', rotSheet: false, exed: null, cired: null, prog: null, progF: '' };
+  const ui = { view: 'list', scheda: '', list: [], i: 0, sets: null, open: -1, editing: false, q: '', g: '', pg: '', pf: '', ed: null, pickFor: '', sel: [], sheet: null, nx: null, prev: '', rotSheet: false, exed: null, cired: null, prog: null, progF: '', ced: null };
   let restEnd = 0;
   let restTotal = REST; // secondi del recupero in corso
   let serieSig = '';
@@ -572,23 +572,24 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   // Indietro trascinando dal bordo sinistro, come in Safari (dalla Home iOS non lo fa da solo):
   // la pagina segue il dito e sotto compare quella prima; oltre metà schermo o con uno scatto si torna lì.
-  const backView = () => (ui.view === 'prog' ? ui.prog.back : ui.view === 'progall' ? 'list' : ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor && !ui.pickFor.startsWith('circ:') ? 'edit' : ui.view === 'newex' ? 'pick' : ui.view === 'prev' ? 'copy' : ui.view === 'exed' ? (ui.exed && ui.exed.back ? 'cired' : 'edit') : ui.view === 'cired' ? 'edit' : ui.view === 'pick' && ui.cired ? 'cired' : 'list');
+  const backView = () => (ui.view === 'prog' ? ui.prog.back : ui.view === 'progall' ? 'list' : ui.view === 'ex' && !ui.scheda ? 'pick' : ui.view === 'pick' && ui.pickFor && !ui.pickFor.startsWith('circ:') ? 'edit' : ui.view === 'newex' ? (ui.nx && ui.nx.cat ? 'cat' : 'pick') : ui.view === 'ced' ? 'cat' : ui.view === 'prev' ? 'copy' : ui.view === 'exed' ? (ui.exed && ui.exed.back ? 'cired' : 'edit') : ui.view === 'cired' ? 'edit' : ui.view === 'pick' && ui.cired ? 'cired' : 'list');
   function goBack(anim = 'wo-pop') {
     navAnim = anim ? 'wo-pop' : '';
-    if (ui.view === 'pick' && ui.pg && !ui.q.trim()) { // da un muscolo o una famiglia: alla prima pagina della scelta
+    if ((ui.view === 'pick' || ui.view === 'cat') && ui.pg && !ui.q.trim()) { // da un muscolo o una famiglia: alla prima pagina della scelta
       Object.assign(ui, { pg: '', pf: '' });
       return;
     }
     const v = backView();
     if (ui.view === 'exed') ui.exed = null; // dalla pagina Esercizio: alla modifica (o al circuito da cui eri partito)
     if (ui.view === 'cired') ui.cired = null;
+    if (ui.view === 'ced') ui.ced = null;
     if (ui.view === 'pick' && v === 'cired') Object.assign(ui, { pickFor: '', sel: [] });
     if (v !== 'pick') Object.assign(ui, { pickFor: v === 'edit' ? '' : ui.pickFor, sel: v === 'edit' ? [] : ui.sel });
     if (v === 'list') Object.assign(ui, { ed: null, pickFor: '', sheet: null });
     ui.view = v;
   }
   function viewHtml(v) {
-    return v === 'ex' ? exView() : v === 'pick' ? pickView() : v === 'edit' ? editView() : v === 'newex' ? newExView() : v === 'copy' ? copyView() : v === 'prev' ? prevView() : v === 'exed' ? exedView() : v === 'cired' ? ciredView() : v === 'prog' ? progView() : v === 'progall' ? progAllView() : listView();
+    return v === 'ex' ? exView() : v === 'pick' ? pickView() : v === 'edit' ? editView() : v === 'newex' ? newExView() : v === 'copy' ? copyView() : v === 'prev' ? prevView() : v === 'exed' ? exedView() : v === 'cired' ? ciredView() : v === 'prog' ? progView() : v === 'progall' ? progAllView() : v === 'cat' ? catView() : v === 'ced' ? cedView() : listView();
   }
   let edge = null;
   root.addEventListener('pointerdown', (ev) => {
@@ -658,8 +659,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let shownView = 'list';
   let navAnim = 'wo-push'; // animazione del prossimo cambio di pagina ('' dopo il trascinamento dal bordo, che si anima da solo)
   /** Profondità delle pagine: entrando più in fondo la pagina arriva da destra, tornando su da sinistra. */
-  const vkey = () => (ui.view === 'pick' && ui.pg && !ui.q.trim() ? 'pick:' + ui.pg : ui.view); // muscolo o attrezzo: pagina a sé
-  const depth = (v) => (v.startsWith('pick:') ? depth('pick') + 1 : null) ?? ({ list: 0, copy: 1, edit: 1, progall: 1, prev: 2, cired: 2, exed: 3, newex: 3, prog: 3 })[v] ?? (v === 'pick' ? (ui.pickFor ? 2 : 1) : v === 'ex' ? (ui.scheda ? 1 : 2) : 1);
+  const vkey = () => ((ui.view === 'pick' || ui.view === 'cat') && ui.pg && !ui.q.trim() ? ui.view + ':' + ui.pg : ui.view); // muscolo o attrezzo: pagina a sé
+  const depth = (v) => (v.startsWith('pick:') ? depth('pick') + 1 : v.startsWith('cat:') ? 2 : null) ?? ({ list: 0, copy: 1, edit: 1, progall: 1, cat: 1, prev: 2, cired: 2, ced: 3, exed: 3, newex: 3, prog: 3 })[v] ?? (v === 'pick' ? (ui.pickFor ? 2 : 1) : v === 'ex' ? (ui.scheda ? 1 : 2) : 1);
   const scrollMem = {};
   function draw() {
     if (!me) return;
@@ -671,7 +672,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const vk = vkey();
     if (sc && vk !== shownView) { // pagina nuova: si parte dall'alto (tornando alla modifica o alla scelta, dal punto in cui eri)
       scrollMem[shownView] = sc.scrollTop;
-      const back = (vk === 'edit' && ['pick', 'newex', 'exed', 'cired'].includes(shownView.split(':')[0])) || (vk === 'pick' && shownView.startsWith('pick:'));
+      const back = (vk === 'edit' && ['pick', 'newex', 'exed', 'cired'].includes(shownView.split(':')[0])) || (vk === 'pick' && shownView.startsWith('pick:'))
+        || (vk.split(':')[0] === 'cat' && ['ced', 'newex'].includes(shownView) || (vk === 'cat' && shownView.startsWith('cat:')));
       if (navAnim) navAnim = depth(vk) < depth(shownView) ? 'wo-pop' : 'wo-push'; // si va più in fondo o si torna su
       shownView = vk;
       root.innerHTML = viewHtml(ui.view) + (ui.view === 'list' ? '' : '<div class="wo-edge" aria-hidden="true"></div>');
@@ -753,6 +755,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <section class="card wo-list"><button class="wo-row wo-altri" data-a="copy"><span class="wo-altri-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.6 3.2-5.5 6.5-5.5s5.9 1.9 6.5 5.5"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14.5c2.4 0 4 1.5 4.5 4"/></svg></span>`
         + `<span><b>Schede degli altri</b><small>${esc(altri().names.join(', '))} · ${altri().n} schede</small></span><span class="wo-chev">›</span></button></section>
       ${serie.length ? `<section class="card wo-list"><button class="wo-row wo-altri" data-a="progall"><span class="wo-altri-ic wo-prog-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l5.5-5.5 4 4L21 7"/><path d="M15 7h6v6"/></svg></span><span><b>I tuoi progressi</b><small>${progSub()}</small></span><span class="wo-chev">›</span></button></section>` : ''}
+      <section class="card wo-list"><button class="wo-row wo-altri" data-a="cat"><span class="wo-altri-ic"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h10M4 18h7"/><path d="M18 14v6M15 17h6"/></svg></span><span><b>Esercizi</b><small>${CATALOGO.filter((e) => !e.old).length} per tutti · aggiungi, modifica, elimina</small></span><span class="wo-chev">›</span></button></section>
       <div class="wo-btns"><button class="secondary" data-a="nuova">+ Nuova scheda</button><button class="secondary" data-a="libero">Allenamento libero</button></div>
       <section class="card wo-list">${timer}</section>`;
   }
@@ -1555,10 +1558,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   /** Scelta degli esercizi: prima pagina con muscoli e attrezzi, poi l'elenco in ordine alfabetico; la ricerca guarda
    *  nome, muscolo e attrezzo. Con la spunta (multi) si scelgono più esercizi per una scheda o un circuito. */
-  function pickBody(multi, had = []) {
+  function pickBody(multi, had = [], manage = false) {
     const cat = CATALOGO.filter((e) => !e.old); // old: tolti dal catalogo, restano solo per i nomi delle serie già fatte
     const q = ui.q.trim().toLowerCase();
     const row = (e) => {
+      if (manage) return `<button class="wo-row" data-a="ce:${e.id}"><span><b>${esc(e.n)}</b><small>${esc([e.m, e.g].filter(Boolean).join(' · '))}</small></span><span class="wo-chev">›</span></button>`;
       if (!multi) {
         const l = lastTime(e.id, unit(e));
         return `<button class="wo-row" data-a="pick:${e.id}"><span><b>${esc(e.n)}</b><small>${esc(e.m || e.g)}${l ? ` · ${summary(l.sets, unit(e))}` : ''}</small></span><span class="wo-chev">›</span></button>`;
@@ -1566,7 +1570,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const h = had.includes(e.id), on = ui.sel.includes(e.id);
       return `<button class="wo-row wo-prow" data-a="${h ? '' : `psel:${e.id}`}"${h ? ' aria-disabled="true"' : ''}><span class="wo-chk${on ? ' on' : ''}${h ? ' had' : ''}">${on || h ? '✓' : ''}</span><span><b>${esc(e.n)}</b><small>${h ? 'già nella scheda' : esc(e.m || e.g)}</small></span></button>`;
     };
-    const newRow = multi ? `<button class="wo-row wo-prow" data-a="newex"><span class="wo-chk add"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></span><span><b>Nuovo esercizio</b><small>se non è nell'elenco</small></span></button>` : '';
+    const newRow = multi || manage ? `<button class="wo-row wo-prow" data-a="newex"><span class="wo-chk add"><svg viewBox="0 0 14 14" aria-hidden="true"><path d="M7 2v10M2 7h10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></svg></span><span><b>Nuovo esercizio</b><small>se non è nell'elenco</small></span></button>` : '';
     const listHtml = (arr, letters = false) => {
       let prev = '';
       const rows = arr.map((e) => {
@@ -1574,7 +1578,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         prev = l;
         return head + row(e);
       }).join('');
-      return `<section class="card wo-list">${newRow}${rows || (multi ? '' : '<p class="wo-empty">Nessun esercizio</p>')}</section>`;
+      return `<section class="card wo-list">${newRow}${rows || (newRow ? '' : '<p class="wo-empty">Nessun esercizio</p>')}</section>`;
     };
     const search = `<input id="wo-q" class="plain wo-search" placeholder="Cerca per nome, muscolo o attrezzo" value="${esc(ui.q)}" autocomplete="off">`;
     if (q) {
@@ -1597,7 +1601,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     serie.slice().sort((a, b) => (a.day < b.day ? 1 : -1)).forEach((x2) => { const id = UNITI[x2.ex] || x2.ex; if (EX[id] && !EX[id].old && !rec.includes(id)) rec.push(id); });
     (schede || []).filter((y) => !y.di).forEach((y) => y.ex.concat(...Object.values(y.circuiti || {}).map((c) => c.ex)).forEach((id) => { if (EX[id] && !EX[id].old && !rec.includes(id)) rec.push(id); }));
     const recIds = rec.filter((id) => !had.includes(id)).slice(0, 10);
-    const recHtml = recIds.length ? `<div class="wo-pk-sec">Nelle tue schede e di recente</div><div class="wo-recs">${recIds.map((id) => `<button class="${ui.sel.includes(id) ? 'on' : ''}" data-a="${multi ? 'psel' : 'pick'}:${id}">${esc(EX[id].n)}</button>`).join('')}</div>` : '';
+    const recHtml = recIds.length && !manage ? `<div class="wo-pk-sec">Nelle tue schede e di recente</div><div class="wo-recs">${recIds.map((id) => `<button class="${ui.sel.includes(id) ? 'on' : ''}" data-a="${multi ? 'psel' : 'pick'}:${id}">${esc(EX[id].n)}</button>`).join('')}</div>` : '';
     const n = (f) => cat.filter(f).length;
     const tile = (pg, pic, name, small) => `<button class="wo-mt" data-a="pg:${esc(pg)}">${pic}<b>${esc(name)}</b><small>${small}</small></button>`;
     const mus = [...MUSCOLI.map((g) => tile('m:' + g, bodySvg(g, { crop: true }), g, n((e) => e.g === g))),
@@ -1606,14 +1610,40 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const fams = FAMIGLIE.map((f) => `<button class="wo-ft" data-a="pg:f:${esc(f)}"><span class="wo-fico">${ICONE[f]}</span><b>${esc(f)}</b></button>`).join('');
     return `${search}${recHtml}<div class="wo-pk-sec">Per muscolo</div><div class="wo-mus">${mus}</div>
       <div class="wo-pk-sec">Per attrezzo</div><div class="wo-fams">${fams}</div>
-      ${multi ? `<section class="card wo-list wo-pk-new">${newRow}</section>` : ''}`;
+      ${newRow ? `<section class="card wo-list wo-pk-new">${newRow}</section>` : ''}`;
   }
 
   function pickView() {
     if (ui.pickFor) return pickMultiView();
     const back = ui.pg && !ui.q.trim() ? 'Esercizi' : 'Allenamento libero';
     return `<button class="wo-back" data-a="back">‹ ${back}</button>${pickBody(false)}
-      <p class="footnote">Manca un esercizio? Aggiungilo da una scheda: ✎ → + Esercizi → Nuovo esercizio.</p>`;
+      <p class="footnote">Manca un esercizio? Aggiungilo da Esercizi, nella pagina dell'Allenamento.</p>`;
+  }
+
+  /** Esercizi (dalla pagina dell'Allenamento): l'elenco comune a tutti, da cui si aggiungono, modificano ed eliminano. */
+  function catView() {
+    const back = ui.pg && !ui.q.trim() ? 'Esercizi' : 'Allenamento';
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${back}</button></div>
+      ${ui.pg && !ui.q.trim() ? '' : '<h2 class="wo-ed-title">Esercizi</h2><p class="wo-sub">Uguali per tutti: quello che cambi o elimini qui vale anche per gli altri.</p>'}
+      ${pickBody(false, [], true)}`;
+  }
+
+  /** Un esercizio dell'elenco comune: nome, macchina, gruppo; si può eliminare. */
+  function cedView() {
+    const e = EX[ui.ced.ex] || { n: ui.ced.ex };
+    const gruppi = [...new Set([...GRUPPI, e.g].filter(Boolean))];
+    const mie = (schede || []).filter((y) => JSON.stringify(y).includes(`"${ui.ced.ex}"`)).map((y) => y.name);
+    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Esercizi</button></div>
+      <h2 class="wo-ed-title">${esc(e.n)}</h2>
+      <label class="wo-lbl" for="wo-ce-n">Nome</label>
+      <input id="wo-ce-n" class="plain wo-sh-in" value="${esc(e.n)}" maxlength="60" autocomplete="off">
+      <label class="wo-lbl" for="wo-ce-m">Macchina o attrezzo</label>
+      <input id="wo-ce-m" class="plain wo-sh-in" value="${esc(e.m || '')}" placeholder="Per esempio Leg press, Manubri" maxlength="40" autocomplete="off">
+      <div class="wo-lbl">Gruppo</div>
+      <div class="wo-groups wrap">${gruppi.map((g) => `<button class="${e.g === g ? 'on' : ''}" data-a="ceg:${esc(g)}">${esc(g)}</button>`).join('')}</div>
+      <p class="wo-sub">${mie.length ? `Nelle tue schede: ${esc(mie.join(', '))}` : 'Non è in nessuna delle tue schede'}</p>
+      <button class="primary wo-exed-ok" data-a="back">Fatto</button>
+      <button class="link-button wo-danger" data-a="cedel">Elimina esercizio</button>`;
   }
 
   // ---------- Schede: crea, modifica, copia (fase 2) ----------
@@ -1861,6 +1891,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     addEx(e);
     writeDoc();
     pubblica(e);
+    if (nx.cat) {
+      toast('Esercizio aggiunto');
+      return Object.assign(ui, { view: 'cat', q: '', pg: '', pf: '', nx: null });
+    }
     ui.sel.push(e.id);
     Object.assign(ui, { view: 'pick', q: '', g: e.g, pg: 'm:' + e.g, pf: '', nx: null });
   }
@@ -1893,9 +1927,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   /** Elimina un esercizio dal catalogo comune: nessuno lo sceglie più ed esce da tutte le mie schede (e da quella che
    *  sto modificando). Chi ce l'ha nelle sue schede lo tiene; resta anche per i nomi delle serie già fatte. */
-  function deleteEx() {
-    const pe = ui.exed, ed = ui.ed, id = pe.ex;
-    if (!confirm(`Eliminare l'esercizio "${(EX[id] || { n: id }).n}"? Non lo potrà più scegliere nessuno ed esce dalle tue schede. Le serie già fatte restano.`)) return;
+  function deleteEx(id) {
+    if (!confirm(`Eliminare l'esercizio "${(EX[id] || { n: id }).n}"? Non lo potrà più scegliere nessuno ed esce dalle tue schede. Le serie già fatte restano.`)) return false;
     const strip = (sc, keep) => { // keep: nella modifica i circuiti rimasti vuoti restano (li toglie il salvataggio)
       const ci = sc.circuiti || {};
       Object.values(ci).forEach((c) => { c.ex = c.ex.filter((e) => e !== id); });
@@ -1903,11 +1936,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       if (sc.piano) delete sc.piano[id];
       return sc;
     };
-    strip(ed, true);
+    if (ui.ed) strip(ui.ed, true);
     saveCat(id, { old: true });
     writeDoc(clone(schede || []).map((sc) => strip(sc)));
-    Object.assign(ui, { exed: null, view: pe.back ? 'cired' : 'edit' });
     toast('Esercizio eliminato');
+    return true;
   }
 
   function deleteEditor() {
@@ -1955,13 +1988,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     else if (cmd === 'edcirc') ui.sheet = { kind: 'newblock', lista: false };
     else if (cmd === 'psel') ui.sel = ui.sel.includes(arg) ? ui.sel.filter((e) => e !== arg) : [...ui.sel, arg];
     else if (cmd === 'padd') pickDone();
-    else if (cmd === 'newex') Object.assign(ui, { nx: { n: ui.q.trim(), g: ui.pg.startsWith('m:') ? ui.pg.slice(2) : '', t: 'kg', m: '' }, view: 'newex' });
-    else if (cmd === 'nxg') ui.nx.g = arg;
-    else if (cmd === 'nxt') ui.nx.t = arg;
-    else if (cmd === 'nxsave') saveNewEx();
     else if (cmd === 'edsave') saveEditor();
     else if (cmd === 'eddel') deleteEditor();
-    else if (cmd === 'exdel') deleteEx();
+    else if (cmd === 'exdel') {
+      if (deleteEx(pe.ex)) Object.assign(ui, { exed: null, view: pe.back ? 'cired' : 'edit' });
+    }
     else return false;
     return true;
   }
@@ -1969,7 +2000,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   /** Testi scritti nella modifica: si salvano a ogni lettera, senza ridisegnare (resta la tastiera). */
   function editInput(el) {
     const ed = ui.ed, sh = ui.sheet, v = el.value;
-    if (!ed) return false;
+    if (el.id === 'wo-nx-n' && ui.nx) ui.nx.n = v;
+    else if (el.id === 'wo-nx-m' && ui.nx) ui.nx.m = v;
+    else if (!ed) return false;
     if (el.id === 'wo-ed-name') ed.name = v;
     else if (el.id === 'wo-pl-nota') (ed.piano[ui.exed.ex] ||= {}).nota = v;
     else if (el.id === 'wo-pl-r') {
@@ -1978,8 +2011,6 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     } else if (el.id === 'wo-cs-name') ed.circuiti[ui.cired.cid].n = v;
     else if (el.id === 'wo-cs-dur') ed.circuiti[ui.cired.cid].durata = v.trim();
     else if (el.dataset.csv) (ed.piano[el.dataset.csv] ||= {}).s = v.trim();
-    else if (el.id === 'wo-nx-n' && ui.nx) ui.nx.n = v;
-    else if (el.id === 'wo-nx-m' && ui.nx) ui.nx.m = v;
     else return false;
     return true;
   }
@@ -2244,6 +2275,31 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       Object.assign(ui.prog, { [cmd === 'ptab' ? 'tab' : 'range']: arg, sel: null });
       return draw();
     }
+    if (cmd === 'newex') { // dalla scelta degli esercizi di una scheda o dalla pagina Esercizi
+      Object.assign(ui, { nx: { n: ui.q.trim(), g: ui.pg.startsWith('m:') ? ui.pg.slice(2) : '', t: 'kg', m: '', cat: ui.view === 'cat' }, view: 'newex' });
+      return draw();
+    }
+    if (ui.nx && ['nxg', 'nxt', 'nxsave'].includes(cmd)) {
+      if (cmd === 'nxsave') saveNewEx();
+      else ui.nx[cmd === 'nxg' ? 'g' : 't'] = arg;
+      return draw();
+    }
+    if (cmd === 'cat') {
+      Object.assign(ui, { view: 'cat', q: '', pg: '', pf: '' });
+      return draw();
+    }
+    if (cmd === 'ce') {
+      Object.assign(ui, { view: 'ced', ced: { ex: arg } });
+      return draw();
+    }
+    if (cmd === 'ceg' && ui.ced) {
+      saveCat(ui.ced.ex, { g: arg });
+      return draw();
+    }
+    if (cmd === 'cedel' && ui.ced) {
+      if (deleteEx(ui.ced.ex)) Object.assign(ui, { view: 'cat', ced: null });
+      return draw();
+    }
     if (ui.ed && editCmd(cmd, arg)) return draw();
     if (cmd === 'go' || cmd === 'sch') {
       const s = schede.find((y) => y.id === arg);
@@ -2354,10 +2410,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   });
 
   root.addEventListener('change', (ev) => {
-    if (ui.exed && ['wo-pl-n', 'wo-pl-m'].includes(ev.target.id)) {
+    const ce = ui.exed && ['wo-pl-n', 'wo-pl-m'].includes(ev.target.id) ? ui.exed.ex : ui.ced && ['wo-ce-n', 'wo-ce-m'].includes(ev.target.id) ? ui.ced.ex : '';
+    if (ce) { // nome e macchina dell'elenco comune (dalla pagina dell'esercizio in una scheda o da Esercizi)
       const v = ev.target.value.replace(/\s+/g, ' ').trim();
-      if (ev.target.id === 'wo-pl-n') return v ? saveCat(ui.exed.ex, { n: v.slice(0, 60) }) : toast('Il nome non può essere vuoto');
-      return saveCat(ui.exed.ex, { m: v.slice(0, 40) });
+      if (ev.target.id.endsWith('-n')) return v ? saveCat(ce, { n: v.slice(0, 60) }) : toast('Il nome non può essere vuoto');
+      return saveCat(ce, { m: v.slice(0, 40) });
     }
     if (ev.target.id === 'wo-pl-kg' && ui.ed && ui.exed) { // peso iniziale di questa scheda
       const pi = (ui.ed.piano[ui.exed.ex] ||= {}), v = readKg(ev.target.value, pi.kg);
