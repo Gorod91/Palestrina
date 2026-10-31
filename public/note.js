@@ -19,6 +19,13 @@ const VERSIONS = [
     ],
   },
   {
+    v: '1.6',
+    date: '31 ottobre 2026',
+    items: [
+      'Penalità: una risposta cambiata da "Ci sono" a "No" poteva restare "Ci sono" nel calcolo e dare "Bidone" invece di "Cambio all\'ultimo"',
+    ],
+  },
+  {
     v: '1.5',
     date: '23 – 27 ottobre 2026',
     items: [
