@@ -511,14 +511,22 @@ function sendMonthlyRecap() {
   const points = computePoints(m.key).filter((t) => t.total > 0);
   const best = points.length ? points[0].total : 0;
   const king = best ? { names: points.filter((t) => t.total === best).map((t) => t.name), total: best } : null;
+  const recap = computeRecap(m.from, m.to);
   if (king) {
     const albo = getAlbo();
-    // Con la classifica completa del mese, per la slide della classifica prima dell'incoronazione
-    albo.push({ key: m.key, label: m.label, names: king.names, total: king.total, ranking: points.map((t) => ({ name: t.name, total: t.total })) });
+    // Medaglie del mese (chi le ha vinte), per la slide delle premiazioni
+    const medaglie = {};
+    points.forEach((t) => t.detail.filter((g) => g.achievement).forEach((g) => (medaglie[g.key] = medaglie[g.key] || []).push(t.name)));
+    // Con la classifica completa del mese, le medaglie e il Divano d'oro, per le slide prima dell'incoronazione
+    albo.push({
+      key: m.key, label: m.label, names: king.names, total: king.total,
+      ranking: points.map((t) => ({ name: t.name, total: t.total })),
+      medaglie, divano: recap.divano, pomodoro: recap.pomodoro,
+    });
     props.setProperty('ALBO', JSON.stringify(albo));
   }
   props.setProperty('LAST_MONTHLY', JSON.stringify(m));
-  addChatEvent('', { kind: 'monthly', month: m.label, ...computeRecap(m.from, m.to), king });
+  addChatEvent('', { kind: 'monthly', month: m.label, ...recap, king });
   dispatch('monthly', '');
 }
 
@@ -1156,7 +1164,13 @@ function sharedState() {
     features: { apripista: featureOn('apripista'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn(), firebaseTutto: !TEST && fbAllOn(), provaTutto: TEST && fbAllOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
-    albo: getAlbo().map((a) => ({ ...a, displays: a.names.map(dn), ranking: (a.ranking || []).map((r) => ({ ...r, display: dn(r.name) })) })),
+    albo: getAlbo().map((a) => ({
+      ...a,
+      displays: a.names.map(dn),
+      ranking: (a.ranking || []).map((r) => ({ ...r, display: dn(r.name) })),
+      medaglie: Object.keys(a.medaglie || {}).reduce((o, k) => ((o[k] = a.medaglie[k].map(dn)), o), {}),
+      divano: a.divano ? { ...a.divano, displays: a.divano.names.map(dn) } : null,
+    })),
     // Novità di fine mese già uscite (per la slide del Re davanti alle loro slide) e quella da mostrare
     // a tutti appena aprono l'app, nella prima settimana del mese nuovo
     news: NEWS.filter((n) => n.month && releasedNews().includes(n.id)).map((n) => ({ id: n.id, month: n.month })),
