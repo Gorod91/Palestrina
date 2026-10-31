@@ -1394,6 +1394,12 @@ function openNews(id) {
   const p = re && { re: (re.displays || re.names).join(' e '), titolo: kingTitle(re.names, isF), mese: re.label.split(' ')[0], punti: re.total, m: re.key };
   // Classifica completa del mese (slide prima dell'incoronazione): [nome, punti, 1 se sono io]
   if (re && re.ranking && re.ranking.length) p.classifica = JSON.stringify(re.ranking.map((r) => [r.display || r.name, r.total, r.name === state.me.name ? 1 : 0]));
+  // Premiazioni del mese (slide prima della classifica): medaglie {chiave: [nomi]} e Divano d'oro [[nomi], presenze]
+  if (re && re.ranking && re.ranking.length) {
+    p.medaglie = JSON.stringify(re.medaglie || {});
+    if (re.divano) p.divano = JSON.stringify([re.divano.displays || re.divano.names, re.divano.count]);
+    if (re.pomodoro) p.sudo = re.pomodoro.score;
+  }
   const q = re ? `?${new URLSearchParams(p)}` : '';
   $('news-frame').src = `news/${id}.html${q}`;
   $('news').hidden = false;

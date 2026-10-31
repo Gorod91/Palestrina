@@ -1,6 +1,7 @@
-// Slide di fine mese davanti alle novità: prima la classifica del mese, poi l'incoronazione del Re.
+// Slide di fine mese davanti alle novità: premiazioni (medaglie e Divano d'oro), classifica del mese, incoronazione del Re.
 // L'app apre la presentazione con ?re=<nomi>&titolo=<Re del mese|Regina del mese|…>&mese=<ottobre>&punti=<n>&m=<yyyy-MM>
-// e, se c'è, &classifica=[[nome, punti, 1 se sono io], …]. Senza parametri non fa niente.
+// e, se c'è, &classifica=[[nome, punti, 1 se sono io], …]&medaglie={chiave: [nomi]}&divano=[[nomi], presenze]&sudo=<n>.
+// Senza parametri non fa niente.
 
 // Cronaca del mese: frasi scritte a mano, mostrate solo se la classifica finale le conferma.
 const CRONACA = {
@@ -13,6 +14,16 @@ const CRONACA = {
     ],
   },
 };
+
+// Medaglie del mese, nell'ordine della slide delle premiazioni
+const MEDAGLIE = [
+  { key: 'maiSaltato', nome: 'Mai saltato', cosa: 'Obiettivo raggiunto ogni settimana', c: '#a6ff00' },
+  { key: 'mattiniero', nome: 'Mattiniero', cosa: '4 check-in prima delle 9', c: '#3be0ff' },
+  { key: 'branco', nome: 'Branco', cosa: '5 volte in palestra con gli amici', c: '#ff9f0a' },
+  { key: 'pomodoro', nome: 'Pomodoro del mese', cosa: 'Il Sudometro più alto del mese', c: '#ff2d6b' },
+];
+const MEDAL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h3l1 5-3 1zM16 2h-3l-1 5 3 1z" fill="currentColor" opacity=".6"/><circle cx="12" cy="15" r="7" fill="currentColor"/><path d="M12 11.2l1.1 2.3 2.5.3-1.8 1.7.5 2.5-2.3-1.2-2.3 1.2.5-2.5-1.8-1.7 2.5-.3z" fill="#000" opacity=".35"/></svg>';
+const COUCH_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9V7a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10a2 2 0 0 1 4 0v3h10v-3a2 2 0 0 1 4 0v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor"/><path d="M6 18v2M18 18v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
 
 const CSS = `
   .king { align-items: center; text-align: center; }
@@ -54,8 +65,26 @@ const CSS = `
   .cronaca { display: grid; gap: 6px; margin-top: 12px; }
   .cronaca p { padding: 9px 14px; border-radius: 16px 16px 16px 5px; background: #2c2c2e; font-size: 15px; line-height: 1.3; color: #e5e5ea; }
   .cronaca b { color: #f5f5f7; }
+  /* Premiazioni: medaglie e Divano d'oro */
+  .awards .eyebrow { color: #ffd60a; }
+  .medals { display: grid; gap: 8px; margin-top: 22px; }
+  .medal { display: grid; grid-template-columns: 44px 1fr; align-items: center; column-gap: 12px; padding: 12px 14px; border-radius: 18px; background: #1c1c1e; }
+  .medal svg { grid-row: span 2; width: 44px; height: 44px; color: var(--c); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--c) 45%, transparent)); }
+  .medal b { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
+  .medal small { font-size: 13px; color: #8e8e93; line-height: 1.25; }
+  .medal .who { grid-column: 2; display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
+  .medal .who span { padding: 3px 10px; border-radius: 99px; background: var(--c); color: #000; font-size: 14px; font-weight: 800; }
+  .medal.none { opacity: .45; }
+  .medal.none svg { filter: none; color: #48484a; }
+  .medal.none .who span { background: #2c2c2e; color: #8e8e93; font-weight: 600; }
+  .medal.couch { margin-top: 6px; background: linear-gradient(160deg, #3a2a08, #1c1c1e 75%); border: 1px solid #ffd60a55; }
   /* Schermi bassi (iPhone SE): tutto un po' più compatto */
   @media (max-height: 700px) {
+    .awards h2 { font-size: 32px; }
+    .medals { margin-top: 14px; gap: 6px; }
+    .medal { padding: 9px 12px; grid-template-columns: 36px 1fr; }
+    .medal svg { width: 36px; height: 36px; }
+    .medal .who { margin-top: 5px; }
     .rank h2 { font-size: 32px; }
     .race { margin-top: 14px; gap: 6px; }
     .bar { height: 40px; font-size: 16px; }
@@ -113,6 +142,7 @@ export function kingSlide() {
       <p class="hint" data-a style="--d:${last + 1.4 + frasi.length * 0.6 + 0.4}">Tocca per l'incoronazione</p>`;
     first.before(sec);
     countUp(sec);
+    awardsSlide(q, mese, sec);
   }
 
   const colors = ['#ffd60a', '#ff9f0a', '#ff2d6b', '#a6ff00', '#3be0ff'];
@@ -130,6 +160,41 @@ export function kingSlide() {
     ${cronaca.re ? `<p class="sub" data-a style="--d:2.6">${cronaca.re}</p>` : ''}
     <p class="hint" data-a style="--d:3.2">Tocca per le novità</p>`;
   first.before(sec);
+}
+
+/** Premiazioni del mese (medaglie e Divano d'oro), prima della classifica. */
+function awardsSlide(q, mese, before) {
+  let medaglie = {};
+  let divano = null;
+  try {
+    medaglie = JSON.parse(q.get('medaglie') || '{}') || {};
+    divano = q.get('divano') ? JSON.parse(q.get('divano')) : null;
+  } catch (err) {
+    return;
+  }
+  if (!q.has('medaglie')) return;
+  const chips = (names, d) => names.map((n, k) => `<span data-a style="--d:${d + 0.35 + k * 0.15};--anim:pop">${esc(n)}</span>`).join('');
+  const cards = MEDAGLIE.map((m, k) => {
+    const names = Array.isArray(medaglie[m.key]) ? medaglie[m.key] : [];
+    const d = 0.6 + k * 0.6;
+    const cosa = m.key === 'pomodoro' && q.get('sudo') ? `${m.cosa}: ${esc(q.get('sudo'))}` : m.cosa;
+    return `<div class="medal${names.length ? '' : ' none'}" data-a style="--d:${d};--c:${m.c}">${MEDAL_SVG}<b>${m.nome}</b><small>${cosa}</small>
+      <p class="who">${names.length ? chips(names, d) : '<span>Nessuno questo mese</span>'}</p></div>`;
+  });
+  if (divano && Array.isArray(divano[0]) && divano[0].length) {
+    const d = 0.6 + MEDAGLIE.length * 0.6 + 0.6;
+    const volte = Number(divano[1]) || 0;
+    cards.push(`<div class="medal couch" data-a style="--d:${d};--c:#ffd60a">${COUCH_SVG}<b>Divano d'oro</b><small>Il meno visto in palestra: ${volte === 1 ? '1 volta' : `${volte} volte`}</small>
+      <p class="who">${chips(divano[0], d)}</p></div>`);
+  }
+  const sec = document.createElement('section');
+  sec.className = 'slide awards';
+  sec.innerHTML = `
+    <p class="eyebrow" data-a style="--d:0">Premiazioni · ${mese}</p>
+    <h2 data-a style="--d:.1">Le medaglie del mese.</h2>
+    <div class="medals">${cards.join('')}</div>
+    <p class="hint" data-a style="--d:${0.6 + cards.length * 0.6 + 1}">Tocca per la classifica</p>`;
+  before.before(sec);
 }
 
 /** I punti della classifica contano da 0 ogni volta che la slide si accende. */

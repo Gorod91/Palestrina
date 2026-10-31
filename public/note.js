@@ -17,7 +17,7 @@ const VERSIONS = [
       'Bonus Apripista: 3 punti a chi chiede per primo "chi va in palestra?" e quel giorno fa check-in',
       { feature: 'sfide', text: 'Sfide tra chi è in palestra insieme: 5 punti a chi vince, 2 a chi partecipa' },
       'Obiettivo settimanale scelto da ognuno per il mese, da 1 a 5 presenze: richiesto all\'apertura dell\'app e valido fino a fine mese',
-      'Presentazione di fine mese: classifica completa del mese con la cronaca, prima dell\'incoronazione del Re',
+      'Presentazione di fine mese: medaglie e Divano d\'oro, classifica completa del mese con la cronaca, poi l\'incoronazione del Re',
     ],
   },
   {
