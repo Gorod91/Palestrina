@@ -93,9 +93,11 @@ const EX = Object.fromEntries(CATALOGO.map((e) => [e.id, e]));
 // Doppioni uniti (lo stesso esercizio a tempo e a ripetizioni): il vecchio id resta solo per le serie già salvate,
 // e "l'ultima volta" del nuovo le conta se sono state fatte nello stesso modo. Come si segna lo dice la scheda (piano.t).
 const UNITI = { 'situps-tempo': 'situps', 'russian-twist-rip': 'russian-twist', 'v-sit-rip': 'v-sit' };
-/** Esercizio cambiato dall'app nel catalogo comune: nome, attrezzo, gruppo, come si segna ('kg' = peso e ripetizioni). */
+/** Esercizio cambiato dall'app nel catalogo comune: nome, attrezzo, gruppo, come si segna ('kg' = peso e ripetizioni),
+ *  eliminato (old). */
 function applyCat(e, d) {
   if (!e || !d) return;
+  if (d.old === true) e.old = true;
   if (typeof d.n === 'string' && d.n) e.n = d.n;
   if (typeof d.m === 'string') e.m = d.m;
   if (typeof d.g === 'string' && d.g) e.g = d.g;
@@ -402,6 +404,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let hasDoc = false; // le mie schede sono già salvate su Firebase (altrimenti si usano quelle di esempio)
   let aggDone = []; // id degli aggiornamenti mirati già applicati alle mie schede
   let rot = []; // schede in rotazione, in ordine (id)
+  let catIds = null; // esercizi nel catalogo comune su Firebase (null finché non arriva)
+  let pubblicati = false; // i miei esercizi nuovi di prima del catalogo unico sono già stati messi nel catalogo
 
   async function start(user, test) {
     const k = `${user.name}|${test}`;
@@ -440,6 +444,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         recMap = (d && d.rec) || {};
         aggDone = (d && d.agg) || [];
         rot = (d && d.rot) || [];
+        pubblicaVecchi();
         const todo = d ? AGGIORNAMENTI.filter((a) => !aggDone.includes(a.id) && (!a.per || a.per.includes(me.name))) : [];
         if (todo.length) { // aggiornamenti mirati non ancora applicati: si applicano e si salvano subito
           const list = JSON.parse(JSON.stringify(schede));
@@ -451,9 +456,15 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       }, (err) => toast(`Allenamento: ${err.message}`)),
     );
     loadOthers(); // schede degli altri (per il tasto "Schede degli altri")
-    // Catalogo comune: attrezzo cambiato dall'app (vale per tutte le schede di tutti)
+    // Catalogo comune: esercizi nuovi, cambiati o eliminati dall'app (valgono per tutte le schede di tutti)
     unsubs.push(fs.onSnapshot(fs.collection(db, pfx + 'catalogo'), (snap) => {
-      snap.docs.forEach((d) => applyCat(EX[d.id], d.data()));
+      snap.docs.forEach((d) => {
+        const v = d.data();
+        if (!EX[d.id] && v.n && v.g) addEx({ id: d.id, n: v.n, g: v.g, m: v.m || '' }); // aggiunto da qualcuno
+        applyCat(EX[d.id], v);
+      });
+      catIds = snap.docs.map((d) => d.id);
+      pubblicaVecchi();
       softDraw();
     }, () => {}));
     // Serie salvate dall'altra parte (in prova se ora si è fuori, o viceversa): si possono copiare qui
@@ -492,6 +503,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     hasDoc = false;
     aggDone = [];
     rot = [];
+    catIds = null;
+    pubblicati = false;
     Object.assign(ui, { view: 'list', ed: null, pickFor: '', sel: [], sheet: null });
     pages = {};
   }
@@ -1713,7 +1726,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function saveCat(ex, patch) {
     const e = EX[ex];
     if (!e) return;
-    const cur = { n: e.n, m: e.m || '', g: e.g || '', t: unit(e) };
+    const cur = { n: e.n, m: e.m || '', g: e.g || '', t: unit(e), ...(e.old ? { old: true } : {}) };
     const next = { ...cur, ...patch };
     if (JSON.stringify(next) === JSON.stringify(cur)) return;
     applyCat(e, next);
@@ -1751,7 +1764,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         <input id="wo-pl-nota" class="plain wo-sh-in" value="${esc(pi.nota || '')}" placeholder="Per esempio sedile al 4" maxlength="80" autocomplete="off">`}`;
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${pe.back ? esc(ed.circuiti[pe.back.cid].n) : esc(ed.name || 'Scheda')}</button></div>
       <h2 class="wo-ed-title">${esc((EX[pe.ex] || { n: pe.ex }).n)}</h2>${body}
-      <button class="primary wo-exed-ok" data-a="back">Fatto</button>`;
+      <button class="primary wo-exed-ok" data-a="back">Fatto</button>
+      <button class="link-button wo-danger" data-a="exdel">Elimina esercizio</button>`;
   }
 
   /** Circuito o lista da spuntare, a pagina intera: nome, giri, recupero, pausa ed esercizi (un tocco apre la loro pagina). */
@@ -1816,9 +1830,24 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <div class="wo-groups wrap">${GRUPPI.map((g) => `<button class="${nx.g === g ? 'on' : ''}" data-a="nxg:${g}">${g}</button>`).join('')}</div>
       <div class="wo-lbl">Come si segna</div>
       <div class="wo-sh-seg">${TIPI.map(([t, l]) => `<button class="${nx.t === t ? 'on' : ''}" data-a="nxt:${t}">${l}</button>`).join('')}</div>
-      <label class="wo-lbl" for="wo-nx-m">Dove si trova o attrezzo (facoltativo)</label>
-      <input id="wo-nx-m" class="plain wo-sh-in" value="${esc(nx.m)}" placeholder="Per esempio Macchina 12, Manubri" maxlength="40" autocomplete="off">
+      <label class="wo-lbl" for="wo-nx-m">Macchina o attrezzo (facoltativo)</label>
+      <input id="wo-nx-m" class="plain wo-sh-in" value="${esc(nx.m)}" placeholder="Per esempio Leg press, Manubri" maxlength="40" autocomplete="off">
       <button class="primary" data-a="nxsave">Aggiungi</button>`;
+  }
+
+  /** Esercizio nuovo nel catalogo comune: da lì lo vedono e lo scelgono tutti. */
+  function pubblica(e) {
+    if (!/^[a-z0-9-]{1,40}$/.test(e.id)) return;
+    const { fs, db } = x;
+    fs.setDoc(fs.doc(db, pfx + 'catalogo', e.id), { n: e.n, m: (e.m || '').slice(0, 40), g: e.g, t: unit(e), by: me.name, at: fs.serverTimestamp() })
+      .catch((err) => toast(`Esercizio non salvato: ${err.message}`));
+  }
+
+  /** I miei esercizi nuovi di prima del catalogo unico (solo nel mio documento): si mettono nel catalogo, una volta. */
+  function pubblicaVecchi() {
+    if (pubblicati || !catIds || !hasDoc) return;
+    pubblicati = true;
+    extra.filter((e) => !catIds.includes(e.id)).forEach(pubblica);
   }
 
   function saveNewEx() {
@@ -1831,6 +1860,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     extra.push(e);
     addEx(e);
     writeDoc();
+    pubblica(e);
     ui.sel.push(e.id);
     Object.assign(ui, { view: 'pick', q: '', g: e.g, pg: 'm:' + e.g, pf: '', nx: null });
   }
@@ -1859,6 +1889,25 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     writeDoc(list);
     Object.assign(ui, { ed: null, sheet: null, view: 'list' });
     toast('Scheda salvata');
+  }
+
+  /** Elimina un esercizio dal catalogo comune: nessuno lo sceglie più ed esce da tutte le mie schede (e da quella che
+   *  sto modificando). Chi ce l'ha nelle sue schede lo tiene; resta anche per i nomi delle serie già fatte. */
+  function deleteEx() {
+    const pe = ui.exed, ed = ui.ed, id = pe.ex;
+    if (!confirm(`Eliminare l'esercizio "${(EX[id] || { n: id }).n}"? Non lo potrà più scegliere nessuno ed esce dalle tue schede. Le serie già fatte restano.`)) return;
+    const strip = (sc, keep) => { // keep: nella modifica i circuiti rimasti vuoti restano (li toglie il salvataggio)
+      const ci = sc.circuiti || {};
+      Object.values(ci).forEach((c) => { c.ex = c.ex.filter((e) => e !== id); });
+      sc.ex = sc.ex.filter((e) => e !== id && (keep || e[0] !== '@' || (ci[e.slice(1)] || { ex: [] }).ex.length));
+      if (sc.piano) delete sc.piano[id];
+      return sc;
+    };
+    strip(ed, true);
+    saveCat(id, { old: true });
+    writeDoc(clone(schede || []).map((sc) => strip(sc)));
+    Object.assign(ui, { exed: null, view: pe.back ? 'cired' : 'edit' });
+    toast('Esercizio eliminato');
   }
 
   function deleteEditor() {
@@ -1912,6 +1961,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     else if (cmd === 'nxsave') saveNewEx();
     else if (cmd === 'edsave') saveEditor();
     else if (cmd === 'eddel') deleteEditor();
+    else if (cmd === 'exdel') deleteEx();
     else return false;
     return true;
   }
