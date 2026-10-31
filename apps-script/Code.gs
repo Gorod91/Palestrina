@@ -3045,6 +3045,8 @@ function copiaFogliSuFirebase() {
  * Da lanciare dall'editor quando serve controllare i dati: copia le tabelle di Firestore nei fogli "FB <nome>"
  * (solo lettura, si possono cancellare). Le tabelle vere restano su Firebase.
  */
+const COPIA_TABELLE_RICHIESTA = '2026-10-31a'; // cambiarlo per rifare la copia al prossimo minuto
+
 function copiaTabelleNelFoglio() {
   TEST = false;
   MEMO = {};
@@ -3635,6 +3637,15 @@ function codaTick() {
     passaggioTick();
   } catch (err) {
     console.error('Passaggio a Firebase non riuscito', err);
+  }
+  // Copia delle tabelle nel foglio chiesta da qui (una volta per valore di COPIA_TABELLE_RICHIESTA)
+  try {
+    if (realProps.getProperty('COPIA_TABELLE_FATTA') !== COPIA_TABELLE_RICHIESTA) {
+      realProps.setProperty('COPIA_TABELLE_FATTA', COPIA_TABELLE_RICHIESTA);
+      copiaTabelleNelFoglio();
+    }
+  } catch (err) {
+    console.error('Copia delle tabelle non riuscita', err);
   }
   [false, true].forEach((test) => {
     TEST = test;
