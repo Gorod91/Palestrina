@@ -2685,9 +2685,14 @@ function dayString(date) {
 
 // ---------- Dati ----------
 
-/** Foglio da modificare: cancella le letture ricordate di quel foglio. */
+/**
+ * Foglio da modificare: cancella le letture ricordate di quel foglio. Una tabella su Firebase è una copia letta in
+ * un momento preciso: si riapre, così dentro il lock si lavora sulla versione aggiornata (openTable decide se
+ * rileggerla). Senza, una risposta già salvata da un'altra richiesta veniva aggiunta di nuovo (righe doppie).
+ */
 function sheet(key) {
   forget(key);
+  if (tablesOn(key)) delete MEMO['sheet:' + key];
   return sheetRaw(key);
 }
 
@@ -3045,7 +3050,42 @@ function copiaFogliSuFirebase() {
  * Da lanciare dall'editor quando serve controllare i dati: copia le tabelle di Firestore nei fogli "FB <nome>"
  * (solo lettura, si possono cancellare). Le tabelle vere restano su Firebase.
  */
-const COPIA_TABELLE_RICHIESTA = '2026-10-31a'; // cambiarlo per rifare la copia al prossimo minuto
+const PIANI_DOPPI = '2026-10-31'; // cambiarlo per rifare la pulizia al prossimo minuto
+
+/**
+ * Risposte doppie per lo stesso giorno e la stessa persona (vedi sheet()): tiene la più recente. Le penalità
+ * guardavano l'ultima riga, le modifiche la prima: un "Ci sono" cambiato in "No" poteva restare "Ci sono".
+ */
+function togliPianiDoppi() {
+  TEST = false;
+  MEMO = {};
+  const lock = scriptLock();
+  lock.waitLock(10000);
+  const removed = [];
+  try {
+    const sh = sheet('piani');
+    const values = sh.getDataRange().getValues();
+    const keep = {};
+    values.forEach((r, i) => {
+      if (i === 0) return;
+      const k = toDay(r[0]) + '|' + r[1];
+      if (keep[k] === undefined || String(r[4]) >= String(values[keep[k]][4])) keep[k] = i;
+    });
+    for (let i = values.length - 1; i > 0; i--) {
+      if (keep[toDay(values[i][0]) + '|' + values[i][1]] !== i) {
+        removed.push(`${toDay(values[i][0])} ${values[i][1]} ${values[i][2]}`);
+        sh.deleteRow(i + 1);
+      }
+    }
+    if (removed.length) bumpChat();
+  } finally {
+    lock.releaseLock();
+  }
+  Logger.log('Piani doppi tolti: ' + (removed.join(', ') || 'nessuno'));
+  return removed;
+}
+
+const COPIA_TABELLE_RICHIESTA = '2026-10-31b'; // cambiarlo per rifare la copia al prossimo minuto
 
 function copiaTabelleNelFoglio() {
   TEST = false;
@@ -3646,6 +3686,14 @@ function codaTick() {
     }
   } catch (err) {
     console.error('Copia delle tabelle non riuscita', err);
+  }
+  try {
+    if (realProps.getProperty('PIANI_DOPPI_FATTO') !== PIANI_DOPPI) {
+      realProps.setProperty('PIANI_DOPPI_FATTO', PIANI_DOPPI);
+      togliPianiDoppi();
+    }
+  } catch (err) {
+    console.error('Pulizia dei piani doppi non riuscita', err);
   }
   [false, true].forEach((test) => {
     TEST = test;
