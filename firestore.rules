@@ -94,17 +94,18 @@ service cloud.firestore {
         && resource.data.name == request.auth.token.name;
 
       // Le proprie schede (id = uid), con le macchine aggiunte (extra), i recuperi scelti per esercizio (rec)
-      // gli aggiornamenti mirati già applicati (agg) e le schede in rotazione (rot)
+      // gli aggiornamenti mirati già applicati (agg), le schede in rotazione (rot) e gli esercizi eliminati (tolti)
       allow create, update: if pal() && allenamento(coll)
         && coll in ['schede', 'prova_schede']
         && id == request.auth.uid
-        && request.resource.data.keys().hasOnly(['name', 'list', 'extra', 'rec', 'agg', 'rot', 'at'])
+        && request.resource.data.keys().hasOnly(['name', 'list', 'extra', 'rec', 'agg', 'rot', 'tolti', 'at'])
         && request.resource.data.name == request.auth.token.name
         && request.resource.data.list is list
         && request.resource.data.list.size() <= 30
         && (!('extra' in request.resource.data) || (request.resource.data.extra is list && request.resource.data.extra.size() <= 200))
         && (!('rec' in request.resource.data) || request.resource.data.rec is map)
         && (!('rot' in request.resource.data) || (request.resource.data.rot is list && request.resource.data.rot.size() <= 30))
+        && (!('tolti' in request.resource.data) || (request.resource.data.tolti is list && request.resource.data.tolti.size() <= 500))
         && (!('agg' in request.resource.data) || (request.resource.data.agg is list && request.resource.data.agg.size() <= 2000))
         && request.resource.data.at == request.time;
     }

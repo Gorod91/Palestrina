@@ -402,6 +402,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let hasDoc = false; // le mie schede sono già salvate su Firebase (altrimenti si usano quelle di esempio)
   let aggDone = []; // id degli aggiornamenti mirati già applicati alle mie schede
   let rot = []; // schede in rotazione, in ordine (id)
+  let tolti = []; // esercizi eliminati da me: non si scelgono più (le serie già fatte restano)
 
   async function start(user, test) {
     const k = `${user.name}|${test}`;
@@ -440,6 +441,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         recMap = (d && d.rec) || {};
         aggDone = (d && d.agg) || [];
         rot = (d && d.rot) || [];
+        tolti = (d && d.tolti) || [];
         const todo = d ? AGGIORNAMENTI.filter((a) => !aggDone.includes(a.id) && (!a.per || a.per.includes(me.name))) : [];
         if (todo.length) { // aggiornamenti mirati non ancora applicati: si applicano e si salvano subito
           const list = JSON.parse(JSON.stringify(schede));
@@ -492,6 +494,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     hasDoc = false;
     aggDone = [];
     rot = [];
+    tolti = [];
     Object.assign(ui, { view: 'list', ed: null, pickFor: '', sel: [], sheet: null });
     pages = {};
   }
@@ -1543,7 +1546,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   /** Scelta degli esercizi: prima pagina con muscoli e attrezzi, poi l'elenco in ordine alfabetico; la ricerca guarda
    *  nome, muscolo e attrezzo. Con la spunta (multi) si scelgono più esercizi per una scheda o un circuito. */
   function pickBody(multi, had = []) {
-    const cat = CATALOGO.filter((e) => !e.old); // old: tolti dal catalogo, restano solo per i nomi delle serie già fatte
+    const cat = CATALOGO.filter((e) => !e.old && !tolti.includes(e.id)); // old: tolti dal catalogo, restano solo per i nomi delle serie già fatte
     const q = ui.q.trim().toLowerCase();
     const row = (e) => {
       if (!multi) {
@@ -1581,8 +1584,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }
     // prima pagina: recenti, muscoli, attrezzi
     const rec = [];
-    serie.slice().sort((a, b) => (a.day < b.day ? 1 : -1)).forEach((x2) => { const id = UNITI[x2.ex] || x2.ex; if (EX[id] && !EX[id].old && !rec.includes(id)) rec.push(id); });
-    (schede || []).filter((y) => !y.di).forEach((y) => y.ex.concat(...Object.values(y.circuiti || {}).map((c) => c.ex)).forEach((id) => { if (EX[id] && !EX[id].old && !rec.includes(id)) rec.push(id); }));
+    serie.slice().sort((a, b) => (a.day < b.day ? 1 : -1)).forEach((x2) => { const id = UNITI[x2.ex] || x2.ex; if (EX[id] && !EX[id].old && !tolti.includes(id) && !rec.includes(id)) rec.push(id); });
+    (schede || []).filter((y) => !y.di).forEach((y) => y.ex.concat(...Object.values(y.circuiti || {}).map((c) => c.ex)).forEach((id) => { if (EX[id] && !EX[id].old && !tolti.includes(id) && !rec.includes(id)) rec.push(id); }));
     const recIds = rec.filter((id) => !had.includes(id)).slice(0, 10);
     const recHtml = recIds.length ? `<div class="wo-pk-sec">Nelle tue schede e di recente</div><div class="wo-recs">${recIds.map((id) => `<button class="${ui.sel.includes(id) ? 'on' : ''}" data-a="${multi ? 'psel' : 'pick'}:${id}">${esc(EX[id].n)}</button>`).join('')}</div>` : '';
     const n = (f) => cat.filter(f).length;
@@ -1604,7 +1607,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   }
 
   // ---------- Schede: crea, modifica, copia (fase 2) ----------
-  // Tutto nel mio documento schede/<uid>: { list, extra (macchine nuove), rec (recuperi) }. La prima volta che si salva
+  // Tutto nel mio documento schede/<uid>: { list, extra (macchine nuove), rec (recuperi), tolti (esercizi eliminati) }. La prima volta che si salva
   // ci finiscono anche le schede di esempio scritte qui sopra; da lì in poi contano solo quelle del documento.
 
   /** Salva schede, macchine nuove e recuperi nel mio documento. */
@@ -1613,7 +1616,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     schede = list;
     if (!hasDoc) aggDone = AGGIORNAMENTI.map((a) => a.id); // le schede di esempio li contengono già
     hasDoc = true;
-    const data = JSON.parse(JSON.stringify({ name: me.name, list, extra, rec: recMap, agg: aggDone, rot })); // via i campi undefined
+    const data = JSON.parse(JSON.stringify({ name: me.name, list, extra, rec: recMap, agg: aggDone, rot, ...(tolti.length ? { tolti } : {}) })); // via i campi undefined
     fs.setDoc(fs.doc(db, pfx + 'schede', fbUid(me.name)), { ...data, at: fs.serverTimestamp() })
       .catch((err) => toast(`Schede non salvate: ${err.message}`));
   }
@@ -1751,7 +1754,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         <input id="wo-pl-nota" class="plain wo-sh-in" value="${esc(pi.nota || '')}" placeholder="Per esempio sedile al 4" maxlength="80" autocomplete="off">`}`;
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${pe.back ? esc(ed.circuiti[pe.back.cid].n) : esc(ed.name || 'Scheda')}</button></div>
       <h2 class="wo-ed-title">${esc((EX[pe.ex] || { n: pe.ex }).n)}</h2>${body}
-      <button class="primary wo-exed-ok" data-a="back">Fatto</button>`;
+      <button class="primary wo-exed-ok" data-a="back">Fatto</button>
+      <button class="link-button wo-danger" data-a="exdel">Elimina esercizio</button>`;
   }
 
   /** Circuito o lista da spuntare, a pagina intera: nome, giri, recupero, pausa ed esercizi (un tocco apre la loro pagina). */
@@ -1816,8 +1820,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <div class="wo-groups wrap">${GRUPPI.map((g) => `<button class="${nx.g === g ? 'on' : ''}" data-a="nxg:${g}">${g}</button>`).join('')}</div>
       <div class="wo-lbl">Come si segna</div>
       <div class="wo-sh-seg">${TIPI.map(([t, l]) => `<button class="${nx.t === t ? 'on' : ''}" data-a="nxt:${t}">${l}</button>`).join('')}</div>
-      <label class="wo-lbl" for="wo-nx-m">Dove si trova o attrezzo (facoltativo)</label>
-      <input id="wo-nx-m" class="plain wo-sh-in" value="${esc(nx.m)}" placeholder="Per esempio Macchina 12, Manubri" maxlength="40" autocomplete="off">
+      <label class="wo-lbl" for="wo-nx-m">Macchina o attrezzo (facoltativo)</label>
+      <input id="wo-nx-m" class="plain wo-sh-in" value="${esc(nx.m)}" placeholder="Per esempio Leg press, Manubri" maxlength="40" autocomplete="off">
       <button class="primary" data-a="nxsave">Aggiungi</button>`;
   }
 
@@ -1859,6 +1863,25 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     writeDoc(list);
     Object.assign(ui, { ed: null, sheet: null, view: 'list' });
     toast('Scheda salvata');
+  }
+
+  /** Elimina un esercizio per me: non si sceglie più ed esce da tutte le mie schede (e da quella che sto modificando).
+   *  Resta nel catalogo degli altri e per i nomi delle serie già fatte. */
+  function deleteEx() {
+    const pe = ui.exed, ed = ui.ed, id = pe.ex;
+    if (!confirm(`Eliminare l'esercizio "${(EX[id] || { n: id }).n}"? Esce da tutte le tue schede e non si potrà più scegliere. Le serie già fatte restano.`)) return;
+    const strip = (sc, keep) => { // keep: nella modifica i circuiti rimasti vuoti restano (li toglie il salvataggio)
+      const ci = sc.circuiti || {};
+      Object.values(ci).forEach((c) => { c.ex = c.ex.filter((e) => e !== id); });
+      sc.ex = sc.ex.filter((e) => e !== id && (keep || e[0] !== '@' || (ci[e.slice(1)] || { ex: [] }).ex.length));
+      if (sc.piano) delete sc.piano[id];
+      return sc;
+    };
+    strip(ed, true);
+    if (!tolti.includes(id)) tolti.push(id);
+    writeDoc(clone(schede || []).map((sc) => strip(sc)));
+    Object.assign(ui, { exed: null, view: pe.back ? 'cired' : 'edit' });
+    toast('Esercizio eliminato');
   }
 
   function deleteEditor() {
@@ -1912,6 +1935,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     else if (cmd === 'nxsave') saveNewEx();
     else if (cmd === 'edsave') saveEditor();
     else if (cmd === 'eddel') deleteEditor();
+    else if (cmd === 'exdel') deleteEx();
     else return false;
     return true;
   }
