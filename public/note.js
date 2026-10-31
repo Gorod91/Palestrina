@@ -16,6 +16,7 @@ const VERSIONS = [
       'Pesi sotto lo zero per gli esercizi assistiti: i chili di aiuto (contrappeso, elastico) si segnano col meno',
       'Bonus Apripista: 3 punti a chi chiede per primo "chi va in palestra?" e quel giorno fa check-in',
       { feature: 'sfide', text: 'Sfide tra chi è in palestra insieme: 5 punti a chi vince, 2 a chi partecipa' },
+      'Obiettivo settimanale scelto da ognuno per il mese, da 1 a 5 presenze: richiesto all\'apertura dell\'app e valido fino a fine mese',
     ],
   },
   {

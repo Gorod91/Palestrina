@@ -1150,3 +1150,30 @@ html.ios.standalone .sr { top: var(--ios-top, 0px); }
 .wo-tring span { position: relative; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--stand); }
 .wo-tplay { width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; background: var(--stand); color: #000; }
 .wo-tplay svg { width: 22px; height: 22px; fill: currentColor; margin-left: 3px; }
+
+/* ---------- Obiettivo del mese (foglio senza ×, dopo le slide di fine mese) ---------- */
+.goal-sheet { z-index: 35; animation: goal-fade .3s ease both; }
+.goal-sheet .sheet-card { max-height: 92%; animation: goal-up .45s cubic-bezier(.2, .8, .2, 1) both; }
+.goal-sheet .sheet-card::before { display: none; }
+@keyframes goal-up { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes goal-fade { from { opacity: 0; } }
+.goal-eb { margin: 0; font-size: 13px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--exercise); }
+.goal-h { font-size: 26px; font-weight: 800; margin: 2px 0 4px; letter-spacing: -.03em; }
+.goal-sub { font-size: 15px; }
+.goal-ring { position: relative; width: 150px; height: 150px; margin: 6px auto 4px; }
+.goal-ring svg { width: 150px; height: 150px; display: block; }
+.goal-in { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; }
+.goal-in b { font-size: 46px; font-weight: 800; line-height: 1; color: var(--move); font-variant-numeric: tabular-nums; }
+.goal-in span { font-size: 12px; color: var(--muted); font-weight: 600; }
+.goal-lab { text-align: center; font-weight: 700; font-size: 17px; margin: 2px 0 8px; min-height: 23px; }
+.goal-chips { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 6px 0 12px; }
+.goal-chips button { position: relative; aspect-ratio: 1; padding: 0; border: 0; border-radius: 50%; background: var(--card-2); color: var(--fg); font-size: 22px; font-weight: 800; font-variant-numeric: tabular-nums; transition: transform .15s, background .2s; }
+.goal-chips button:active { transform: scale(.92); }
+.goal-chips button.on { background: var(--exercise); color: #000; box-shadow: 0 0 24px rgba(166, 255, 0, .35); }
+.goal-chips button small { position: absolute; left: 0; right: 0; bottom: -17px; font-size: 10px; font-weight: 600; color: var(--muted); }
+.goal-info { font-size: 13px; text-align: center; margin-top: 22px; }
+.goal-pop { animation: goal-popn .35s cubic-bezier(.2, .8, .2, 1); }
+@keyframes goal-popn { 0% { transform: scale(.6); } 60% { transform: scale(1.15); } 100% { transform: scale(1); } }
+.goal-shake { animation: goal-shake .4s; }
+@keyframes goal-shake { 20%, 60% { transform: translateX(-7px); } 40%, 80% { transform: translateX(7px); } }
+@media (prefers-reduced-motion: reduce) { .goal-sheet, .goal-sheet .sheet-card, .goal-pop, .goal-shake { animation: none; } }

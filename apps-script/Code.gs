@@ -351,7 +351,7 @@ const NEWS = [
     id: '2026-11',
     month: '2026-10',
     from: '2026-11-01',
-    features: ['apripista', 'sfide', 'allenamento'],
+    features: ['apripista', 'sfide', 'allenamento', 'obiettivo'],
     title: 'Novità di novembre',
     body: 'Apripista, le schede di allenamento… e una sorpresa. Tocca per vedere.',
   },
@@ -372,6 +372,45 @@ function featureOn(feature) {
 function featureFrom(feature) {
   const n = NEWS.find((x) => x.features.includes(feature));
   return TEST || !n ? '' : n.from;
+}
+
+// ---------- Obiettivo settimanale scelto per il mese ----------
+// Con la novità 'obiettivo' (rilascio del 31/10 alle 21), dopo le slide l'app chiede a ognuno quante volte a settimana
+// verrà a novembre (da 1 a 5). La scelta resta per tutto il mese. Ogni settimana usa l'obiettivo del mese del suo
+// lunedì (l'ultima scelta fatta fino a quel mese); senza scelte vale la colonna C del foglio Utenti.
+// Scelte in una proprietà per persona (goal_<nome> = {"2026-11": 3}): in prova restano separate da quelle vere.
+const GOAL_ASK_MONTH = '2026-11';
+const GOAL_MAX = 5;
+
+function goalsOf(name) {
+  const g = safeJson(props.getProperty('goal_' + name) || '{}');
+  return g && typeof g === 'object' ? g : {};
+}
+
+/** Obiettivo della settimana che inizia il lunedì `week`. */
+function goalAt(user, week) {
+  const m = String(week).slice(0, 7);
+  const g = goalsOf(user.name);
+  const k = Object.keys(g).filter((x) => x <= m).sort().pop();
+  return k ? Number(g[k]) || user.goal : user.goal;
+}
+
+/** Mese per cui l'app deve ancora chiedere l'obiettivo ('' = niente da chiedere). */
+function goalAsk(user) {
+  if (!featureOn('obiettivo') || dayString(new Date()) > GOAL_ASK_MONTH + '-31') return '';
+  return goalsOf(user.name)[GOAL_ASK_MONTH] ? '' : GOAL_ASK_MONTH;
+}
+
+function setGoal(user, month, goal) {
+  const n = Math.round(Number(goal));
+  if (!featureOn('obiettivo')) return { error: 'Non ancora disponibile' };
+  if (String(month) !== GOAL_ASK_MONTH || !(n >= 1 && n <= GOAL_MAX)) return { error: 'Obiettivo non valido' };
+  const g = goalsOf(user.name);
+  if (g[month]) return { ok: true, goal: Number(g[month]) }; // scelto una volta sola per tutto il mese
+  g[month] = n;
+  props.setProperty('goal_' + user.name, JSON.stringify(g));
+  forget('state:shared');
+  return { ok: true, goal: n };
 }
 
 /** Rilascia le novità di un mese (tutte quelle in attesa se month è vuoto, solo `id` se indicato): evento in chat e notifica. */
@@ -718,6 +757,8 @@ function handle(req, user) {
         if (req.muted) props.setProperty('mute_' + user.name, '1');
         else props.deleteProperty('mute_' + user.name);
         return json({ ok: true, muted: !!req.muted });
+      case 'setGoal':
+        return json(setGoal(user, req.month, req.goal));
       case 'setAlias':
         if (TEST) return json({ error: 'In modalità prova l\'alias non si cambia (è un dato vero)' });
         return json(setAlias(user, req.alias));
@@ -864,7 +905,7 @@ function checkin(user, source) {
   tmark('presenza');
   const rest = () => {
     const count = countInWeek(rows('presenze'), user.name, weekKey(dayString(new Date())));
-    addChatEvent(user.name, { kind: 'checkin', count, goal: user.goal, auto: source === 'automatico' });
+    addChatEvent(user.name, { kind: 'checkin', count, goal: goalAt(user, weekKey(dayString(new Date()))), auto: source === 'automatico' });
     tmark('evento chat');
     announceAchievements(user);
     tmark('traguardi');
@@ -1068,7 +1109,8 @@ function buildState(user) {
       name: user.name,
       display: user.display,
       alias: user.alias,
-      goal: user.goal,
+      goal: goalAt(user, weekKey(today)),
+      goalAsk: goalAsk(user),
       debug: user.debug,
       admin: user.admin,
       tester: user.admin || PROVA_USERS.includes(user.name),
@@ -1096,7 +1138,7 @@ function sharedState() {
     .map((u) => ({
       name: u.name,
       display: u.display,
-      goal: u.goal,
+      goal: goalAt(u, week),
       count: countInWeek(presenze, u.name, week),
       streak: streak(presenze, u, week),
     }))
@@ -1143,6 +1185,12 @@ function sharedState() {
   };
 }
 
+function monthMondays(from, to) {
+  const out = [];
+  for (let w = from; w <= to; w = addDays(w, 7)) out.push(w);
+  return out;
+}
+
 function presenzeMese(users, presenze, today) {
   const m = today.slice(0, 7);
   const from = weekKey(m + '-01');
@@ -1154,7 +1202,9 @@ function presenzeMese(users, presenze, today) {
     people: users.map((u) => ({
       name: u.name,
       display: u.display,
-      goal: u.goal,
+      goal: goalAt(u, from),
+      // obiettivo di ogni settimana del mese (dal lunedì della prima), che può cambiare da un mese all'altro
+      goals: monthMondays(from, to).map((w) => goalAt(u, w)),
       days: [...new Set(presenze.filter((r) => r.name === u.name && r.day >= from && r.day <= to).map((r) => r.day))].sort(),
     })),
   };
@@ -1201,7 +1251,8 @@ function buildNotifications(event, name) {
     const u = users.find((x) => x.name === name);
     const n = countInWeek(presenze, name, week);
     const teases = ['E tu dove sei?', 'Il divano può aspettare.', 'Qualcuno lo segua.', 'La classifica trema.'];
-    const extra = u && n === u.goal ? `Obiettivo settimanale raggiunto (${n}/${u.goal})` : `Presenza n. ${n} della settimana. ${pick(teases)}`;
+    const goal = u && goalAt(u, week);
+    const extra = u && n === goal ? `Obiettivo settimanale raggiunto (${n}/${goal})` : `Presenza n. ${n} della settimana. ${pick(teases)}`;
     return toAllBut(name, `${dn(name)} è in palestra`, extra);
   }
 
@@ -2544,10 +2595,11 @@ function computePointsRaw(month) {
     // Settimane di fila: il bonus arriva nel giorno in cui si raggiunge l'obiettivo
     for (let w = weekKey(monthStart); w <= addDays(monthStart, 31); w = addDays(w, 7)) {
       const days = mine.filter((r) => weekKey(r.day) === w).map((r) => r.day);
-      if (days.length < u.goal || !inMonth(days[u.goal - 1])) continue;
+      const goal = goalAt(u, w);
+      if (days.length < goal || !inMonth(days[goal - 1])) continue;
       let n = 1;
-      while (countInWeek(pres, u.name, addDays(w, -7 * n)) >= u.goal) n++;
-      if (n > 1) add('serie', 'Settimane di fila', Math.min(P.seriePerSettimana * (n - 1), P.serieMax), false, days[u.goal - 1], `${n}ª settimana di fila con l'obiettivo`);
+      while (countInWeek(pres, u.name, addDays(w, -7 * n)) >= goalAt(u, addDays(w, -7 * n))) n++;
+      if (n > 1) add('serie', 'Settimane di fila', Math.min(P.seriePerSettimana * (n - 1), P.serieMax), false, days[goal - 1], `${n}ª settimana di fila con l'obiettivo`);
     }
     // Sfide: +5 a chi vince, +2 agli altri partecipanti
     if (featureOn('sfide')) {
@@ -2597,7 +2649,7 @@ function computePointsRaw(month) {
     }
     if (early >= P.mattinieroVolte) add('mattiniero', u.f ? 'Mattiniera' : 'Mattiniero', P.mattiniero, true, earlyDay, `${P.mattinieroVolte}° check-in prima delle ${Number(P.mattinieroPrima.slice(0, 2))}`);
     if (friends >= P.brancoVolte) add('branco', 'Branco', P.branco, true, friendsDay, `${P.brancoVolte}° bonus amici del mese`);
-    if (mondays.length && mondays.every((w) => countInWeek(pres, u.name, w) >= u.goal)) add('maiSaltato', 'Mai saltato', P.maiSaltato, true, '', 'Obiettivo raggiunto in ogni settimana del mese');
+    if (mondays.length && mondays.every((w) => countInWeek(pres, u.name, w) >= goalAt(u, w))) add('maiSaltato', 'Mai saltato', P.maiSaltato, true, '', 'Obiettivo raggiunto in ogni settimana del mese');
     return { name: u.name, display: u.display, items, penalties };
   });
 
@@ -2652,9 +2704,9 @@ function countInWeek(presenze, name, week) {
 
 /** Settimane consecutive con obiettivo raggiunto (la corrente conta solo se già raggiunto). */
 function streak(presenze, user, currentWeek) {
-  let s = countInWeek(presenze, user.name, currentWeek) >= user.goal ? 1 : 0;
+  let s = countInWeek(presenze, user.name, currentWeek) >= goalAt(user, currentWeek) ? 1 : 0;
   let week = addDays(currentWeek, -7);
-  while (countInWeek(presenze, user.name, week) >= user.goal) {
+  while (countInWeek(presenze, user.name, week) >= goalAt(user, week)) {
     s++;
     week = addDays(week, -7);
   }
