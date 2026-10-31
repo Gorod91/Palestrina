@@ -17,10 +17,10 @@ const CRONACA = {
 
 // Medaglie del mese, nell'ordine della slide delle premiazioni
 const MEDAGLIE = [
-  { key: 'maiSaltato', nome: 'Mai saltato', cosa: 'Obiettivo raggiunto ogni settimana', c: '#a6ff00' },
-  { key: 'mattiniero', nome: 'Mattiniero', cosa: '4 check-in prima delle 9', c: '#3be0ff' },
-  { key: 'branco', nome: 'Branco', cosa: '5 volte in palestra con gli amici', c: '#ff9f0a' },
-  { key: 'pomodoro', nome: 'Pomodoro del mese', cosa: 'Il Sudometro più alto del mese', c: '#ff2d6b' },
+  { key: 'maiSaltato', nome: 'Mai saltato', cosa: 'Obiettivo raggiunto in ogni settimana del mese.', c: '#a6ff00', c2: '#3be0ff' },
+  { key: 'mattiniero', nome: 'Mattiniero', cosa: 'Almeno 4 check-in prima delle 9.', c: '#3be0ff', c2: '#a6ff00' },
+  { key: 'branco', nome: 'Branco', cosa: 'Almeno 5 volte in palestra insieme agli amici.', c: '#ffd60a', c2: '#ff9f0a' },
+  { key: 'pomodoro', nome: 'Pomodoro del mese', cosa: 'Il Sudometro più alto del mese', c: '#ff9f0a', c2: '#ff2d6b' },
 ];
 const MEDAL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h3l1 5-3 1zM16 2h-3l-1 5 3 1z" fill="currentColor" opacity=".6"/><circle cx="12" cy="15" r="7" fill="currentColor"/><path d="M12 11.2l1.1 2.3 2.5.3-1.8 1.7.5 2.5-2.3-1.2-2.3 1.2.5-2.5-1.8-1.7 2.5-.3z" fill="#000" opacity=".35"/></svg>';
 const COUCH_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9V7a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10a2 2 0 0 1 4 0v3h10v-3a2 2 0 0 1 4 0v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor"/><path d="M6 18v2M18 18v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
@@ -65,26 +65,24 @@ const CSS = `
   .cronaca { display: grid; gap: 6px; margin-top: 12px; }
   .cronaca p { padding: 9px 14px; border-radius: 16px 16px 16px 5px; background: #2c2c2e; font-size: 15px; line-height: 1.3; color: #e5e5ea; }
   .cronaca b { color: #f5f5f7; }
-  /* Premiazioni: medaglie e Divano d'oro */
-  .awards .eyebrow { color: #ffd60a; }
-  .medals { display: grid; gap: 8px; margin-top: 22px; }
-  .medal { display: grid; grid-template-columns: 44px 1fr; align-items: center; column-gap: 12px; padding: 12px 14px; border-radius: 18px; background: #1c1c1e; }
-  .medal svg { grid-row: span 2; width: 44px; height: 44px; color: var(--c); filter: drop-shadow(0 0 12px color-mix(in srgb, var(--c) 45%, transparent)); }
-  .medal b { font-size: 17px; font-weight: 800; letter-spacing: -.01em; }
-  .medal small { font-size: 13px; color: #8e8e93; line-height: 1.25; }
-  .medal .who { grid-column: 2; display: flex; flex-wrap: wrap; gap: 5px; margin-top: 7px; }
-  .medal .who span { padding: 3px 10px; border-radius: 99px; background: var(--c); color: #000; font-size: 14px; font-weight: 800; }
-  .medal.none { opacity: .45; }
-  .medal.none svg { filter: none; color: #48484a; }
-  .medal.none .who span { background: #2c2c2e; color: #8e8e93; font-weight: 600; }
-  .medal.couch { margin-top: 6px; background: linear-gradient(160deg, #3a2a08, #1c1c1e 75%); border: 1px solid #ffd60a55; }
+  /* Premiazioni: una slide per medaglia vinta e una per il Divano d'oro */
+  .award { align-items: center; text-align: center; }
+  .award .eyebrow { color: var(--c); }
+  .award .glow { background: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--c) 22%, transparent), transparent 65%); }
+  .award h1 { font-size: clamp(44px, 13vw, 64px); overflow-wrap: anywhere; background: linear-gradient(90deg, var(--c), var(--c2)); -webkit-background-clip: text; background-clip: text; }
+  .medals2 { align-self: stretch; display: grid; gap: 22px; margin: 26px 0 8px; text-align: left; }
+  .mrow { display: grid; grid-template-columns: 64px 1fr; column-gap: 14px; align-items: center; }
+  .mrow svg { grid-row: span 3; width: 64px; height: 64px; color: var(--c); filter: drop-shadow(0 0 18px color-mix(in srgb, var(--c) 55%, transparent)); }
+  .mrow h3 { font-size: 30px; font-weight: 900; letter-spacing: -.04em; line-height: 1; background: linear-gradient(90deg, var(--c), var(--c2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .mrow small { margin-top: 3px; font-size: 14px; color: #8e8e93; }
+  .mrow p { margin-top: 5px; font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
   /* Schermi bassi (iPhone SE): tutto un po' più compatto */
   @media (max-height: 700px) {
-    .awards h2 { font-size: 32px; }
-    .medals { margin-top: 14px; gap: 6px; }
-    .medal { padding: 9px 12px; grid-template-columns: 36px 1fr; }
-    .medal svg { width: 36px; height: 36px; }
-    .medal .who { margin-top: 5px; }
+    .award h1 { font-size: 44px; margin: 8px 0 12px; }
+    .medals2 { gap: 16px; margin-top: 18px; }
+    .mrow { grid-template-columns: 52px 1fr; }
+    .mrow svg { width: 52px; height: 52px; }
+    .mrow h3 { font-size: 26px; }
     .rank h2 { font-size: 32px; }
     .race { margin-top: 14px; gap: 6px; }
     .bar { height: 40px; font-size: 16px; }
@@ -162,8 +160,9 @@ export function kingSlide() {
   first.before(sec);
 }
 
-/** Premiazioni del mese (medaglie e Divano d'oro), prima della classifica. */
+/** Premiazioni del mese, prima della classifica: una slide per ogni medaglia vinta e una per il Divano d'oro. */
 function awardsSlide(q, mese, before) {
+  if (!q.has('medaglie')) return;
   let medaglie = {};
   let divano = null;
   try {
@@ -172,29 +171,32 @@ function awardsSlide(q, mese, before) {
   } catch (err) {
     return;
   }
-  if (!q.has('medaglie')) return;
-  const chips = (names, d) => names.map((n, k) => `<span data-a style="--d:${d + 0.35 + k * 0.15};--anim:pop">${esc(n)}</span>`).join('');
-  const cards = MEDAGLIE.map((m, k) => {
-    const names = Array.isArray(medaglie[m.key]) ? medaglie[m.key] : [];
-    const d = 0.6 + k * 0.6;
-    const cosa = m.key === 'pomodoro' && q.get('sudo') ? `${m.cosa}: ${esc(q.get('sudo'))}` : m.cosa;
-    return `<div class="medal${names.length ? '' : ' none'}" data-a style="--d:${d};--c:${m.c}">${MEDAL_SVG}<b>${m.nome}</b><small>${cosa}</small>
-      <p class="who">${names.length ? chips(names, d) : '<span>Nessuno questo mese</span>'}</p></div>`;
-  });
+  const slides = [];
+  // Tutte le medaglie vinte e il Divano d'oro in una slide sola
+  const rows = MEDAGLIE.filter((m) => Array.isArray(medaglie[m.key]) && medaglie[m.key].length).map((m) => ({
+    c: m.c, c2: m.c2, icon: MEDAL_SVG, nome: m.nome, names: medaglie[m.key],
+    cosa: m.key === 'pomodoro' && q.get('sudo') ? `${m.cosa}: ${esc(q.get('sudo'))}` : m.cosa.replace(/\.$/, ''),
+  }));
   if (divano && Array.isArray(divano[0]) && divano[0].length) {
-    const d = 0.6 + MEDAGLIE.length * 0.6 + 0.6;
     const volte = Number(divano[1]) || 0;
-    cards.push(`<div class="medal couch" data-a style="--d:${d};--c:#ffd60a">${COUCH_SVG}<b>Divano d'oro</b><small>Il meno visto in palestra: ${volte === 1 ? '1 volta' : `${volte} volte`}</small>
-      <p class="who">${chips(divano[0], d)}</p></div>`);
+    rows.push({ c: '#ffd60a', c2: '#c98a1b', icon: COUCH_SVG, nome: "Divano d'oro", names: divano[0], cosa: `Il meno visto in palestra: ${volte === 1 ? '1 volta' : `${volte} volte`}` });
   }
-  const sec = document.createElement('section');
-  sec.className = 'slide awards';
-  sec.innerHTML = `
-    <p class="eyebrow" data-a style="--d:0">Premiazioni · ${mese}</p>
-    <h2 data-a style="--d:.1">Le medaglie del mese.</h2>
-    <div class="medals">${cards.join('')}</div>
-    <p class="hint" data-a style="--d:${0.6 + cards.length * 0.6 + 1}">Tocca per la classifica</p>`;
-  before.before(sec);
+  if (rows.length) {
+    const sec = document.createElement('section');
+    sec.className = 'slide award';
+    sec.style.cssText = '--c:#ffd60a;--c2:#ff9f0a';
+    const end = 1 + rows.length * 0.7;
+    sec.innerHTML = `
+      <div class="glow"></div>
+      <p class="eyebrow" data-a style="--d:.1">Premiazioni · ${mese}</p>
+      <h1 data-a style="--d:.4;--anim:pop">Medaglie.</h1>
+      <div class="medals2">${rows.map((r, k) => `<div class="mrow" data-a style="--d:${1 + k * 0.7};--anim:left;--c:${r.c};--c2:${r.c2}">${r.icon}<h3>${r.nome}</h3><small>${r.cosa}</small><p>${r.names.map(esc).join(', ')}</p></div>`).join('')}</div>
+      <p class="hint" data-a style="--d:${end + 0.8}">Tocca per continuare</p>`;
+    slides.push(sec);
+  }
+  if (!slides.length) return;
+  slides[slides.length - 1].querySelector('.hint').textContent = 'Tocca per la classifica';
+  slides.forEach((sec) => before.before(sec));
 }
 
 /** I punti della classifica contano da 0 ogni volta che la slide si accende. */
