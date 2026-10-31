@@ -1242,7 +1242,10 @@ const workout = createWorkout({
   root: $('workout'),
   getToken: () => realApi('fbToken'),
   toast,
-  openTimer: () => selectTab('timer'),
+  openTimer: (go) => {
+    selectTab('timer');
+    if (go && !$('timer-start').hidden) $('timer-start').click(); // ▶ dalla pagina Allenamento: parte subito
+  },
   timerSeconds: () => (state && state.me && state.me.timerSeconds) || 30,
 });
 $('timer-back').addEventListener('click', () => selectTab('allenamento'));

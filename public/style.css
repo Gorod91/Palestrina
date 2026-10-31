@@ -1131,3 +1131,22 @@ html.ios.standalone .sr { top: var(--ios-top, 0px); }
 .wo-chart .wo-ch-lab .d { font-size: 10px; font-weight: 600; fill: #3a3a3c; }
 .wo-ptitle2 { margin-bottom: 2px; }
 .wo-pex { margin: 0 0 12px; font-size: 17px; font-weight: 600; color: #d1d1d6; }
+
+/* Pagina principale dell'Allenamento: titoli con il tasto a destra, Allenamento libero, timer */
+.wo-sec { margin: 26px 0 10px; }
+.wo-sec .section { margin: 0; }
+.wo-sec .wo-rot-ord { padding: 0; }
+.wo-srow > .wo-star:first-child { margin-left: -8px; }
+.wo-srow-chev { flex: none; padding-right: 2px; }
+.wo-free { margin-top: 18px; }
+.wo-free-ic { color: var(--exercise); }
+.wo-free-ic svg { stroke-linejoin: round; }
+.wo-cat-ic { color: var(--stand-2); }
+.wo-tcard { display: grid; grid-template-columns: 58px 1fr 48px; align-items: center; gap: 14px; padding: 14px 16px; cursor: pointer;
+  background: linear-gradient(150deg, rgba(0, 217, 255, .16), var(--card) 60%); border: 1px solid rgba(0, 217, 255, .28); }
+.wo-tcard b { font-size: 17px; font-weight: 700; }
+.wo-tring { position: relative; width: 58px; height: 58px; border-radius: 50%; display: grid; place-items: center; background: var(--stand); }
+.wo-tring::before { content: ''; position: absolute; inset: 5px; border-radius: 50%; background: #17191b; }
+.wo-tring span { position: relative; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--stand); }
+.wo-tplay { width: 48px; height: 48px; padding: 0; border: 0; border-radius: 50%; display: grid; place-items: center; background: var(--stand); color: #000; }
+.wo-tplay svg { width: 22px; height: 22px; fill: currentColor; margin-left: 3px; }
