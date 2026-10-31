@@ -3041,6 +3041,30 @@ function copiaFogliSuFirebase() {
   return done;
 }
 
+/**
+ * Da lanciare dall'editor quando serve controllare i dati: copia le tabelle di Firestore nei fogli "FB <nome>"
+ * (solo lettura, si possono cancellare). Le tabelle vere restano su Firebase.
+ */
+function copiaTabelleNelFoglio() {
+  TEST = false;
+  MEMO = {};
+  const ss = SpreadsheetApp.getActive();
+  const done = [];
+  ['piani', 'cambi', 'presenze', 'chat'].forEach((key) => {
+    const doc = readTableDoc(tablePath(key, false));
+    if (!doc) return;
+    const name = 'FB ' + SHEETS[key].name;
+    const sh = ss.getSheetByName(name) || ss.insertSheet(name);
+    sh.clearContents();
+    const w = doc.rows.reduce((m, r) => Math.max(m, r.length), 0);
+    const values = doc.rows.map((r) => Array.from({ length: w }, (_, i) => (r[i] instanceof Date ? Utilities.formatDate(r[i], TZ, 'yyyy-MM-dd HH:mm') : r[i] === undefined || r[i] === null ? '' : String(r[i]))));
+    sh.getRange(1, 1, values.length, w).setNumberFormat('@').setValues(values);
+    done.push(`${key} (${values.length - 1})`);
+  });
+  Logger.log('Tabelle copiate nel foglio: ' + done.join(', '));
+  return done;
+}
+
 function toTime(v) {
   return v instanceof Date ? Utilities.formatDate(v, TZ, 'HH:mm') : String(v);
 }
