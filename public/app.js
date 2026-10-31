@@ -394,6 +394,7 @@ function render() {
   if (!state) return;
   const { me, week } = state;
   showcase();
+  askGoal();
 
   const btn = $('btn-checkin');
   btn.disabled = me.checkedInToday;
@@ -707,7 +708,7 @@ function renderPresenceMonth(pm, me) {
         for (let d = a; d <= b; d = nextDay(d)) cells += `<span class="d${days.has(d) ? ' in' : ''}${d > pm.today ? ' fut' : ''}${d === pm.today ? ' today' : ''}"></span>`;
         // obiettivo della settimana intera: per la prima contano anche i giorni del mese prima
         const n = p.days.filter((d) => d <= b && (w === 0 ? !inMonth(d) || d >= a : d >= a)).length;
-        const bar = a > pm.today ? ' fut' : n >= p.goal ? ' ok' : '';
+        const bar = a > pm.today ? ' fut' : n >= ((p.goals && p.goals[w]) || p.goal) ? ' ok' : '';
         return `<div class="wk" style="--n:${Number(b.slice(8)) - Number(a.slice(8)) + 1}"><div class="days">${cells}</div><div class="bar${bar}"></div></div>`;
       })
       .join('');
@@ -1404,7 +1405,85 @@ function showcase() {
 function closeNews() {
   $('news').hidden = true;
   $('news-frame').src = 'about:blank';
+  askGoal();
 }
+
+// ---------- Obiettivo del mese ----------
+// Dopo le slide di fine mese (novità 'obiettivo' sul server) l'app chiede quante volte a settimana si verrà nel
+// mese nuovo: foglio senza ×, che non si chiude finché non si sceglie e conferma.
+const MONTHS_IT = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+const GOAL_LABELS = ['', 'Il minimo sindacale', 'Costanza', 'Si fa sul serio', 'Modalità atleta', 'Vivi in palestra'];
+const GOAL_MAX = 5;
+let goalPick = 0;
+let goalSaving = false;
+const goalKey = (month) => `${state.me.name}|${testOn() ? 'prova' : ''}|${month}`;
+
+function askGoal() {
+  const month = state && state.me && state.me.goalAsk;
+  if (!month || fakeOn() || store.get('goalSent') === goalKey(month) || !$('news').hidden || !$('goal-sheet').hidden) return;
+  const name = MONTHS_IT[Number(month.slice(5, 7)) - 1];
+  const cur = state.me.goal;
+  const curName = MONTHS_IT[new Date().getMonth()];
+  goalPick = 0;
+  $('goal-eyebrow').textContent = name;
+  $('goal-sub').textContent = `Quante volte a settimana vieni in palestra? Vale per tutto ${name}, dal primo lunedì.`;
+  $('goal-chips').innerHTML = Array.from({ length: GOAL_MAX }, (_, k) => `<button type="button" data-n="${k + 1}">${k + 1}${k + 1 === cur ? `<small>${curName}</small>` : ''}</button>`).join('');
+  renderGoal();
+  $('goal-sheet').hidden = false;
+}
+
+function renderGoal() {
+  const g = goalPick;
+  $('goal-ring').innerHTML = ring(g / GOAL_MAX, ...COLORS.move, { size: 150, width: 18 });
+  $('goal-n').textContent = g || '?';
+  $('goal-lab').textContent = g ? GOAL_LABELS[g] : 'Scegli un numero';
+  $('goal-chips').querySelectorAll('button').forEach((b) => b.classList.toggle('on', Number(b.dataset.n) === g));
+  const name = MONTHS_IT[Number(state.me.goalAsk.slice(5, 7)) - 1];
+  $('goal-info').innerHTML = `${g ? `Circa <b>${Math.round((g * 30) / 7)} presenze</b> a ${name}. ` : ''}Su questo numero si contano anche <b>Settimane di fila</b> e <b>Mai saltato</b>. Non si cambia fino a fine mese.`;
+  $('goal-go').disabled = !g || goalSaving;
+  if (!goalSaving) $('goal-go').textContent = g ? `Conferma: ${g} a settimana` : 'Scegli un numero';
+}
+
+$('goal-chips').addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || goalSaving) return;
+  goalPick = Number(b.dataset.n);
+  renderGoal();
+  $('goal-n').classList.remove('goal-pop');
+  void $('goal-n').offsetWidth;
+  $('goal-n').classList.add('goal-pop');
+});
+$('goal-sheet').addEventListener('click', (e) => {
+  if (e.target !== $('goal-sheet')) return; // fuori dal foglio: non si chiude
+  const card = $('goal-sheet').querySelector('.sheet-card');
+  card.classList.remove('goal-shake');
+  void card.offsetWidth;
+  card.classList.add('goal-shake');
+});
+$('goal-go').addEventListener('click', async () => {
+  const month = state.me.goalAsk;
+  const goal = goalPick;
+  if (!month || !goal || goalSaving) return;
+  goalSaving = true;
+  $('goal-go').disabled = true;
+  $('goal-go').innerHTML = `${bicep()}Salvo…`;
+  $('goal-go').classList.add('with-bicep');
+  try {
+    const r = await api('setGoal', { month, goal });
+    if (r && r.error) throw new Error(r.error);
+    store.set('goalSent', goalKey(month));
+    $('goal-sheet').hidden = true;
+    state.me.goalAsk = '';
+    toast(`Obiettivo di ${MONTHS_IT[Number(month.slice(5, 7)) - 1]}: ${(r && r.goal) || goal} a settimana`);
+    refresh();
+  } catch (err) {
+    toast(`Obiettivo non salvato: ${err.message}`);
+  } finally {
+    goalSaving = false;
+    $('goal-go').classList.remove('with-bicep');
+    renderGoal();
+  }
+});
 window.addEventListener('message', (e) => {
   if (e.origin === location.origin && e.data && e.data.palestrinaNews === 'close') closeNews();
 });

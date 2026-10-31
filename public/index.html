@@ -446,6 +446,20 @@
     </div>
   </div>
 
+  <!-- Obiettivo del mese: dopo le slide di fine mese, finché non si sceglie (niente ×) -->
+  <div id="goal-sheet" class="sheet goal-sheet" hidden>
+    <div class="sheet-card" role="dialog" aria-labelledby="goal-title">
+      <p id="goal-eyebrow" class="goal-eb"></p>
+      <h3 id="goal-title" class="goal-h">Il tuo obiettivo</h3>
+      <p id="goal-sub" class="muted goal-sub"></p>
+      <div class="goal-ring"><div id="goal-ring"></div><div class="goal-in"><b id="goal-n">?</b><span>a settimana</span></div></div>
+      <p id="goal-lab" class="goal-lab">Scegli un numero</p>
+      <div id="goal-chips" class="goal-chips"></div>
+      <p id="goal-info" class="muted goal-info"></p>
+      <button id="goal-go" class="primary" disabled>Scegli un numero</button>
+    </div>
+  </div>
+
   <!-- Novità: slide a tutto schermo (public/news/<id>.html) -->
   <div id="news" class="news-viewer" hidden><iframe id="news-frame" title="Novità" src="about:blank"></iframe></div>
 
