@@ -3085,7 +3085,7 @@ function togliPianiDoppi() {
   return removed;
 }
 
-const COPIA_TABELLE_RICHIESTA = '2026-10-31b'; // cambiarlo per rifare la copia al prossimo minuto
+const COPIA_TABELLE_RICHIESTA = '2026-10-31c'; // cambiarlo per rifare la copia al prossimo minuto
 
 function copiaTabelleNelFoglio() {
   TEST = false;
