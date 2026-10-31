@@ -12,7 +12,7 @@ const VERSIONS = [
       'Nuova sezione Allenamento al posto del Timer: schede personali, chili e ripetizioni per ogni serie, recupero e risultati della volta precedente',
       'Creazione di nuove schede e copia di quelle degli altri',
       'Grafici dei progressi per ogni esercizio',
-      'Eliminazione degli esercizi: escono dalle proprie schede e dall\'elenco, le serie già fatte restano',
+      'Esercizi nuovi ed eliminati validi per tutti: un unico elenco comune, le serie già fatte restano',
       'Pesi sotto lo zero per gli esercizi assistiti: i chili di aiuto (contrappeso, elastico) si segnano col meno',
       'Bonus Apripista: 3 punti a chi chiede per primo "chi va in palestra?" e quel giorno fa check-in',
       { feature: 'sfide', text: 'Sfide tra chi è in palestra insieme: 5 punti a chi vince, 2 a chi partecipa' },

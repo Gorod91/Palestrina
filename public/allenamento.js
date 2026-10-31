@@ -93,9 +93,11 @@ const EX = Object.fromEntries(CATALOGO.map((e) => [e.id, e]));
 // Doppioni uniti (lo stesso esercizio a tempo e a ripetizioni): il vecchio id resta solo per le serie già salvate,
 // e "l'ultima volta" del nuovo le conta se sono state fatte nello stesso modo. Come si segna lo dice la scheda (piano.t).
 const UNITI = { 'situps-tempo': 'situps', 'russian-twist-rip': 'russian-twist', 'v-sit-rip': 'v-sit' };
-/** Esercizio cambiato dall'app nel catalogo comune: nome, attrezzo, gruppo, come si segna ('kg' = peso e ripetizioni). */
+/** Esercizio cambiato dall'app nel catalogo comune: nome, attrezzo, gruppo, come si segna ('kg' = peso e ripetizioni),
+ *  eliminato (old). */
 function applyCat(e, d) {
   if (!e || !d) return;
+  if (d.old === true) e.old = true;
   if (typeof d.n === 'string' && d.n) e.n = d.n;
   if (typeof d.m === 'string') e.m = d.m;
   if (typeof d.g === 'string' && d.g) e.g = d.g;
@@ -402,7 +404,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   let hasDoc = false; // le mie schede sono già salvate su Firebase (altrimenti si usano quelle di esempio)
   let aggDone = []; // id degli aggiornamenti mirati già applicati alle mie schede
   let rot = []; // schede in rotazione, in ordine (id)
-  let tolti = []; // esercizi eliminati da me: non si scelgono più (le serie già fatte restano)
+  let catIds = null; // esercizi nel catalogo comune su Firebase (null finché non arriva)
+  let pubblicati = false; // i miei esercizi nuovi di prima del catalogo unico sono già stati messi nel catalogo
 
   async function start(user, test) {
     const k = `${user.name}|${test}`;
@@ -441,7 +444,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
         recMap = (d && d.rec) || {};
         aggDone = (d && d.agg) || [];
         rot = (d && d.rot) || [];
-        tolti = (d && d.tolti) || [];
+        pubblicaVecchi();
         const todo = d ? AGGIORNAMENTI.filter((a) => !aggDone.includes(a.id) && (!a.per || a.per.includes(me.name))) : [];
         if (todo.length) { // aggiornamenti mirati non ancora applicati: si applicano e si salvano subito
           const list = JSON.parse(JSON.stringify(schede));
@@ -453,9 +456,15 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       }, (err) => toast(`Allenamento: ${err.message}`)),
     );
     loadOthers(); // schede degli altri (per il tasto "Schede degli altri")
-    // Catalogo comune: attrezzo cambiato dall'app (vale per tutte le schede di tutti)
+    // Catalogo comune: esercizi nuovi, cambiati o eliminati dall'app (valgono per tutte le schede di tutti)
     unsubs.push(fs.onSnapshot(fs.collection(db, pfx + 'catalogo'), (snap) => {
-      snap.docs.forEach((d) => applyCat(EX[d.id], d.data()));
+      snap.docs.forEach((d) => {
+        const v = d.data();
+        if (!EX[d.id] && v.n && v.g) addEx({ id: d.id, n: v.n, g: v.g, m: v.m || '' }); // aggiunto da qualcuno
+        applyCat(EX[d.id], v);
+      });
+      catIds = snap.docs.map((d) => d.id);
+      pubblicaVecchi();
       softDraw();
     }, () => {}));
     // Serie salvate dall'altra parte (in prova se ora si è fuori, o viceversa): si possono copiare qui
@@ -494,7 +503,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     hasDoc = false;
     aggDone = [];
     rot = [];
-    tolti = [];
+    catIds = null;
+    pubblicati = false;
     Object.assign(ui, { view: 'list', ed: null, pickFor: '', sel: [], sheet: null });
     pages = {};
   }
@@ -1546,7 +1556,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   /** Scelta degli esercizi: prima pagina con muscoli e attrezzi, poi l'elenco in ordine alfabetico; la ricerca guarda
    *  nome, muscolo e attrezzo. Con la spunta (multi) si scelgono più esercizi per una scheda o un circuito. */
   function pickBody(multi, had = []) {
-    const cat = CATALOGO.filter((e) => !e.old && !tolti.includes(e.id)); // old: tolti dal catalogo, restano solo per i nomi delle serie già fatte
+    const cat = CATALOGO.filter((e) => !e.old); // old: tolti dal catalogo, restano solo per i nomi delle serie già fatte
     const q = ui.q.trim().toLowerCase();
     const row = (e) => {
       if (!multi) {
@@ -1584,8 +1594,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     }
     // prima pagina: recenti, muscoli, attrezzi
     const rec = [];
-    serie.slice().sort((a, b) => (a.day < b.day ? 1 : -1)).forEach((x2) => { const id = UNITI[x2.ex] || x2.ex; if (EX[id] && !EX[id].old && !tolti.includes(id) && !rec.includes(id)) rec.push(id); });
-    (schede || []).filter((y) => !y.di).forEach((y) => y.ex.concat(...Object.values(y.circuiti || {}).map((c) => c.ex)).forEach((id) => { if (EX[id] && !EX[id].old && !tolti.includes(id) && !rec.includes(id)) rec.push(id); }));
+    serie.slice().sort((a, b) => (a.day < b.day ? 1 : -1)).forEach((x2) => { const id = UNITI[x2.ex] || x2.ex; if (EX[id] && !EX[id].old && !rec.includes(id)) rec.push(id); });
+    (schede || []).filter((y) => !y.di).forEach((y) => y.ex.concat(...Object.values(y.circuiti || {}).map((c) => c.ex)).forEach((id) => { if (EX[id] && !EX[id].old && !rec.includes(id)) rec.push(id); }));
     const recIds = rec.filter((id) => !had.includes(id)).slice(0, 10);
     const recHtml = recIds.length ? `<div class="wo-pk-sec">Nelle tue schede e di recente</div><div class="wo-recs">${recIds.map((id) => `<button class="${ui.sel.includes(id) ? 'on' : ''}" data-a="${multi ? 'psel' : 'pick'}:${id}">${esc(EX[id].n)}</button>`).join('')}</div>` : '';
     const n = (f) => cat.filter(f).length;
@@ -1607,7 +1617,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   }
 
   // ---------- Schede: crea, modifica, copia (fase 2) ----------
-  // Tutto nel mio documento schede/<uid>: { list, extra (macchine nuove), rec (recuperi), tolti (esercizi eliminati) }. La prima volta che si salva
+  // Tutto nel mio documento schede/<uid>: { list, extra (macchine nuove), rec (recuperi) }. La prima volta che si salva
   // ci finiscono anche le schede di esempio scritte qui sopra; da lì in poi contano solo quelle del documento.
 
   /** Salva schede, macchine nuove e recuperi nel mio documento. */
@@ -1616,7 +1626,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     schede = list;
     if (!hasDoc) aggDone = AGGIORNAMENTI.map((a) => a.id); // le schede di esempio li contengono già
     hasDoc = true;
-    const data = JSON.parse(JSON.stringify({ name: me.name, list, extra, rec: recMap, agg: aggDone, rot, ...(tolti.length ? { tolti } : {}) })); // via i campi undefined
+    const data = JSON.parse(JSON.stringify({ name: me.name, list, extra, rec: recMap, agg: aggDone, rot })); // via i campi undefined
     fs.setDoc(fs.doc(db, pfx + 'schede', fbUid(me.name)), { ...data, at: fs.serverTimestamp() })
       .catch((err) => toast(`Schede non salvate: ${err.message}`));
   }
@@ -1716,7 +1726,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function saveCat(ex, patch) {
     const e = EX[ex];
     if (!e) return;
-    const cur = { n: e.n, m: e.m || '', g: e.g || '', t: unit(e) };
+    const cur = { n: e.n, m: e.m || '', g: e.g || '', t: unit(e), ...(e.old ? { old: true } : {}) };
     const next = { ...cur, ...patch };
     if (JSON.stringify(next) === JSON.stringify(cur)) return;
     applyCat(e, next);
@@ -1825,6 +1835,21 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       <button class="primary" data-a="nxsave">Aggiungi</button>`;
   }
 
+  /** Esercizio nuovo nel catalogo comune: da lì lo vedono e lo scelgono tutti. */
+  function pubblica(e) {
+    if (!/^[a-z0-9-]{1,40}$/.test(e.id)) return;
+    const { fs, db } = x;
+    fs.setDoc(fs.doc(db, pfx + 'catalogo', e.id), { n: e.n, m: (e.m || '').slice(0, 40), g: e.g, t: unit(e), by: me.name, at: fs.serverTimestamp() })
+      .catch((err) => toast(`Esercizio non salvato: ${err.message}`));
+  }
+
+  /** I miei esercizi nuovi di prima del catalogo unico (solo nel mio documento): si mettono nel catalogo, una volta. */
+  function pubblicaVecchi() {
+    if (pubblicati || !catIds || !hasDoc) return;
+    pubblicati = true;
+    extra.filter((e) => !catIds.includes(e.id)).forEach(pubblica);
+  }
+
   function saveNewEx() {
     const nx = ui.nx, n = nx.n.trim();
     if (!n) return toast('Scrivi il nome dell\'esercizio');
@@ -1835,6 +1860,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     extra.push(e);
     addEx(e);
     writeDoc();
+    pubblica(e);
     ui.sel.push(e.id);
     Object.assign(ui, { view: 'pick', q: '', g: e.g, pg: 'm:' + e.g, pf: '', nx: null });
   }
@@ -1865,11 +1891,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     toast('Scheda salvata');
   }
 
-  /** Elimina un esercizio per me: non si sceglie più ed esce da tutte le mie schede (e da quella che sto modificando).
-   *  Resta nel catalogo degli altri e per i nomi delle serie già fatte. */
+  /** Elimina un esercizio dal catalogo comune: nessuno lo sceglie più ed esce da tutte le mie schede (e da quella che
+   *  sto modificando). Chi ce l'ha nelle sue schede lo tiene; resta anche per i nomi delle serie già fatte. */
   function deleteEx() {
     const pe = ui.exed, ed = ui.ed, id = pe.ex;
-    if (!confirm(`Eliminare l'esercizio "${(EX[id] || { n: id }).n}"? Esce da tutte le tue schede e non si potrà più scegliere. Le serie già fatte restano.`)) return;
+    if (!confirm(`Eliminare l'esercizio "${(EX[id] || { n: id }).n}"? Non lo potrà più scegliere nessuno ed esce dalle tue schede. Le serie già fatte restano.`)) return;
     const strip = (sc, keep) => { // keep: nella modifica i circuiti rimasti vuoti restano (li toglie il salvataggio)
       const ci = sc.circuiti || {};
       Object.values(ci).forEach((c) => { c.ex = c.ex.filter((e) => e !== id); });
@@ -1878,7 +1904,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       return sc;
     };
     strip(ed, true);
-    if (!tolti.includes(id)) tolti.push(id);
+    saveCat(id, { old: true });
     writeDoc(clone(schede || []).map((sc) => strip(sc)));
     Object.assign(ui, { exed: null, view: pe.back ? 'cired' : 'edit' });
     toast('Esercizio eliminato');

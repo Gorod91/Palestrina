@@ -57,16 +57,18 @@ service cloud.firestore {
     match /{coll}/{id} {
       allow read: if pal() && allenamento(coll) && coll in ['serie', 'prova_serie', 'schede', 'prova_schede', 'catalogo', 'prova_catalogo'];
 
-      // Catalogo comune (id = esercizio): nome, attrezzo, gruppo e come si segna cambiati dall'app valgono per tutti
+      // Catalogo comune (id = esercizio): esercizi aggiunti, cambiati (nome, attrezzo, gruppo, come si segna) o eliminati
+      // (old) dall'app valgono per tutti
       allow create, update: if pal() && allenamento(coll)
         && coll in ['catalogo', 'prova_catalogo']
         && id.matches('^[a-z0-9-]{1,40}$')
-        && request.resource.data.keys().hasOnly(['n', 'm', 'g', 't', 'by', 'at'])
+        && request.resource.data.keys().hasOnly(['n', 'm', 'g', 't', 'old', 'by', 'at'])
         && request.resource.data.m is string
         && request.resource.data.m.size() <= 40
         && (!('n' in request.resource.data) || (request.resource.data.n is string && request.resource.data.n.size() >= 1 && request.resource.data.n.size() <= 60))
         && (!('g' in request.resource.data) || (request.resource.data.g is string && request.resource.data.g.size() <= 30))
         && (!('t' in request.resource.data) || request.resource.data.t in ['kg', 'rip', 'sec', 'm'])
+        && (!('old' in request.resource.data) || request.resource.data.old is bool)
         && request.resource.data.by == request.auth.token.name
         && request.resource.data.at == request.time;
 
@@ -94,18 +96,17 @@ service cloud.firestore {
         && resource.data.name == request.auth.token.name;
 
       // Le proprie schede (id = uid), con le macchine aggiunte (extra), i recuperi scelti per esercizio (rec)
-      // gli aggiornamenti mirati già applicati (agg), le schede in rotazione (rot) e gli esercizi eliminati (tolti)
+      // gli aggiornamenti mirati già applicati (agg) e le schede in rotazione (rot)
       allow create, update: if pal() && allenamento(coll)
         && coll in ['schede', 'prova_schede']
         && id == request.auth.uid
-        && request.resource.data.keys().hasOnly(['name', 'list', 'extra', 'rec', 'agg', 'rot', 'tolti', 'at'])
+        && request.resource.data.keys().hasOnly(['name', 'list', 'extra', 'rec', 'agg', 'rot', 'at'])
         && request.resource.data.name == request.auth.token.name
         && request.resource.data.list is list
         && request.resource.data.list.size() <= 30
         && (!('extra' in request.resource.data) || (request.resource.data.extra is list && request.resource.data.extra.size() <= 200))
         && (!('rec' in request.resource.data) || request.resource.data.rec is map)
         && (!('rot' in request.resource.data) || (request.resource.data.rot is list && request.resource.data.rot.size() <= 30))
-        && (!('tolti' in request.resource.data) || (request.resource.data.tolti is list && request.resource.data.tolti.size() <= 500))
         && (!('agg' in request.resource.data) || (request.resource.data.agg is list && request.resource.data.agg.size() <= 2000))
         && request.resource.data.at == request.time;
     }
