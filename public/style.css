@@ -830,6 +830,12 @@ body.keyboard .wo-bar { display: none; }
 .wo-run-page .timer-running, .wo-run-page .timer-start { margin: 0; }
 .wo-run-rest { background: radial-gradient(closest-side, var(--bg) 87%, transparent 88%), conic-gradient(var(--stand) calc(var(--p) * 360deg), rgba(0, 217, 255, .18) 0) !important; }
 .wo-rest-head b { color: var(--stand); }
+/* esercizi a due lati (plank laterale): sinistro e destro sotto il nome */
+.wo-lati { display: flex; gap: 8px; justify-content: center; }
+.wo-lati i { font-style: normal; font-size: 15px; font-weight: 800; padding: 6px 14px; border-radius: 999px; background: var(--card); color: var(--muted); }
+.wo-lati i.cur { background: var(--fg); color: #000; }
+.wo-lati i.ok { background: rgba(166, 255, 0, .16); color: var(--exercise); }
+.wo-big-head small.wo-lato { color: var(--exercise); }
 
 /* Impostazioni: riquadro che si apre toccandolo (check-in automatico) */
 .fold summary { list-style: none; cursor: pointer; display: grid; gap: 8px; color: var(--muted); font-size: 15px; }

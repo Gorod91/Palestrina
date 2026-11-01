@@ -9,6 +9,8 @@ const VERSIONS = [
     date: '1 novembre 2026',
     items: [
       'Timer addominali: ritorno ad Allenamento trascinando dal bordo sinistro, come nelle altre pagine',
+      'Plank laterale da entrambi i lati: il timer conta il lato sinistro, 5 secondi per girarsi e il lato destro; il tempo segnato è per lato',
+      'Circuito guidato: per gli esercizi a ripetizioni compare quello che indica la scheda (es. "per gamba")',
     ],
   },
   {
