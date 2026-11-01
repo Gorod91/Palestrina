@@ -1250,6 +1250,57 @@ const workout = createWorkout({
   timerSeconds: () => (state && state.me && state.me.timerSeconds) || 30,
 });
 $('timer-back').addEventListener('click', () => selectTab('allenamento'));
+// Indietro trascinando dal bordo sinistro, come nelle pagine di Allenamento: il timer segue il dito
+// e sotto compare Allenamento; oltre metà schermo o con uno scatto si torna lì.
+(() => {
+  const edgeEl = $('timer-edge'), panel = edgeEl.parentElement;
+  const under = document.querySelector('.tab-panel[data-tab="allenamento"]');
+  let e = null;
+  const move = (dx, anim) => {
+    const f = Math.min(1, dx / panel.clientWidth), t = anim ? 'transform .22s ease-out' : '';
+    panel.style.transition = t;
+    panel.style.transform = `translateX(${dx}px)`;
+    under.style.transition = anim ? t + ', opacity .22s ease-out' : '';
+    under.style.transform = `translateX(${(f - 1) * 30}%)`;
+    under.style.opacity = String(0.4 + 0.6 * f);
+  };
+  edgeEl.addEventListener('pointerdown', (ev) => {
+    edgeEl.setPointerCapture(ev.pointerId);
+    e = { x: ev.clientX, t: ev.timeStamp, dx: 0, v: 0, on: false };
+  });
+  edgeEl.addEventListener('pointermove', (ev) => {
+    if (!e) return;
+    const dx = Math.max(0, ev.clientX - e.x);
+    if (!e.on && dx > 6) {
+      e.on = true;
+      $('scroller').classList.add('tm-swiping'); // prima di misurare: il pannello sotto si posiziona rispetto a #scroller
+      Object.assign(under.style, { position: 'absolute', zIndex: '0', pointerEvents: 'none', top: panel.offsetTop + 'px', left: panel.offsetLeft + 'px', width: panel.offsetWidth + 'px' });
+      under.hidden = false;
+      panel.insertAdjacentHTML('afterbegin', '<div class="wo-cover"></div>');
+    }
+    if (!e.on) return;
+    e.v = (dx - e.dx) / Math.max(1, ev.timeStamp - e.t);
+    e.dx = dx;
+    e.t = ev.timeStamp;
+    move(dx, false);
+  });
+  const end = () => {
+    const s = e;
+    e = null;
+    if (!s || !s.on) return;
+    const go = s.dx > panel.clientWidth / 2 || s.v > 0.5;
+    move(go ? panel.clientWidth : 0, true);
+    setTimeout(() => {
+      panel.querySelector('.wo-cover')?.remove();
+      $('scroller').classList.remove('tm-swiping');
+      [panel, under].forEach((el) => el.removeAttribute('style'));
+      if (go) selectTab('allenamento');
+      else under.hidden = true;
+    }, 230);
+  };
+  edgeEl.addEventListener('pointerup', end);
+  edgeEl.addEventListener('pointercancel', end);
+})();
 $('btn-workout-reset').addEventListener('click', async () => {
   if (!confirm("Segnare l'allenamento di oggi come non fatto? Le serie salvate oggi vengono cancellate.")) return;
   try {
@@ -1276,6 +1327,7 @@ function workoutTab() {
   btn.querySelector('use').setAttribute('href', prova ? '#i-dumbbell' : '#i-timer');
   btn.querySelector('span').textContent = prova ? 'Allenamento' : 'Timer';
   $('timer-back').hidden = !prova;
+  $('timer-edge').hidden = !prova;
   if (!prova) workout.stop();
   const cur = store.get('tab');
   if (!prova && cur === 'allenamento') selectTab('timer');
