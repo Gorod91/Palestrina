@@ -5,6 +5,13 @@
 
 const VERSIONS = [
   {
+    v: '2.1',
+    date: '1 novembre 2026',
+    items: [
+      'Timer addominali: ritorno ad Allenamento trascinando dal bordo sinistro, come nelle altre pagine',
+    ],
+  },
+  {
     v: '2.0',
     date: '31 ottobre 2026',
     news: '2026-11',

@@ -855,6 +855,9 @@ body.keyboard .wo-bar { display: none; }
 #workout { position: relative; }
 .wo-edge { position: fixed; z-index: 7; top: 0; bottom: calc(70px + env(safe-area-inset-bottom)); left: 0; width: 18px; touch-action: none; }
 #workout.wo-swiping { overflow-x: clip; }
+#scroller.tm-swiping { position: relative; overflow-x: clip; }
+#scroller.tm-swiping .tab-panel.timer { position: relative; z-index: 2; }
+#scroller.tm-swiping .tab-panel.timer > :not(.wo-cover):not(.wo-edge) { position: relative; z-index: 2; }
 .wo-under { position: absolute; z-index: 0; top: 0; left: 0; right: 0; pointer-events: none; }
 .wo-cover { position: absolute; z-index: 1; top: 0; left: -16px; right: -16px; height: max(100%, 100vh); background: var(--bg); box-shadow: -10px 0 24px rgba(0, 0, 0, .6); pointer-events: none; }
 #workout.wo-swiping > :not(.wo-under):not(.wo-cover):not(.wo-edge):not(.wo-bar):not(.wo-sheet) { position: relative; z-index: 2; }
