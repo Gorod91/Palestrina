@@ -11,6 +11,7 @@ import { popCount, askMotion, shakeToStop } from './timer.js';
 // Catalogo: gli esercizi delle schede che abbiamo; gli esercizi nuovi si aggiungono dall'app ("Nuovo esercizio").
 // t: 'kg' (peso e ripetizioni, se manca), 'rip' (solo ripetizioni, a corpo libero), 'sec' (a tempo, in secondi), 'm' (metri)
 // old: non più nel catalogo (non si sceglie), resta solo per mostrare il nome delle serie già salvate
+// lati: a tempo da fare da entrambi i lati (il timer conta sinistro, 5" per girarsi, destro; il tempo segnato è per lato)
 export const CATALOGO = [
   { id: 'rot-anca', n: 'Rotazioni d\'anca', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
   { id: 'slanci', n: 'Slanci per lato', g: 'Mobilità', m: 'Corpo libero', t: 'rip' },
@@ -53,7 +54,7 @@ export const CATALOGO = [
   { id: 'pushdown-corda', n: 'Push down con corda', g: 'Tricipiti', m: 'Cavi' },
   { id: 'french-press', n: 'French press con manubri', g: 'Tricipiti', m: 'Manubri' },
   { id: 'russian-twist', n: 'Russian twist', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
-  { id: 'plank-laterale', n: 'Plank laterale', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
+  { id: 'plank-laterale', n: 'Plank laterale', g: 'Addominali', m: 'Corpo libero', t: 'sec', lati: true },
   { id: 'situps-tempo', n: 'Sit-up', g: 'Addominali', m: 'Corpo libero', t: 'sec', old: true },
   { id: 'v-sit', n: 'V-sit crunch', g: 'Addominali', m: 'Corpo libero', t: 'sec' },
   // Ceppo
@@ -336,6 +337,10 @@ function primaVolta(piano) {
   return Array.from({ length: n }, () => ({ kg: (piano && piano.kg) || 0, reps }));
 }
 const unit = (e) => (e && e.t) || 'kg';
+const CAMBIO_LATO = 5; // secondi per girarsi tra un lato e l'altro
+const latoName = (l) => (l === 'sx' ? 'Lato sinistro' : 'Lato destro');
+/** Sinistro e destro sotto il nome: quello in corso in bianco, quello fatto in verde. */
+const latiHtml = (cur) => `<div class="wo-lati"><i class="${cur === 'dx' ? 'ok' : 'cur'}">${cur === 'dx' ? '✓ ' : ''}Sinistro</i><i class="${cur === 'dx' ? 'cur' : ''}">Destro</i></div>`;
 const uShort = (t) => (t === 'sec' ? 's' : t === 'm' ? 'm' : 'rip');
 const uLong = (t) => (t === 'sec' ? 'secondi' : t === 'm' ? 'metri' : 'ripetizioni');
 const uStep = (t) => (t === 'sec' ? 5 : t === 'm' ? 50 : 1);
@@ -524,6 +529,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   const curSch = () => (schede || []).find((s) => s.id === ui.scheda);
   /** Come si segna un esercizio in una scheda: quello scelto lì, altrimenti quello del catalogo. */
   const tOf = (ex, sch = curSch()) => (sch && sch.piano && sch.piano[ex] && sch.piano[ex].t) || unit(EX[ex]);
+  /** A tempo e da fare da entrambi i lati (plank laterale). */
+  const lati = (ex, sch) => !!(EX[ex] && EX[ex].lati) && tOf(ex, sch) === 'sec';
+  /** Il piano della scheda come si legge: per gli esercizi a due lati "per lato" se non lo dice già. */
+  const pianoTxt = (ex, pi, sch) => (!pi ? '' : lati(ex, sch) && !/lato/i.test(pi.s) ? `${pi.s} per lato` : pi.s);
   /** Fatto oggi: per un circuito, tutti i suoi esercizi salvati. */
   function isDone(id, sch = curSch()) {
     const c = circIn(sch, id);
@@ -930,7 +939,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const rows = c.ex.map((e, j) => {
       const t = tOf(e, sch), l = lastTime(e, t), pi = sch && sch.piano ? sch.piano[e] : null;
       if (l && l.day > lastDay) lastDay = l.day;
-      const info = [pi && esc(pi.s), l && `<span class="wo-was">${esc(summary(l.sets, t))}</span>`].filter(Boolean).join(' · ');
+      const info = [pi && esc(pianoTxt(e, pi, sch)), l && `<span class="wo-was">${esc(summary(l.sets, t))}</span>`].filter(Boolean).join(' · ');
       return `<div class="wo-cex"><span class="wo-cn">${j + 1}</span>${figSvg(e, 'sm')}<div class="wo-cname"><b>${esc(nameOf(e))}</b><small>${info}</small></div>
         <span class="wo-pm"><button data-a="cv-:${e}" aria-label="Meno">−</button><label class="wo-in"><input data-f="c:${e}" inputmode="numeric" value="${st.vals[e]}" aria-label="${esc(nameOf(e))}, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>${uShort(t)}</em></label><button data-a="cv+:${e}" aria-label="Più">+</button></span></div>`;
     }).join('');
@@ -972,7 +981,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   run.className = 'wo-run';
   run.hidden = true;
   document.body.append(run);
-  let runId = '', runPlan = [], runAt = 0, runRaf = 0;
+  let runId = '', runPlan = [], runAt = 0, runRaf = 0, runFase = null;
 
   function circRun(id) {
     const c = circIn(curSch(), id), st = pageOf(id).circ;
@@ -1005,10 +1014,15 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const s = runPlan[j];
     if (s.rest) return `<div class="wo-big-head wo-rest-head"><b>${restName(s)}</b><small>${restNext(s)}</small></div>
       <button class="timer-running wo-run-rest" data-r="next"><span>${mmss(s.pausa ? c.pausa : circRec(runId, c))}</span><small>tocca per saltare</small></button>`;
-    if (tOf(s.e) !== 'sec') return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>${figSvg(s.e, 'run')}
-      <button class="wo-run-reps" data-r="next">${st.vals[s.e]}<small>ripetizioni · fatto ✓</small></button>`;
-    const total = st.vals[s.e];
-    return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>${mmss(total)}${total < 60 ? '"' : ''}</small></div>${figSvg(s.e, 'run')}
+    if (tOf(s.e) !== 'sec') {
+      // quello che la scheda dice oltre al numero ("10 per gamba", "12 dx, sx, centro")
+      const pi = curSch() && curSch().piano ? curSch().piano[s.e] : null;
+      const come = String((pi && pi.s) || '').replace(/^\s*[\d\s×x-]+/, '').trim();
+      return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>contale tu, poi tocca</small></div>${figSvg(s.e, 'run')}
+      <button class="wo-run-reps" data-r="next">${st.vals[s.e]}<small>${esc(come || 'ripetizioni')} · fatto ✓</small></button>`;
+    }
+    const total = st.vals[s.e], dl = lati(s.e);
+    return `<div class="wo-big-head"><b>${esc(nameOf(s.e))}</b><small>${mmss(total)}${total < 60 ? '"' : ''}${dl ? ' per lato' : ''}</small></div>${dl ? latiHtml('sx') : figSvg(s.e, 'run')}
       <button class="timer-start" data-r="start">Inizia</button>`;
   }
 
@@ -1066,42 +1080,58 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     if (pager) pager.scrollTo({ left: (runAt + 1) * pager.clientWidth, behavior: 'smooth' });
   }
 
-  /** Il recupero parte da solo; gli esercizi a tempo dopo "Inizia" (3-2-1); i sit-up aspettano il tocco. */
+  /** Il recupero parte da solo; gli esercizi a tempo dopo "Inizia" (3-2-1); i sit-up aspettano il tocco.
+   *  Gli esercizi a due lati (plank laterale) contano il sinistro, 5" azzurri per girarsi e il destro, senza toccare. */
   function runActivate() {
     const s = runPlan[runAt];
     if (!s || !(s.rest || s.started)) return;
     const c = circIn(curSch(), runId), st = pageOf(runId).circ;
     const page = run.querySelector(`.wo-run-page[data-j="${runAt}"]`);
     const total = s.rest ? (s.pausa ? c.pausa : circRec(runId, c)) : st.vals[s.e];
-    run.classList.toggle('rest', !!s.rest);
-    page.innerHTML = `<div class="wo-big-head${s.rest ? ' wo-rest-head' : ''}"><b>${s.rest ? restName(s) : esc(nameOf(s.e))}</b><small>${s.rest ? restNext(s) : ''}</small></div>
-      <button class="timer-running${s.rest ? ' wo-run-rest' : ''}" data-r="next"><span></span><small>tocca per saltare</small></button>`;
-    const d = page.querySelector('.timer-running'), n = d.querySelector('span');
-    const go = Date.now() + (s.rest ? 0 : COUNTDOWN), end = go + total * 1000;
-    const tick = () => {
-      const now = Date.now(), counting = now < go;
-      d.classList.toggle('counting', counting);
-      if (counting) {
-        popCount(n, String(Math.ceil((go - now) / 1000)));
-        d.style.setProperty('--p', '0');
-      } else {
-        if (now >= end) {
-          if (navigator.vibrate) navigator.vibrate(200);
-          return runGoNext();
+    const fasi = !s.rest && lati(s.e)
+      ? [{ t: total, count: true, lato: 'sx' }, { t: CAMBIO_LATO, cambio: true }, { t: total, lato: 'dx' }]
+      : [{ t: total, count: !s.rest }];
+    let f = 0;
+    const fase = () => {
+      const p = fasi[f], blue = !!(s.rest || p.cambio), dl = p.lato || p.cambio;
+      run.classList.toggle('rest', blue);
+      const b = s.rest ? restName(s) : p.cambio ? 'Cambia lato' : esc(nameOf(s.e));
+      const sm = s.rest ? restNext(s) : p.cambio ? 'poi lato destro' : p.lato ? latoName(p.lato) : '';
+      page.innerHTML = `<div class="wo-big-head${blue ? ' wo-rest-head' : ''}"><b>${b}</b><small${p.lato ? ' class="wo-lato"' : ''}>${sm}</small></div>${dl ? latiHtml(p.cambio ? 'dx' : p.lato) : ''}
+      <button class="timer-running${blue ? ' wo-run-rest' : ''}" data-r="${f < fasi.length - 1 ? 'fase' : 'next'}"><span></span><small>tocca per saltare</small></button>`;
+      const d = page.querySelector('.timer-running'), n = d.querySelector('span');
+      const go = Date.now() + (p.count ? COUNTDOWN : 0), end = go + p.t * 1000;
+      const tick = () => {
+        const now = Date.now(), counting = now < go;
+        d.classList.toggle('counting', counting);
+        if (counting) {
+          popCount(n, String(Math.ceil((go - now) / 1000)));
+          d.style.setProperty('--p', '0');
+        } else {
+          if (now >= end) {
+            if (navigator.vibrate) navigator.vibrate(200);
+            return f < fasi.length - 1 ? runFase() : runGoNext();
+          }
+          n.textContent = mmss(Math.ceil((end - now) / 1000));
+          d.style.setProperty('--p', String(1 - (end - now) / (p.t * 1000)));
         }
-        n.textContent = mmss(Math.ceil((end - now) / 1000));
-        d.style.setProperty('--p', String(1 - (end - now) / (total * 1000)));
-      }
+        runRaf = requestAnimationFrame(tick);
+      };
       runRaf = requestAnimationFrame(tick);
     };
-    runRaf = requestAnimationFrame(tick);
+    runFase = () => {
+      cancelAnimationFrame(runRaf);
+      f++;
+      fase();
+    };
+    fase();
   }
 
   function runFinish(c) {
     const st = pageOf(runId).circ;
     run.classList.remove('rest');
     run.innerHTML = `<div class="wo-run-done">✓</div><div class="wo-big-head"><b>Circuito fatto</b></div>
-      <div class="wo-run-sum">${c.ex.map((e) => `<div>${esc(nameOf(e))}<span>${summary(st.done[e].map((v) => ({ kg: 0, reps: v })), tOf(e))}</span></div>`).join('')}</div>
+      <div class="wo-run-sum">${c.ex.map((e) => `<div>${esc(nameOf(e))}<span>${summary(st.done[e].map((v) => ({ kg: 0, reps: v })), tOf(e))}${lati(e) ? ' per lato' : ''}</span></div>`).join('')}</div>
       <button class="primary" data-r="close">Fine · salvato</button>`;
     circSave(runId);
   }
@@ -1109,6 +1139,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   run.addEventListener('click', (ev) => {
     const r = ev.target.closest('[data-r]')?.dataset.r;
     if (r === 'next') runGoNext();
+    if (r === 'fase' && runFase) runFase(); // plank laterale: salta al cambio lato o al destro
     if (r === 'start' && runPlan[runAt]) {
       runPlan[runAt].started = true;
       runActivate();
@@ -1193,7 +1224,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
          <button class="link-button" data-a="edit">Modifica</button>${done.pending ? '<p class="wo-sub wo-center">Salvato sul telefono: parte appena c\'è rete</p>' : ''}`
       : `<div class="wo-btns"><button class="secondary" data-a="add">+ Serie</button><button class="secondary" data-a="del">− Serie</button></div><button class="primary" data-a="ok">✓ Fatto</button>`;
     return `<section class="wo-page" data-k="${k}">
-      <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(piano.s)}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
+      <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(pianoTxt(ex, piano, sch))}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
       ${figSvg(ex, 'card')}
       ${last ? `<p class="wo-last">In <b>rosso</b> la volta scorsa, ${ago}</p>` : ''}
       ${t === 'sec' && !saved ? `<div class="wo-tmr" data-ex="${ex}">${tmrHtml(ex, sets)}</div>` : ''}
@@ -1454,10 +1485,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function tmrHtml(ex, sets) {
     const j = tmr.ex === ex ? Math.min(tmr.j, sets.length - 1) : 0;
     if (tmr.ex === ex && tmr.end) {
-      return `${dial(0, '<b class="wo-dial-n"></b>')}<div class="wo-tmr-txt"><small>Serie ${j + 1} di ${sets.length}</small><span>tocca Stop per annullare</span></div><button class="wo-chip" data-a="tstop">Stop</button>`;
+      const lt = !tmr.lati ? '' : tmr.lato === 'cambio' ? ' · cambia lato' : ` · ${latoName(tmr.lato).toLowerCase()}`;
+      return `${dial(0, '<b class="wo-dial-n"></b>')}<div class="wo-tmr-txt"><small>Serie ${j + 1} di ${sets.length}${lt}</small><span>tocca Stop per annullare</span></div><button class="wo-chip" data-a="tstop">Stop</button>`;
     }
     const s = sets[j] || sets[0];
-    return `<button class="wo-tmr-go" data-a="tgo:${j}"><span>▶</span>${sets.length > 1 ? `Serie ${j + 1} · ` : ''}${s ? s.reps : 0}"</button>`;
+    return `<button class="wo-tmr-go" data-a="tgo:${j}"><span>▶</span>${sets.length > 1 ? `Serie ${j + 1} · ` : ''}${s ? s.reps : 0}"${lati(ex) ? ' per lato' : ''}</button>`;
   }
 
   // Timer grande a tutto schermo: compare appena parte un timer (lo stesso anello del timer addominali); un tocco lo annulla
@@ -1476,10 +1508,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   function tickRest() {
     big.hidden = !tmr.end; // a tutto schermo solo gli esercizi a tempo: il recupero resta nella sua barra
     if (!big.hidden) {
-      const e = EX[tmr.ex] || {};
-      big.querySelector('.wo-big-head b').textContent = tmr.end ? e.n || '' : 'Recupero';
-      big.querySelector('.wo-big-head small').textContent = tmr.end ? `Serie ${tmr.j + 1} di ${tmrSets(tmr.ex).length}` : '';
-      big.classList.toggle('rest', !tmr.end); // il recupero è azzurro
+      const e = EX[tmr.ex] || {}, cambio = tmr.lato === 'cambio';
+      big.querySelector('.wo-big-head b').textContent = cambio ? 'Cambia lato' : e.n || '';
+      big.querySelector('.wo-big-head small').textContent = cambio ? 'poi lato destro'
+        : `Serie ${tmr.j + 1} di ${tmrSets(tmr.ex).length}${tmr.lati ? ` · ${latoName(tmr.lato)}` : ''}`;
+      big.classList.toggle('rest', cambio); // il cambio lato è azzurro come il recupero
     }
     root.querySelectorAll('.wo-rest').forEach((el) => {
       el.innerHTML = restHtml(el.dataset.ex);
@@ -1531,6 +1564,15 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   }
 
   function finish(which) {
+    // plank laterale: finito il sinistro, 5" per girarsi e poi il destro, senza lampeggio in mezzo
+    if (which === 'tmr' && tmr.lati && tmr.lato !== 'dx') {
+      const now = Date.now();
+      if (navigator.vibrate) navigator.vibrate(200);
+      tmr = tmr.lato === 'sx'
+        ? { ...tmr, lato: 'cambio', go: now, end: now + CAMBIO_LATO * 1000, total: CAMBIO_LATO }
+        : { ...tmr, lato: 'dx', go: now, end: now + tmr.sec * 1000, total: tmr.sec };
+      return tickRest();
+    }
     if (which === 'rest') restEnd = 0;
     else {
       tmr.end = 0;
@@ -2402,7 +2444,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       const j = Math.max(0, Math.min(Number(arg) || 0, sets.length - 1));
       const sec = (sets[j] || {}).reps || 30;
       const go = Date.now() + COUNTDOWN; // 3, 2, 1 come il timer grande
-      tmr = { ex, j, go, end: go + sec * 1000, total: sec };
+      tmr = { ex, j, go, end: go + sec * 1000, total: sec, sec, lati: lati(ex), lato: 'sx' };
     } else if (cmd === 'tstop') {
       tmr.end = 0;
     } else if (cmd === 'crec-' || cmd === 'crec+') { // come il recupero degli esercizi: si ricorda per il circuito
