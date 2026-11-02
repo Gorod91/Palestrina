@@ -348,7 +348,6 @@ function overlayHTML(m, lost, eyebrow, sub) {
       <h1 class="md-t${m.label.length > 12 ? ' long' : ''}" data-a style="--d:${lost ? 1.2 : 1.7}">${esc(m.label)}</h1>
       <p class="md-pill" data-a style="--d:${lost ? 1.5 : 2.05}">${lost ? `<b>-${m.pts}</b> punti` : m.pts ? `<b data-count="${m.pts}">+0</b> punti` : '<b>0</b> punti'}</p>
       <p class="md-sub" data-a style="--d:${lost ? 1.8 : 2.4}">${sub}</p>
-      <p class="md-hint" data-a style="--d:${lost ? 3.6 : 3.2}">${lost ? 'Tocca per chiudere' : 'Trascina per girarla · tocca per lanciarla<br>due dita per lo zoom · scorri giù per chiudere'}</p>
     </section>
   </div>`;
 }
