@@ -62,6 +62,20 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     } catch { /* storage non disponibile */ }
   };
   const who = (name) => (data && data.names && data.names[name]) || name;
+  // Coroncina accanto al nome del Re in carica, ovunque compaia in chat (testo con HTML)
+  const escH = (t) => String(t).replace(/[<&>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+  const kn = (name, display) => escH(display || who(name)) + (name && isKing(name) ? crown(name) : '');
+  /** Dal nome visualizzato (risultati delle sfide) al nome vero, per sapere se è il Re. */
+  const knD = (display) => {
+    const e = data && data.names && Object.entries(data.names).find(([, d]) => d === display);
+    return kn(e ? e[0] : display, display);
+  };
+  const elH = (tag, cls, html) => {
+    const n = el(tag, cls);
+    n.innerHTML = html;
+    return n;
+  };
+  const andList = (xs) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} e ${xs[xs.length - 1]}` : xs.join(''));
   // ragazze (colonna Sesso di Utenti): dallo stato della chat, altrimenti da quello dell'app
   const isF = (name) => (data && data.fem ? data.fem.includes(name) : isFApp(name));
 
@@ -768,18 +782,18 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     }, 300);
     // Chi c'è e chi no, in chiaro e in poco spazio
     const names = card.querySelector('.poll-names');
-    const who = (k) => plan.people.filter((p) => p.choice === k).map((p) => p.display + (p.time ? ` ${p.time}` : '') + (p.arrived ? ' ✓' : ''));
+    const who = (k) => plan.people.filter((p) => p.choice === k).map((p) => kn(p.name, p.display) + (p.time ? ` ${escH(p.time)}` : '') + (p.arrived ? ' ✓' : ''));
     [['si', 'Ci sono'], ['forse', 'Forse'], ['no', 'No']].forEach(([k, label]) => {
       const list = who(k);
       if (!list.length) return;
       const part = el('span', `part ${k}`);
-      part.append(el('b', '', `${label} `), document.createTextNode(list.join(', ')));
+      part.innerHTML = `<b>${label} </b>${list.join(', ')}`;
       names.append(part);
     });
     const missing = plan.people.filter((p) => !p.choice).length;
     if (missing) names.append(el('span', 'part none', `${missing} senza risposta`));
     // Chi ha fatto la domanda
-    const side = el('span', 'poll-side muted', `da ${poll.byDisplay} · ${poll.clock}`);
+    const side = elH('span', 'poll-side muted', `da ${kn(poll.by, poll.byDisplay)} · ${escH(poll.clock)}`);
     names.append(side);
     if (isDebug() && poll.id) {
       const cancel = el('button', 'poll-cancel', 'Annulla');
@@ -865,7 +879,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     const mineAsk = m.name === me.name;
     row.dataset.target = day;
     row.dataset.id = m.id;
-    row.append(el('p', 'event-title', mineAsk ? 'Hai chiesto a tutti' : `${m.display || who(m.name)} chiede`));
+    row.append(mineAsk ? el('p', 'event-title', 'Hai chiesto a tutti') : elH('p', 'event-title', `${kn(m.name, m.display)} chiede`));
     row.append(el('p', 'poll-q', `Chi va in palestra ${planLabel(day)}?`));
     const btns = el('div', 'poll-ev-choices');
     CHOICES.forEach(([k, l]) => {
@@ -1029,8 +1043,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       return row;
     }
     row.append(el('p', 'event-title', s.state === 'conclusa' ? `Sfida conclusa: ${s.label}` : `Sfida! ${s.label}`));
-    const names = s.invited.map((x) => x.display);
-    row.append(el('p', 'sfida-between', `Tra ${names.length > 1 ? `${names.slice(0, -1).join(', ')} e ${names[names.length - 1]}` : names.join('')}`));
+    row.append(elH('p', 'sfida-between', `Tra ${andList(s.invited.map((x) => kn(x.name, x.display)))}`));
     row.append(el('p', 'event-text', s.desc));
     if (s.saving) {
       const sv = el('p', 'sfida-saving');
@@ -1045,16 +1058,16 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     const invited = s.invited.some((x) => x.name === me.name);
     const ins = s.people.filter((p) => p.in);
     const outs = s.people.filter((p) => !p.in);
-    const line = [ins.length && `Ci stanno: ${ins.map((p) => p.display).join(', ')}`, outs.length && `Passano: ${outs.map((p) => p.display).join(', ')}`].filter(Boolean).join(' · ');
-    if (line) row.append(el('p', 'sfida-who', line));
+    const line = [ins.length && `Ci stanno: ${ins.map((p) => kn(p.name, p.display)).join(', ')}`, outs.length && `Passano: ${outs.map((p) => kn(p.name, p.display)).join(', ')}`].filter(Boolean).join(' · ');
+    if (line) row.append(elH('p', 'sfida-who', line));
 
     if (s.state === 'conclusa') {
       const r = s.result || { winners: [], points: [], records: [], pct: [] };
-      row.append(el('p', 'sfida-win', r.winners.length ? `Vince ${r.winners.join(', ')} · +5` : 'Nessun vincitore'));
-      const others = r.points.filter((x) => x.pts !== 5).map((x) => x.display);
-      if (others.length) row.append(el('p', 'event-text', `Partecipazione +2: ${others.join(', ')}`));
-      if (r.pct.length) row.append(el('p', 'event-text', r.pct.map((x) => `${x.display} ${x.pct}%`).join(' · ')));
-      r.records.forEach((x) => row.append(el('p', 'sfida-rec', x.first ? `Primo record di ${x.display}: ${x.value}` : `Nuovo record di ${x.display}: ${x.value}`)));
+      row.append(elH('p', 'sfida-win', r.winners.length ? `Vince ${r.winners.map(knD).join(', ')} · +5` : 'Nessun vincitore'));
+      const others = r.points.filter((x) => x.pts !== 5).map((x) => knD(x.display));
+      if (others.length) row.append(elH('p', 'event-text', `Partecipazione +2: ${others.join(', ')}`));
+      if (r.pct.length) row.append(elH('p', 'event-text', r.pct.map((x) => `${knD(x.display)} ${escH(x.pct)}%`).join(' · ')));
+      r.records.forEach((x) => row.append(elH('p', 'sfida-rec', `${x.first ? 'Primo' : 'Nuovo'} record di ${knD(x.display)}: ${escH(x.value)}`)));
       return row;
     }
 
@@ -1091,7 +1104,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       if (s.noWinner) row.append(el('p', 'event-text', `${isF(s.contestato) ? 'Vincitrice contestata' : 'Vincitore contestato'} due volte: vale solo la partecipazione.`));
       else if (s.winner) {
         const conf = s.winner.conf ? ` · confermato da ${s.winner.conf}` : ' · da confermare';
-        row.append(el('p', 'sfida-res', `Ha vinto ${s.winner.display} (dice ${s.winner.byDisplay})${conf}`));
+        row.append(elH('p', 'sfida-res', `Ha vinto ${kn(s.winner.name, s.winner.display)} (dice ${kn(s.winner.by, s.winner.byDisplay)})${escH(conf)}`));
         if (amIn && !s.winner.conf && s.winner.by !== me.name) row.append(confirmBtns('__winner'));
       } else if (amIn && ins.length >= 2) {
         row.append(el('p', 'event-text', s.winnerContests ? `${isF(s.contestato) ? 'Vincitrice contestata' : 'Vincitore contestato'}: dichiaratelo di nuovo. Chi ha vinto?` : 'Finita? Chi ha vinto?'));
@@ -1111,13 +1124,13 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     ins.forEach((p) => {
       const r = el('div', 'sfida-row');
       let txt;
-      if (p.annulled) txt = `${p.display}: contestato due volte, vale la partecipazione`;
-      else if (p.value === null) txt = `${p.display}: ${p.contested ? 'contestato, da riscrivere' : 'deve ancora scrivere'}`;
+      if (p.annulled) txt = 'contestato due volte, vale la partecipazione';
+      else if (p.value === null) txt = p.contested ? 'contestato, da riscrivere' : 'deve ancora scrivere';
       else {
         const pct = p.record ? ` (${Math.round((p.value / p.record) * 100)}% del record ${p.record})` : ' (prima volta: calibrazione)';
-        txt = `${p.display}: ${p.value}${pct}${p.by ? ` · ✓ ${p.by}` : ' · da confermare'}`;
+        txt = `${p.value}${pct}${p.by ? ` · ✓ ${p.by}` : ' · da confermare'}`;
       }
-      r.append(el('p', 'sfida-res', txt));
+      r.append(elH('p', 'sfida-res', `${kn(p.name, p.display)}: ${escH(txt)}`));
       if (amIn && p.name !== me.name && p.value !== null && !p.by && !p.annulled) r.append(confirmBtns(p.name));
       row.append(r);
     });
@@ -1150,10 +1163,10 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     row.append(el('p', 'event-title', s ? `Sfida conclusa: ${s.label}` : 'Sfida conclusa'));
     const r = s && s.result;
     if (r) {
-      row.append(el('p', 'event-text', r.winners.length ? `Vince ${r.winners.join(', ')} (+5)` : 'Nessun vincitore'));
-      const others = r.points.filter((x) => x.pts !== 5).map((x) => x.display);
-      if (others.length) row.append(el('p', 'event-text', `Partecipazione +2: ${others.join(', ')}`));
-      r.records.filter((x) => !x.first).forEach((x) => row.append(el('p', 'event-text', `Nuovo record di ${x.display}: ${x.value}`)));
+      row.append(elH('p', 'event-text', r.winners.length ? `Vince ${r.winners.map(knD).join(', ')} (+5)` : 'Nessun vincitore'));
+      const others = r.points.filter((x) => x.pts !== 5).map((x) => knD(x.display));
+      if (others.length) row.append(elH('p', 'event-text', `Partecipazione +2: ${others.join(', ')}`));
+      r.records.filter((x) => !x.first).forEach((x) => row.append(elH('p', 'event-text', `Nuovo record di ${knD(x.display)}: ${escH(x.value)}`)));
     }
     return row;
   }
@@ -1173,14 +1186,15 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     const row = el('div', 'event');
     const d = m.data || {};
     const name = m.display || who(m.name);
+    const nameH = kn(m.name, m.display);
     if (d.kind === 'checkin') {
       const goal = d.count >= d.goal && d.goal ? ' · obiettivo raggiunto' : '';
-      row.append(el('p', 'event-text', `${name} ha fatto check-in${d.auto ? ' (automatico)' : ''} · ${d.count}/${d.goal} questa settimana${goal}`));
+      row.append(elH('p', 'event-text', `${nameH} ha fatto check-in${d.auto ? ' (automatico)' : ''} · ${escH(d.count)}/${escH(d.goal)} questa settimana${goal}`));
     } else if (d.kind === 'sudometro') {
       if (d.photoId) row.classList.add('with-photo');
       const box = el('div', 'event-sudo');
       const text = el('div');
-      text.append(el('p', 'event-text', `${name} ha fatto il Sudometro`));
+      text.append(elH('p', 'event-text', `${nameH} ha fatto il Sudometro`));
       const title = alF(clean(d.title), isF(m.name));
       text.append(el('p', 'event-score', `${d.score} · ${title}`));
       if (d.photoId) box.append(photoPair(d.photoId, d.ref || (data.refPhotos || {})[m.name], `${name} · ${d.score} · ${title}`, false, isF(m.name)));
@@ -1189,7 +1203,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     } else if (d.kind === 'achievement') {
       row.classList.add('award');
       row.append(el('p', 'event-title', 'Medaglia vinta'));
-      row.append(el('p', 'event-text', `${name}: ${alF(d.title, isF(m.name))} (+${d.pts} punti)`));
+      row.append(elH('p', 'event-text', `${nameH}: ${escH(alF(d.title, isF(m.name)))} (+${escH(d.pts)} punti)`));
     } else if (d.kind === 'news') {
       // Novità sbloccate: le slide si aprono a tutto schermo
       row.classList.add('award', 'news');
@@ -1203,12 +1217,13 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       row.append(el('p', 'event-title', d.kind === 'weekly' ? 'Premiazioni della settimana' : `Premiazioni di ${d.month}`));
       const period = d.kind === 'weekly' ? 'della settimana' : 'del mese';
       const lines = [];
-      if (d.king) lines.push(`${kingTitle(d.king.names, isF)}: ${d.king.names.map(who).join(', ')} (${d.king.total} punti)`);
-      if (d.mvp) lines.push(`MVP: ${d.mvp.names.map(who).join(', ')} (${d.mvp.count})`);
-      if (d.divano) lines.push(`Divano d'oro: ${d.divano.names.map(who).join(', ')} (${d.divano.count})`);
-      if (d.pomodoro) lines.push(`Pomodoro ${period}: ${who(d.pomodoro.name)} (${d.pomodoro.score})`);
+      const list = (names) => names.map((n) => kn(n)).join(', ');
+      if (d.king) lines.push(`${kingTitle(d.king.names, isF)}: ${list(d.king.names)} (${escH(d.king.total)} punti)`);
+      if (d.mvp) lines.push(`MVP: ${list(d.mvp.names)} (${escH(d.mvp.count)})`);
+      if (d.divano) lines.push(`Divano d'oro: ${list(d.divano.names)} (${escH(d.divano.count)})`);
+      if (d.pomodoro) lines.push(`Pomodoro ${period}: ${kn(d.pomodoro.name)} (${escH(d.pomodoro.score)})`);
       if (!lines.length) lines.push('Periodo tranquillo... troppo tranquillo.');
-      lines.forEach((l) => row.append(el('p', 'event-text', l)));
+      lines.forEach((l) => row.append(elH('p', 'event-text', l)));
     } else {
       return el('div');
     }
