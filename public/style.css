@@ -1186,3 +1186,65 @@ html.ios.standalone .sr { top: var(--ios-top, 0px); }
 .goal-shake { animation: goal-shake .4s; }
 @keyframes goal-shake { 20%, 60% { transform: translateX(-7px); } 40%, 80% { transform: translateX(7px); } }
 @media (prefers-reduced-motion: reduce) { .goal-sheet, .goal-sheet .sheet-card, .goal-pop, .goal-shake { animation: none; } }
+
+/* ---------- Medaglie 3D (public/medaglie.js) ---------- */
+.mdw { position: fixed; inset: 0; z-index: 45; background: radial-gradient(120% 70% at 50% 38%, color-mix(in srgb, var(--c, #888) 16%, #15161a) 0%, #0a0a0c 55%, #000 100%); color: #f5f5f7; overflow: hidden; -webkit-user-select: none; user-select: none; touch-action: none; transition: background-color .3s; }
+.mdw.in { animation: md-fadein .35s ease both; }
+@keyframes md-fadein { from { opacity: 0; } }
+.mdw.leaving { background: transparent; pointer-events: none; }
+.mdw.leaving .mdw-x, .mdw.leaving .md-glow { opacity: 0; transition: opacity .25s; }
+.mdw-x { position: absolute; top: calc(env(safe-area-inset-top) + 8px); right: 12px; z-index: 6; width: 40px; height: 40px; border: 0; border-radius: 50%; background: #ffffff1f; color: #f5f5f7; font-size: 22px; line-height: 1; }
+.md-s { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: calc(env(safe-area-inset-top) + 56px) 28px calc(env(safe-area-inset-bottom) + 64px); }
+.md-s [data-a] { opacity: 0; }
+.md-s.on [data-a] { animation: md-rise .8s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--d, 0) * 1s); }
+@keyframes md-rise { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: none; } }
+.md-s > :not(.md-medal) { filter: opacity(var(--fade, 1)); }
+.md-glow { position: absolute; inset: auto -20% -30% -20%; height: 60%; background: radial-gradient(ellipse at 50% 100%, color-mix(in srgb, var(--c) 26%, transparent), transparent 65%); pointer-events: none; opacity: .6; }
+.md-s.lost .md-glow { opacity: .25; }
+.md-eb { margin: 0 0 10px; font-size: 14px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--c); }
+.md-t { font-size: 52px; font-weight: 900; letter-spacing: -.045em; line-height: .98; margin: 6px 0 12px; padding-bottom: 4px; background: linear-gradient(90deg, var(--c), var(--c2)); -webkit-background-clip: text; background-clip: text; color: transparent; overflow-wrap: anywhere; }
+.md-t.long { font-size: 44px; }
+.md-pill { display: inline-flex; align-items: baseline; gap: 6px; margin: 4px 0 14px; padding: 10px 18px; border-radius: 99px; background: #1c1c1e; border: 1px solid color-mix(in srgb, var(--c) 45%, transparent); font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; }
+.md-pill b { color: var(--c); }
+.md-s.lost .md-pill b { color: #ff453a; }
+.md-sub { font-size: 18px; font-weight: 300; line-height: 1.38; color: #d1d1d6; margin: 0; }
+.md-sub b { font-weight: 700; color: #f5f5f7; }
+.md-hint { position: absolute; left: 0; right: 0; bottom: calc(env(safe-area-inset-bottom) + 16px); margin: 0; text-align: center; font-size: 14px; line-height: 1.5; color: #8e8e93; }
+.md-medal { --ms: min(220px, 56vw, 28vh); position: relative; width: var(--ms); height: var(--ms); margin: 0 auto 14px; flex: none; touch-action: none; will-change: transform; }
+.md-coin { position: absolute; inset: 0; animation: md-emerge 1.6s cubic-bezier(.2, .8, .2, 1) .2s both; animation-play-state: paused; }
+.md-s.on .md-coin { animation-play-state: running; }
+@keyframes md-emerge { from { opacity: 0; transform: scale(.55); filter: brightness(.2); } 60% { opacity: 1; } to { opacity: 1; transform: none; filter: none; } }
+.md-medal.glowing .md-coin { filter: drop-shadow(0 18px 40px rgba(0, 0, 0, .7)) drop-shadow(0 0 30px color-mix(in srgb, var(--c) 25%, transparent)); }
+.md-glc { position: absolute; left: -12%; top: -12%; width: 124% !important; height: 124% !important; }
+.md-flat { position: absolute; inset: 0; border-radius: 50%; display: grid; place-items: center; background: radial-gradient(circle at 32% 26%, #ffffffaa, transparent 30%), linear-gradient(145deg, var(--c), var(--c2)); box-shadow: inset 0 0 0 calc(var(--ms) * .05) #ffffff38, inset 0 0 0 calc(var(--ms) * .075) #00000030, inset 0 -10px 24px #0000004d; }
+.md-flat i { width: 50%; height: 50%; color: #000; opacity: .55; }
+.md-flat svg { width: 100%; height: 100%; display: block; }
+.tabbar button.md-bump svg { animation: md-bump .5s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes md-bump { 50% { transform: scale(1.45); } }
+
+/* Medaglie piccole in Classifica */
+.points .medals { display: flex; align-items: center; gap: 4px; margin-top: 4px; min-height: 30px; }
+.points .medals.with3d { min-height: 42px; }
+.points .mnames { font-size: 13px; color: var(--muted); margin-left: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.md-chip { flex: none; width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 0; cursor: pointer; position: relative;
+  background: radial-gradient(circle at 32% 28%, color-mix(in srgb, var(--c) 55%, #fff) 0%, var(--c) 38%, var(--c2) 100%);
+  box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--c) 70%, #fff), inset 0 0 0 4px var(--c2), 0 2px 6px rgba(0, 0, 0, .5); }
+.md-chip i { position: absolute; inset: 7px; color: color-mix(in srgb, var(--c2) 70%, #000); }
+.md-chip i svg { width: 100%; height: 100%; display: block; }
+.md-chip:active { transform: scale(.92); }
+.md-chip.g3 { width: 40px; height: 40px; background: none; box-shadow: none; }
+.md-chip.g3 i { display: none; }
+.md-chip.g3 canvas { position: absolute; left: 50%; top: 50%; width: 124%; height: 124%; transform: translate(-50%, -50%); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .6)); }
+.md-chip.md-pulse { animation: md-chipin .6s cubic-bezier(.2, 1.6, .4, 1); }
+@keyframes md-chipin { from { transform: scale(0); } to { transform: none; } }
+.medal-list li { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.medal-list li:last-child { border-bottom: 0; }
+.medal-list .md-chip, .medal-list .md-chip.g3 { width: 52px; height: 52px; }
+.medal-list .md-chip:not(.g3) i { inset: 12px; }
+.medal-list li.vuota .md-chip { filter: grayscale(1) brightness(.55); }
+.medal-list .name { font-weight: 600; }
+.medal-list .sub { font-size: 13px; color: var(--muted); }
+.medal-list .total { font-size: 17px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
+.medal-list .total small { font-size: 13px; }
+.points li > div { min-width: 0; }
+.points .mnames { min-width: 0; flex: 1; }

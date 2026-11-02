@@ -9,6 +9,12 @@ const VERSIONS = [
     date: '2 novembre 2026',
     items: [
       'Schermo sempre acceso mentre c\'è un timer: recupero, esercizi a tempo, circuito guidato e timer addominali',
+      'Medaglie in 3D: animazione quando se ne vince una, da girare, lanciare e ingrandire; chiusa, vola nella Classifica',
+      'Medaglie in 3D anche in Classifica accanto ai nomi, con la nuova sezione "Medaglie del mese"',
+      'Pomodoro del mese a chi fa per primo il Sudometro più alto; passa solo a chi lo supera, e a chi lo perde arriva un avviso',
+      'Divano d\'oro settimanale anche come medaglia',
+      { feature: 'sfide', text: 'Nuova medaglia Gladiatore (5 punti): a chi vince più sfide nel mese, almeno 3; passa solo a chi lo supera' },
+      'Notifiche senza spoiler per medaglie, fine delle sfide e premiazioni',
     ],
   },
   {
