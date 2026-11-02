@@ -431,7 +431,9 @@ function render() {
     store.set('session', session);
     show('home');
   }
-  $('pomodoro').textContent = week.pomodoro ? `Sudometro più alto: ${week.pomodoro.display || week.pomodoro.name}, ${week.pomodoro.score}` : '';
+  $('pomodoro').textContent = week.pomodoro ? `Sudometro più alto: ${week.pomodoro.display || week.pomodoro.name}` : '';
+  if (week.pomodoro && isKing(week.pomodoro.name)) $('pomodoro').insertAdjacentHTML('beforeend', crownFor(week.pomodoro.name));
+  if (week.pomodoro) $('pomodoro').append(`, ${week.pomodoro.score}`);
 
   renderSudometro();
   renderGallery();
@@ -776,6 +778,7 @@ function renderGallery() {
       <div class="pts">${r.score}</div>`;
     const who = r.display || r.name;
     li.querySelector('.name').textContent = who;
+    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(r.name));
     li.querySelector('.sub').textContent = `${title} · ${day}`;
     el.append(li);
     li.querySelector('.photo').replaceWith(photoPair(r.photoId, r.refId || (state.refPhotos || {})[r.name], `${who} · ${r.score} · ${title}`, false, isF(r.name)));
