@@ -5,6 +5,13 @@
 
 const VERSIONS = [
   {
+    v: '2.2',
+    date: '2 novembre 2026',
+    items: [
+      'Schermo sempre acceso mentre c\'è un timer: recupero, esercizi a tempo, circuito guidato e timer addominali',
+    ],
+  },
+  {
     v: '2.1',
     date: '1 novembre 2026',
     items: [

@@ -7,6 +7,7 @@ import { fbSignIn, fbUid } from './fbchat.js';
 import { figSvg } from './figure.js';
 import { bodySvg, ICONE } from './corpo.js';
 import { popCount, askMotion, shakeToStop } from './timer.js';
+import { setAwake, awakeWhileShown } from './awake.js';
 
 // Catalogo: gli esercizi delle schede che abbiamo; gli esercizi nuovi si aggiungono dall'app ("Nuovo esercizio").
 // t: 'kg' (peso e ripetizioni, se manca), 'rip' (solo ripetizioni, a corpo libero), 'sec' (a tempo, in secondi), 'm' (metri)
@@ -981,6 +982,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   run.className = 'wo-run';
   run.hidden = true;
   document.body.append(run);
+  awakeWhileShown('circuito', run); // schermo acceso per tutto il circuito
   let runId = '', runPlan = [], runAt = 0, runRaf = 0, runFase = null;
 
   function circRun(id) {
@@ -1523,6 +1525,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       el.classList.toggle('on', tmr.ex === el.dataset.ex && !!tmr.end);
     });
     cancelAnimationFrame(raf);
+    setAwake('scheda', !!(restEnd || tmr.end)); // schermo acceso mentre conta
     if (restEnd || tmr.end) raf = requestAnimationFrame(frame);
   }
 
