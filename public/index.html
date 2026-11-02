@@ -164,7 +164,10 @@
         <section class="card list">
           <ol id="points" class="ranking points"></ol>
         </section>
-        <p class="footnote">Tocca un nome per vedere da dove arrivano i punti, poi una voce per vedere quando.</p>
+        <p class="footnote">Tocca un nome per vedere da dove arrivano i punti, poi una voce per vedere quando. Tocca una medaglia per rivederla in grande.</p>
+
+        <h2 class="section">Medaglie del mese</h2>
+        <section class="card list"><ul id="medal-list" class="ranking medal-list"></ul></section>
 
         <div class="section section-row">
           <h2>Presenze</h2>
@@ -300,6 +303,7 @@
             </label>
             <button id="btn-test-weekly" class="row">Simula il recap della settimana</button>
             <button id="btn-test-monthly" class="row">Simula le premiazioni del mese</button>
+            <button id="btn-test-medals" class="row">Rivedi le mie medaglie del mese</button>
             <button id="btn-test-news" class="row">Simula il rilascio delle novità</button>
             <button id="btn-test-reset" class="row destructive">Riallinea la prova ai dati veri</button>
           </section>
@@ -430,9 +434,11 @@
           <li><div><b>Mai saltato</b><span>Obiettivo raggiunto in ogni settimana che inizia nel mese</span></div><em>20</em></li>
           <li><div><b>Mattiniero</b><span>4 check-in prima delle 9</span></div><em>10</em></li>
           <li><div><b>Branco</b><span>5 bonus amici</span></div><em>10</em></li>
-          <li><div><b>Pomodoro del mese</b><span>Il Sudometro più alto del mese. Fino alla fine del mese può cambiare proprietario</span></div><em>10</em></li>
+          <li><div><b>Pomodoro del mese</b><span>Il Sudometro più alto del mese, a chi lo fa per primo. Passa a chi lo supera (a pari punteggio resta a chi c'era prima)</span></div><em>10</em></li>
+          <li id="rule-gladiatore" hidden><div><b>Gladiatore</b><span>Chi vince più sfide nel mese, almeno 3, a chi ci arriva per primo. Passa a chi lo supera (a pari sfide vinte resta a chi c'era prima)</span></div><em>5</em></li>
+          <li><div><b>Divano d'oro</b><span>Ogni settimana, a chi è venuto meno volte in palestra (a pari, a tutti gli ultimi): assegnato la domenica sera</span></div><em>0</em></li>
       </ul>
-      <p class="muted">Quando qualcuno vince una medaglia compare in chat.</p>
+      <p class="muted">Chi vince una medaglia la vede comparire in 3D e compare in chat; in Classifica le medaglie stanno accanto al nome.</p>
       <h4>Re del mese</h4>
       <p class="muted">L'ultimo giorno del mese alle 21 chi ha più punti diventa Re del mese: annuncio in chat e notifica a tutti, poi il suo nome entra nell'albo d'oro.</p>
       <p class="muted">L'albo d'oro è in fondo alla Classifica.</p>

@@ -499,7 +499,13 @@ function sendWeeklyRecap() {
   const week = weekKey(dayString(new Date()));
   if (props.getProperty('LAST_WEEKLY') === week) return; // già fatte questa settimana
   props.setProperty('LAST_WEEKLY', week);
-  addChatEvent('', { kind: 'weekly', ...weekRecap() });
+  const recap = weekRecap();
+  addChatEvent('', { kind: 'weekly', ...recap });
+  // Divano d'oro della settimana: anche medaglia (si vede nell'app alla prima apertura dopo)
+  const key = `${TEST ? 'prova_' : ''}DIVANI`;
+  const list = (safeJson(props.getProperty(key) || '[]') || []).filter((d) => d.week !== week);
+  if (recap.divano) list.push({ week, names: recap.divano.names, count: recap.divano.count });
+  props.setProperty(key, JSON.stringify(list.slice(-8)));
   dispatch('recap', '');
 }
 
@@ -916,7 +922,7 @@ function checkin(user, source) {
     const count = countInWeek(rows('presenze'), user.name, weekKey(dayString(new Date())));
     addChatEvent(user.name, { kind: 'checkin', count, goal: goalAt(user, weekKey(dayString(new Date()))), auto: source === 'automatico' });
     tmark('evento chat');
-    announceAchievements(user);
+    medalCheck(user.name, source !== 'automatico');
     tmark('traguardi');
     dispatch('checkin', user.name);
     try {
@@ -1032,6 +1038,7 @@ function saveSudometro(user, req) {
   if (!debug) {
     addChatEvent(user.name, { kind: 'sudometro', score, title: String(req.title || '').slice(0, 60), photoId: saved.id || '', ref: refId });
     dispatch('sudometro', user.name);
+    medalCheck(user.name, true);
   }
   return { ok: true, score, debug, photoId: saved.id || '', refId, photoError: saved.error };
 }
@@ -1163,6 +1170,8 @@ function sharedState() {
     fem: femmine(),
     features: { apripista: featureOn('apripista'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn(), firebaseTutto: !TEST && fbAllOn(), provaTutto: TEST && fbAllOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
+    // Divano d'oro delle ultime settimane (medaglia settimanale)
+    divani: safeJson(props.getProperty(`${TEST ? 'prova_' : ''}DIVANI`) || '[]').map((d) => ({ ...d, displays: d.names.map(dn) })),
     // Albo d'oro: il più recente è il Re in carica (corona accanto al nome fino al prossimo)
     albo: getAlbo().map((a) => ({
       ...a,
@@ -1316,10 +1325,7 @@ function buildNotifications(event, name) {
     if (what === 'open') return to(s.data.invited, `Sfida! ${def.label}`, `${def.desc}. Tocca per partecipare.`);
     if (what === 'invite') return to([actor], `Sfida in corso: ${def.label}`, `${def.desc}. Tocca per partecipare.`);
     if (what === 'remind') return to(sfidaPending(s), `Sfida ${def.label}: mancano conferme`, 'Conferma i risultati entro mezzanotte, o valgono solo come partecipazione.');
-    if (what === 'end') {
-      const r = s.data.result || { winners: [] };
-      return to(parts, `Sfida conclusa: ${def.label}`, r.winners.length ? `Vince ${r.winners.map(dn).join(', ')} (+${POINTS.sfidaVinta}). Partecipare vale +${POINTS.sfida}.` : `Nessun vincitore. Partecipare vale +${POINTS.sfida}.`);
-    }
+    if (what === 'end') return to(parts, `Sfida conclusa: ${def.label}`, 'Tocca per scoprire chi ha vinto.'); // niente spoiler
     if (what === 'result') {
       const others = parts.filter((n) => n !== actor);
       if (def.kind === 'durata') {
@@ -1338,22 +1344,20 @@ function buildNotifications(event, name) {
     return subs.map((s) => ({ subscription: s.sub, title: n.title, body: n.body, tab: 'chat' }));
   }
 
+  // Premiazioni e medaglie: mai spoiler nella notifica, si scopre tutto nell'app
   if (event === 'recap') {
-    const body = recapText(weekRecap(), 'della settimana');
-    return subs.map((s) => ({ subscription: s.sub, title: 'Premiazioni della settimana', body, tab: 'chat' }));
+    return subs.map((s) => ({ subscription: s.sub, title: 'Premiazioni della settimana', body: 'Chi ha vinto questa settimana? Tocca per scoprirlo.', tab: 'chat' }));
   }
 
   if (event === 'monthly') {
     const m = safeJson(props.getProperty('LAST_MONTHLY') || '{}');
     if (!m.key) return [];
-    let body = recapText(computeRecap(m.from, m.to), 'del mese');
-    const points = computePoints(m.key).filter((t) => t.total > 0);
-    if (points.length) {
-      const dn = displayNames();
-      const kings = points.filter((t) => t.total === points[0].total).map((t) => dn(t.name)).join(', ');
-      body = `${kingTitle(points.filter((t) => t.total === points[0].total).map((t) => t.name))}: ${kings} (${points[0].total} punti)\n${body}`;
-    }
-    return subs.map((s) => ({ subscription: s.sub, title: `Premiazioni di ${m.label}`, body, tab: 'chat' }));
+    return subs.map((s) => ({ subscription: s.sub, title: `Premiazioni di ${m.label}`, body: 'Il nuovo Re è stato incoronato. Tocca per scoprire chi è.', tab: 'chat' }));
+  }
+
+  if (event === 'medaglia') {
+    const [who] = String(name).split('|');
+    return subs.filter((s) => s.name === who).map((s) => ({ subscription: s.sub, title: 'Novità per te', body: 'C\'è una sorpresa per te nell\'app. Tocca per scoprirla.', tab: 'classifica' }));
   }
 
   return [];
@@ -1908,6 +1912,7 @@ function sfidaAction(user, req) {
   if (ended) {
     addChatEvent('', { kind: 'sfidaFine', id: ended });
     dispatch('sfida', `${ended}|end|${user.name}`);
+    medalCheck(user.name, true);
     return chatState(user, -1); // c'è un evento nuovo in chat: serve tutto
   }
   if (notify) dispatch('sfida', `${req.id}|${notify}|${user.name}`);
@@ -1993,6 +1998,7 @@ function closeOldSfide() {
     lock.releaseLock();
   }
   old.forEach((s) => sfidaParts(s).length && addChatEvent('', { kind: 'sfidaFine', id: s.id }));
+  medalCheck('', false);
 }
 
 /** Ogni ora: chiude le sfide di ieri e, 2 ore dopo l'apertura, ricorda le conferme mancanti. */
@@ -2514,6 +2520,8 @@ const POINTS = {
   mattiniero: 10,
   branco: 10,
   pomodoro: 10,
+  gladiatore: 5, // novità di novembre 2026: chi ha vinto più sfide nel mese (almeno 3), finché non viene superato
+  gladiatoreMin: 3,
   apripista: 3, // novità di novembre 2026: primo a chiedere "chi va in palestra?" per un giorno e poi check-in
   sfidaVinta: 5, // novità di novembre 2026: sfida vinta
   sfida: 2, // novità di novembre 2026: partecipazione a una sfida
@@ -2668,12 +2676,35 @@ function computePointsRaw(month) {
     return { name: u.name, display: u.display, items, penalties };
   });
 
+  // Pomodoro del mese: a chi per primo ha fatto il Sudometro più alto. Passa solo a chi lo supera (a pari resta lì).
   const top = sudo.reduce((m, r) => Math.max(m, r.score), -1);
   if (top >= 0) {
-    table.forEach((t) => {
-      const best = sudo.find((r) => r.name === t.name && r.score === top);
-      if (best) t.items.push({ key: 'pomodoro', label: 'Pomodoro del mese', pts: POINTS.pomodoro, achievement: true, day: best.day, note: `Sudometro più alto del mese (${top})` });
-    });
+    const when = (r) => `${r.day} ${r.time || ''}`;
+    const best = sudo.filter((r) => r.score === top).sort((a, b) => (when(a) < when(b) ? -1 : when(a) > when(b) ? 1 : 0))[0];
+    const t = table.find((x) => x.name === best.name);
+    if (t) t.items.push({ key: 'pomodoro', label: 'Pomodoro del mese', pts: P.pomodoro, achievement: true, day: best.day, note: `Sudometro più alto del mese (${top})` });
+  }
+  // Gladiatore: chi ha vinto più sfide nel mese (almeno 3). Passa solo a chi lo supera: a pari resta a chi ci è
+  // arrivato prima. Solo dopo che le sfide sono state svelate.
+  if (sfideRevealed()) {
+    const from = featureFrom('sfide');
+    const done = sfide()
+      .filter((x) => x.state === 'conclusa' && inMonth(x.day) && x.day >= from && x.data.result)
+      .sort((a, b) => (`${a.day} ${a.at}` < `${b.day} ${b.at}` ? -1 : 1));
+    const wins = {};
+    const reached = {}; // reached[nome][n] = { i, day }: la sfida in cui è arrivato a n vittorie
+    done.forEach((x, i) =>
+      (x.data.result.winners || []).forEach((n) => {
+        wins[n] = (wins[n] || 0) + 1;
+        (reached[n] = reached[n] || {})[wins[n]] = { i, day: x.day };
+      })
+    );
+    const max = Object.keys(wins).reduce((m, n) => Math.max(m, wins[n]), 0);
+    if (max >= P.gladiatoreMin) {
+      const holder = Object.keys(wins).filter((n) => wins[n] === max).sort((a, b) => reached[a][max].i - reached[b][max].i)[0];
+      const t = table.find((x) => x.name === holder);
+      if (t) t.items.push({ key: 'gladiatore', label: 'Gladiatore', pts: P.gladiatore, achievement: true, day: reached[holder][max].day, note: `${max} sfide vinte, il più vincente del mese` });
+    }
   }
 
   return table
@@ -2692,17 +2723,63 @@ function computePointsRaw(month) {
     .sort((a, b) => b.total - a.total || a.display.localeCompare(b.display));
 }
 
-/** Annuncia in chat gli achievement appena sbloccati (il Pomodoro del mese si festeggia nel riepilogo mensile). */
-function announceAchievements(user) {
+/** Sfide già svelate a tutti (come features.sfide nello stato). */
+function sfideRevealed() {
+  return featureOn('sfide') && sfide().length > 0;
+}
+
+// Medaglie che passano a chi supera chi le ha: a chi le perde arriva un avviso (senza dire cosa è successo)
+const MEDALS_STOLEN = ['pomodoro', 'gladiatore'];
+
+/**
+ * Dopo un'azione che può far vincere o perdere medaglie (check-in, Sudometro, sfide): le medaglie nuove vanno in
+ * chat (una volta al mese per medaglia) e chi ne vince o ne perde una senza essere nell'app riceve una notifica
+ * senza spoiler. `actor` è chi ha fatto l'azione; `inApp` se l'ha fatta dall'app (vede subito l'animazione).
+ */
+function medalCheck(actor, inApp) {
+  try {
+    Object.keys(MEMO).forEach((k) => {
+      if (k.indexOf('points:') === 0) delete MEMO[k];
+    });
+    const month = dayString(new Date()).slice(0, 7);
+    const key = `${TEST ? 'prova_' : ''}medaglie_${month}`;
+    const initKey = `${TEST ? 'prova_' : ''}medaglie_init`;
+    const before = safeJson(props.getProperty(key) || '{}') || {};
+    const now = {};
+    computePoints(month).forEach((t) => (now[t.name] = t.detail.filter((g) => g.achievement).map((g) => g.key)));
+    if (!props.getProperty(initKey)) {
+      // Prima volta: le medaglie già vinte non si annunciano di nuovo
+      props.setProperty(initKey, '1');
+      props.setProperty(key, JSON.stringify(now));
+      return;
+    }
+    Object.keys(now).forEach((name) => {
+      const had = before[name] || [];
+      const gained = now[name].filter((k) => had.indexOf(k) < 0);
+      const lost = had.filter((k) => now[name].indexOf(k) < 0 && MEDALS_STOLEN.indexOf(k) >= 0);
+      if (gained.length) {
+        announceAchievements({ name }, gained);
+        if (!(inApp && name === actor)) dispatch('medaglia', `${name}|vinta`);
+      }
+      if (lost.length) dispatch('medaglia', `${name}|persa`);
+    });
+    props.setProperty(key, JSON.stringify(now));
+  } catch (err) {
+    console.error('Controllo medaglie non riuscito', err);
+  }
+}
+
+/** Annuncia in chat le medaglie appena vinte (una volta al mese per medaglia). */
+function announceAchievements(user, keys) {
   try {
     const month = dayString(new Date()).slice(0, 7);
     const mine = computePoints(month).find((t) => t.name === user.name);
     if (!mine) return;
-    const key = `ach_${month}_${user.name}`;
+    const key = `${TEST ? 'prova_' : ''}ach_${month}_${user.name}`;
     const done = safeJson(props.getProperty(key) || '[]');
     const list = Array.isArray(done) ? done : [];
     mine.detail
-      .filter((g) => g.achievement && g.key !== 'pomodoro' && list.indexOf(g.key) < 0)
+      .filter((g) => g.achievement && keys.indexOf(g.key) >= 0 && list.indexOf(g.key) < 0)
       .forEach((g) => {
         list.push(g.key);
         addChatEvent(user.name, { kind: 'achievement', title: g.label, pts: g.pts });
@@ -3198,7 +3275,7 @@ function readRows(key) {
   if (key === 'presenze') return values.map((r) => ({ day: toDay(r[0]), time: toTime(r[1]), name: r[2] }));
   if (key === 'sudometro') {
     // Le prove di debug restano nel foglio ma non contano.
-    return values.filter((r) => !r[6]).map((r) => ({ day: toDay(r[0]), name: r[2], score: Number(r[3]), title: r[4], photoId: r[7] || '', refId: r[8] || '' }));
+    return values.filter((r) => !r[6]).map((r) => ({ day: toDay(r[0]), time: r[1] ? toTime(r[1]) : '', name: r[2], score: Number(r[3]), title: r[4], photoId: r[7] || '', refId: r[8] || '' }));
   }
   if (key === 'iscrizioni') return values.map((r) => ({ name: r[0], sub: JSON.parse(r[2]) }));
   if (key === 'cambi') return values.map((r) => ({ at: String(r[0]), day: toDay(r[1]), name: String(r[2]), from: String(r[3]), to: String(r[4]), timeBefore: r[5] ? toTime(r[5]) : '', timeAfter: r[6] ? toTime(r[6]) : '' }));

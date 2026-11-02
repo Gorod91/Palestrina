@@ -21,6 +21,7 @@ const MEDAGLIE = [
   { key: 'mattiniero', nome: 'Mattiniero', cosa: 'Almeno 4 check-in prima delle 9.', c: '#3be0ff', c2: '#a6ff00' },
   { key: 'branco', nome: 'Branco', cosa: 'Almeno 5 volte in palestra insieme agli amici.', c: '#ffd60a', c2: '#ff9f0a' },
   { key: 'pomodoro', nome: 'Pomodoro del mese', cosa: 'Il Sudometro più alto del mese', c: '#ff9f0a', c2: '#ff2d6b' },
+  { key: 'gladiatore', nome: 'Gladiatore', cosa: 'Il più vincente nelle sfide del mese.', c: '#c7ccd4', c2: '#7d8189' },
 ];
 const MEDAL_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 2h3l1 5-3 1zM16 2h-3l-1 5 3 1z" fill="currentColor" opacity=".6"/><circle cx="12" cy="15" r="7" fill="currentColor"/><path d="M12 11.2l1.1 2.3 2.5.3-1.8 1.7.5 2.5-2.3-1.2-2.3 1.2.5-2.5-1.8-1.7 2.5-.3z" fill="#000" opacity=".35"/></svg>';
 const COUCH_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9V7a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v2" fill="none" stroke="currentColor" stroke-width="2"/><path d="M3 10a2 2 0 0 1 4 0v3h10v-3a2 2 0 0 1 4 0v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="currentColor"/><path d="M6 18v2M18 18v2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';

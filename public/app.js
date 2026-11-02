@@ -9,6 +9,7 @@ import { alF, kingTitle } from './genere.js';
 import { initSheetDrag } from './sheetdrag.js';
 import { showSudoReveal } from './sudoreveal.js';
 import { releaseNotesHtml } from './note.js';
+import { createMedals } from './medaglie.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -31,6 +32,14 @@ const store = {
 
 let session = store.get('session'); // { code, name }
 let state = null;
+// Medaglie 3D: animazione quando se ne vince (o perde) una, medaglie piccole in Classifica
+const medals = createMedals({
+  getState: () => state,
+  store,
+  isBlocked: () => medalsBlocked(),
+  mode: () => (fakeOn() ? 'finto' : testOn() ? 'prova' : ''),
+  scroller: document.getElementById('scroller'),
+});
 
 // ---------- Diagnostica (accesa dal server per un singolo account) ----------
 // Quando il server risponde trace:true, l'app registra cosa succede (richieste, errori, caricamenti, rete)
@@ -411,6 +420,7 @@ function render() {
 
   renderPresence();
   renderPoints();
+  setTimeout(medals.check, 1200); // medaglie vinte o strappate: dopo l'anello del check-in
   workoutTab();
   renderAlbo();
   if (document.activeElement !== $('in-name')) $('in-name').value = me.alias || '';
@@ -455,6 +465,7 @@ function render() {
   sel.value = store.get('actAs') || '';
   $('rule-apripista').hidden = !(state.features && state.features.apripista);
   $('rule-sfide').hidden = !(state.features && state.features.sfide);
+  $('rule-gladiatore').hidden = !(state.features && state.features.sfide); // si scopre solo con le sfide svelate
   $('viewport-card').hidden = !debugOn();
   if (debugOn()) renderViewportDebug();
   $('chat-notify').checked = !me.chatMuted;
@@ -512,10 +523,10 @@ function renderPoints() {
   if (!pts) return;
   $('points-title').textContent = `Punti di ${pts.month}`;
   $('points').innerHTML = '';
+  medals.resetChips();
   pts.ranking.forEach((r, i) => {
     const li = document.createElement('li');
     li.className = `${r.name === state.me.name ? 'me ' : ''}${openPoints.has(r.name) ? 'open' : ''}`;
-    const ach = r.detail.filter((g) => g.achievement);
     li.innerHTML = `
       <span class="pos">${i + 1}</span>
       <div><div class="name"></div><div class="sub"></div></div>
@@ -523,7 +534,15 @@ function renderPoints() {
       <div class="detail"></div>`;
     li.querySelector('.name').textContent = r.display || r.name;
     if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(r.name));
-    li.querySelector('.sub').textContent = ach.length ? ach.map((g) => g.label).join(' · ') : 'Nessuna medaglia';
+    // Medaglie piccole in 3D accanto al nome: toccandole si rivedono in grande
+    const chips = medals.chipsFor(r.name);
+    const sub = li.querySelector('.sub');
+    sub.className = 'medals';
+    sub.innerHTML = chips.html;
+    const names = document.createElement('span');
+    names.className = 'mnames';
+    names.textContent = !chips.names.length ? 'Nessuna medaglia' : chips.names.length <= 2 ? chips.names.join(' · ') : ''; // con tante medaglie bastano quelle
+    sub.append(names);
     const detail = li.querySelector('.detail');
     if (!r.detail.length) detail.textContent = 'Ancora nessun punto questo mese.';
     const sign = (n) => (n < 0 ? `${n}` : `+${n}`);
@@ -573,6 +592,9 @@ function renderPoints() {
     };
     $('points').append(li);
   });
+  $('medal-list').innerHTML = medals.monthHTML();
+  medals.mountChips($('points'));
+  medals.mountChips($('medal-list'));
 }
 
 function renderAlbo() {
@@ -1350,6 +1372,7 @@ function selectTab(name) {
   $('scroller').scrollTop = 0;
   document.body.classList.toggle('chat-mode', name === 'chat');
   chat.setActive(name === 'chat' && !!session);
+  if (name === 'classifica') medals.wake();
   if (name === 'classifica' && galleryMode !== 'week' && state) {
     galleryMode = 'week'; // ogni volta che si apre la Classifica si riparte dalla settimana
     renderGallery();
@@ -1745,6 +1768,7 @@ $('btn-test-reset').addEventListener('click', () => {
   if (confirm('Riallineare la prova ai dati veri? Tutto quello fatto in prova viene cancellato.')) testAction($('btn-test-reset'), 'Riallineo…', ['testReset'], 'Prova riallineata ai dati veri');
 });
 $('btn-test-weekly').addEventListener('click', () => testAction($('btn-test-weekly'), 'Invio…', ['testRecap', { kind: 'weekly' }], 'Recap della settimana simulato'));
+$('btn-test-medals').addEventListener('click', () => medals.replay());
 $('btn-test-news').addEventListener('click', () => testAction($('btn-test-news'), 'Rilascio…', ['testRecap', { kind: 'news' }], 'Novità rilasciate nella prova: guarda la chat'));
 $('btn-test-monthly').addEventListener('click', () => testAction($('btn-test-monthly'), 'Invio…', ['testRecap', { kind: 'monthly' }], 'Premiazioni del mese simulate'));
 $('admin-sheet').addEventListener('click', async (e) => {
@@ -1816,10 +1840,15 @@ $('admin-add').addEventListener('submit', async (e) => {
 // A ogni pubblicazione GitHub scrive la versione qui sotto e in version.json: se non coincidono l'app si ricarica.
 const APP_VERSION = (document.querySelector('meta[name="app-version"]') || {}).content || 'dev';
 
+/** Medaglia da mostrare solo a schermo libero: niente slide, fogli, fotocamera, Sudometro o timer aperti. */
+function medalsBlocked() {
+  return $('tabbar').hidden || !$('news').hidden || !$('goal-sheet').hidden || !$('camera').hidden || !$('viewer').hidden || !!document.querySelector('.sr, .sheet:not([hidden]), .wo-run:not([hidden]), .wo-big:not([hidden]), .wo-sheet:not([hidden]), .wo-edsheet:not([hidden])') || busyNow();
+}
+
 /** Mai ricaricare mentre qualcuno scrive, fa una foto, aspetta un'azione o ha il timer in corso. */
 function busyNow() {
   const input = $('chat-input');
-  return !!document.querySelector('.with-bicep') || !$('camera').hidden || !!(input && (input.value.trim() || document.activeElement === input)) || !!(document.activeElement && document.activeElement.classList.contains('sfida-num')) || !$('timer-running').hidden;
+  return (medals && medals.isOpen()) || !!document.querySelector('.with-bicep') || !$('camera').hidden || !!(input && (input.value.trim() || document.activeElement === input)) || !!(document.activeElement && document.activeElement.classList.contains('sfida-num')) || !$('timer-running').hidden;
 }
 
 async function checkUpdate() {
