@@ -1237,14 +1237,5 @@ html.ios.standalone .sr { top: var(--ios-top, 0px); }
 .md-chip.g3 canvas { position: absolute; left: 50%; top: 50%; width: 124%; height: 124%; transform: translate(-50%, -50%); filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .6)); }
 .md-chip.md-pulse { animation: md-chipin .6s cubic-bezier(.2, 1.6, .4, 1); }
 @keyframes md-chipin { from { transform: scale(0); } to { transform: none; } }
-.medal-list li { display: grid; grid-template-columns: 52px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
-.medal-list li:last-child { border-bottom: 0; }
-.medal-list .md-chip, .medal-list .md-chip.g3 { width: 52px; height: 52px; }
-.medal-list .md-chip:not(.g3) i { inset: 12px; }
-.medal-list li.vuota .md-chip { filter: grayscale(1) brightness(.55); }
-.medal-list .name { font-weight: 600; }
-.medal-list .sub { font-size: 13px; color: var(--muted); }
-.medal-list .total { font-size: 17px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; }
-.medal-list .total small { font-size: 13px; }
 .points li > div { min-width: 0; }
 .points .mnames { min-width: 0; flex: 1; }

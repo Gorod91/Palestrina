@@ -592,9 +592,7 @@ function renderPoints() {
     };
     $('points').append(li);
   });
-  $('medal-list').innerHTML = medals.monthHTML();
   medals.mountChips($('points'));
-  medals.mountChips($('medal-list'));
 }
 
 function renderAlbo() {
