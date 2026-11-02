@@ -867,7 +867,7 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
         const cls = ['pcell', c, mine && 'me', mine && d.day === selDay && 'sel', !d.poll && 'closed', p.arrived && 'arrived'].filter(Boolean).join(' ');
         return mine ? `<button class="${cls}" data-cell="${d.day}" type="button">${txt}</button>` : `<span class="${cls}" data-day="${d.day}">${txt}</span>`;
       });
-      return `<span class="pname${mine ? ' me' : ''}">${mine ? 'Tu' : esc(person.display)}</span>${cells.join('')}`;
+      return `<span class="pname${mine ? ' me' : ''}"><span class="pn">${mine ? 'Tu' : esc(person.display)}</span>${isKing(person.name) ? crown(person.name) : ''}</span>${cells.join('')}`;
     });
     return `<div class="pweek">${rows.join('')}</div>`;
   }

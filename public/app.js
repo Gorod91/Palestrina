@@ -1276,6 +1276,7 @@ const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn()
 // ---------- Allenamento (fase 1, solo in prova) ----------
 
 const workout = createWorkout({
+  crown: (name) => (isKing(name) ? crownFor(name) : ''),
   root: $('workout'),
   getToken: () => realApi('fbToken'),
   toast,
