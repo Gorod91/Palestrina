@@ -679,22 +679,6 @@ export function createMedals({ getState, store, isBlocked, mode, scroller }) {
   }
   function resetChips() { chipList = []; }
 
-  /** Sezione "Medaglie del mese": ogni medaglia con chi l'ha vinta (il Gladiatore solo con le sfide svelate). */
-  function monthHTML() {
-    const state = getState();
-    const all = allMedals(state);
-    const P = { maiSaltato: 20, mattiniero: 10, branco: 10, pomodoro: 10, gladiatore: 5, divano: 0 };
-    const NAMES = { maiSaltato: 'Mai saltato', mattiniero: 'Mattiniero', branco: 'Branco', pomodoro: 'Pomodoro del mese', gladiatore: 'Gladiatore', divano: 'Divano d\'oro' };
-    const keys = ['branco', 'pomodoro', 'divano', 'mattiniero', 'maiSaltato'].concat(state.features && state.features.sfide ? ['gladiatore'] : []);
-    return keys.map((k) => {
-      const list = all[k] || [];
-      const sample = list[0] || { key: k, label: NAMES[k], pts: P[k], who: '', name: '', note: '', when: '', period: '' };
-      chipList.push(sample);
-      const what = k === 'divano' ? (list.length ? `Settimana ${weekLabel(list[0].week)}: ${list.map((x) => x.who).join(', ')}` : 'Ancora nessuno questa settimana') : list.length ? `Vinta da ${list.map((x) => x.who).join(', ')}` : 'Ancora nessuno questo mese';
-      return `<li class="${list.length ? '' : 'vuota'}">${chipHTML(sample, chipList.length - 1)}<div><div class="name">${esc(NAMES[k])}</div><div class="sub">${esc(what)}</div></div><span class="total">${P[k] ? `+${P[k]}` : '0'}<small> pt</small></span></li>`;
-    }).join('');
-  }
-
   /** Dopo aver messo le chip nella pagina: le rende 3D (se si può) e le collega al tocco. */
   function mountChips(root) {
     root.querySelectorAll('.md-chip').forEach((b) => {
@@ -735,5 +719,5 @@ export function createMedals({ getState, store, isBlocked, mode, scroller }) {
     check();
   }
 
-  return { check, chipsFor, resetChips, monthHTML, mountChips, wake, replay, isOpen: () => !!ui };
+  return { check, chipsFor, resetChips, mountChips, wake, replay, isOpen: () => !!ui };
 }
