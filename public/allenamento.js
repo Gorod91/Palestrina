@@ -2172,7 +2172,9 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
    *  dai miei) e quelle di chi ha già le sue. key: e:<id> (inserite qui) oppure o:<documento>:<n>. */
   function altri() {
     const by = {};
-    SCHEDE_ESEMPIO.filter((y) => y.di).forEach((y) => (by[y.di] ||= []).push({ sc: y, key: `e:${y.id}`, chi: y.di }));
+    // l'originale inserito qui non serve se la persona ha già salvato una sua scheda con lo stesso nome (sarebbe un doppione)
+    const sua = (y) => otherSchede.some((d) => d.name === y.di && (d.list || []).some((z) => !z.di && z.name === y.name));
+    SCHEDE_ESEMPIO.filter((y) => y.di && y.di !== me.name && !sua(y)).forEach((y) => (by[y.di] ||= []).push({ sc: y, key: `e:${y.id}`, chi: y.di }));
     // di ognuno le schede sue e le copie che ha modificato (quelle copiate e lasciate uguali no: sarebbero doppioni)
     otherSchede.forEach((d, i) => (d.list || []).forEach((y, j) => { if (!y.di || y.mod) (by[d.name] ||= []).push({ sc: y, key: `o:${i}:${j}`, chi: d.name }); }));
     const names = Object.keys(by);
