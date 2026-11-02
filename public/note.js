@@ -10,7 +10,8 @@ const VERSIONS = [
     items: [
       'Schermo sempre acceso mentre c\'è un timer: recupero, esercizi a tempo, circuito guidato e timer addominali',
       'Medaglie in 3D: animazione quando se ne vince una, da girare, lanciare e ingrandire; chiusa, vola nella Classifica',
-      'Medaglie in 3D anche in Classifica accanto ai nomi',
+      'Classifica: medaglie accanto ai nomi, da toccare per vederle in 3D',
+      'Corona del Re in 3D: in Classifica la riga del Re è in oro e toccando la corona si apre l\'incoronazione; anche nella slide del Re di fine mese',
       'Pomodoro del mese a chi fa per primo il Sudometro più alto; passa solo a chi lo supera, e a chi lo perde arriva un avviso',
       'Divano d\'oro settimanale anche come medaglia',
       { feature: 'sfide', text: 'Nuova medaglia Gladiatore (5 punti): a chi vince più sfide nel mese, almeno 3; passa solo a chi lo supera' },

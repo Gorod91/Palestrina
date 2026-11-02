@@ -3,6 +3,8 @@
 // e, se c'è, &classifica=[[nome, punti, 1 se sono io], …]&medaglie={chiave: [nomi]}&divano=[[nomi], presenze]&sudo=<n>.
 // Senza parametri non fa niente.
 
+import { slideCrown } from '../corona.js';
+
 // Cronaca del mese: frasi scritte a mano, mostrate solo se la classifica finale le conferma.
 const CRONACA = {
   '2026-10': {
@@ -29,6 +31,11 @@ const COUCH_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 9V7a3
 const CSS = `
   .king { align-items: center; text-align: center; }
   .king .eyebrow { color: #ffd60a; }
+  .king .crown3d { position: relative; width: min(300px, 80vw); height: min(260px, 32vh); margin: 0 0 4px; display: grid; place-items: center; }
+  .king .crown3d canvas { position: absolute; inset: 0; width: 100% !important; height: 100% !important; }
+  .king .crown3d.gl .crownbig { display: none; }
+  .king .crown3d::before { content: ''; position: absolute; left: 50%; top: 52%; width: 260px; height: 260px; margin: -130px 0 0 -130px; border-radius: 50%; background: radial-gradient(circle, #ffd60a33, transparent 62%); opacity: 0; transition: opacity 1.2s; }
+  .king .crown3d.lit::before { opacity: 1; }
   .king .crownbig { width: 150px; height: 125px; margin: 18px 0 6px; color: #ffd60a; filter: drop-shadow(0 0 40px #ffd60a99); }
   .slide.on .crownbig { animation: crowndrop 1.1s cubic-bezier(.2, 1.4, .4, 1) .4s both, shine 2.6s ease-in-out 1.6s infinite; }
   @keyframes crowndrop { from { opacity: 0; transform: translateY(-160px) rotate(-14deg) scale(.6); } to { opacity: 1; transform: none; } }
@@ -153,12 +160,15 @@ export function kingSlide() {
     <div class="glow"></div>
     <div class="confetti">${confetti}</div>
     <p class="eyebrow" data-a style="--d:.1">${esc(q.get('titolo') || 'Re del mese')} · ${mese}</p>
-    <svg class="crownbig" viewBox="0 0 24 20" aria-hidden="true">${CROWN}<circle cx="3" cy="6" r="1.8" fill="currentColor"/><circle cx="12" cy="3" r="1.8" fill="currentColor"/><circle cx="21" cy="6" r="1.8" fill="currentColor"/><path d="M4 18.5 H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+    <div class="crown3d"><svg class="crownbig" viewBox="0 0 24 20" aria-hidden="true">${CROWN}<circle cx="3" cy="6" r="1.8" fill="currentColor"/><circle cx="12" cy="3" r="1.8" fill="currentColor"/><circle cx="21" cy="6" r="1.8" fill="currentColor"/><path d="M4 18.5 H20" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg></div>
     <h1 data-a style="--d:1.3;--anim:pop">${esc(re)}</h1>
     ${q.get('punti') ? `<p class="pts" data-a style="--d:2">${esc(q.get('punti'))} punti</p>` : ''}
     ${cronaca.re ? `<p class="sub" data-a style="--d:2.6">${cronaca.re}</p>` : ''}
     <p class="hint" data-a style="--d:3.2">Tocca per le novità</p>`;
   first.before(sec);
+  // Corona in 3D (oro martellato e smeraldi) che scende girando; senza WebGL resta quella disegnata
+  const box = sec.querySelector('.crown3d');
+  slideCrown(box, sec).then((ok) => { if (ok) box.classList.add('gl'); }).catch(() => {});
 }
 
 /** Premiazioni del mese, prima della classifica: una slide per ogni medaglia vinta e una per il Divano d'oro. */
