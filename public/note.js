@@ -16,6 +16,7 @@ const VERSIONS = [
       { feature: 'sfide', text: 'Nuova medaglia Gladiatore (5 punti): a chi vince più sfide nel mese, almeno 3; passa solo a chi lo supera' },
       'Notifiche senza spoiler per medaglie, fine delle sfide e premiazioni',
       'Corona del Re del mese accanto al nome anche in chat (domande, check-in, Sudometro, sfide, premiazioni) e nell\'elenco dei Sudometri',
+      'Progressi dell\'esercizio: al posto della data, il tempo trascorso (es. "in 13 giorni", "in 2 settimane")',
     ],
   },
   {

@@ -1244,6 +1244,16 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   const dayLong = (d) => `${GIORNI[new Date(d + 'T12:00:00Z').getUTCDay()]} ${dayShort(d)}`;
   /** "26 ago"; con l'anno se è di più di dieci mesi fa ("26 ott 2025"). */
   const dayShort = (d) => `${Number(d.slice(8))} ${MESI[Number(d.slice(5, 7)) - 1]}${daysAgo(d) > 300 ? ' ' + d.slice(0, 4) : ''}`;
+  /** Tempo tra due giorni: "in 13 giorni", "in 3 settimane", "in 4 mesi" (oggi: "oggi"). */
+  const spanTxt = (a, b) => {
+    const g = Math.round((Date.parse(b + 'T12:00:00Z') - Date.parse(a + 'T12:00:00Z')) / 864e5);
+    const n = (k, s, p) => `in ${k} ${k === 1 ? s : p}`;
+    if (g < 1) return 'oggi';
+    if (g < 14) return n(g, 'giorno', 'giorni');
+    if (g < 61) return n(Math.round(g / 7), 'settimana', 'settimane');
+    if (g < 365) return n(Math.round(g / 30.4), 'mese', 'mesi');
+    return n(Math.round(g / 365), 'anno', 'anni');
+  };
   const PERIODI = [['mese', 31, '1 mese'], ['3mesi', 92, '3 mesi'], ['6mesi', 183, '6 mesi']];
   /** Un valore con la sua unità: "70 kg", "75"", "20 rip". */
   const uVal = (t, v) => (t === 'kg' ? `${kgf(v)} kg` : t === 'sec' ? `${v}"` : t === 'm' ? `${v} m` : `${v} rip`); // come nel resto dell'app
@@ -1300,7 +1310,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
     const vs = h.map((p) => p.best), d = vs[vs.length - 1] - vs[0], sp = sparkPath(vs, 200, 56, 6);
     const col = trendCol(d);
     return `<button class="card wo-pcard" data-a="prog:${esc(ex)}"><span class="wo-pcard-h"><small>Progressi</small><small>Vedi ›</small></span>
-      <span class="wo-pcard-b"><span><b style="color:${col}">${d ? uDelta(t, d) : 'uguale'}</b><small>dal ${dayShort(h[0].day)}</small></span>
+      <span class="wo-pcard-b"><span><b style="color:${col}">${d ? uDelta(t, d) : 'uguale'}</b><small>${spanTxt(h[0].day, h[h.length - 1].day)}</small></span>
       <svg viewBox="0 0 200 56" aria-hidden="true"><path d="${sp.d}" fill="none" stroke="${col}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
       <circle cx="${sp.last[0].toFixed(1)}" cy="${sp.last[1].toFixed(1)}" r="4.5" fill="${col}" stroke="var(--card)" stroke-width="2"/></svg></span></button>`;
   }
