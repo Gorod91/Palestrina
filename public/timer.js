@@ -1,5 +1,7 @@
 // Timer addominali: niente suoni, a fine tempo lo schermo pulsa finché non lo tocchi.
 
+import { setAwake, awakeWhileShown } from './awake.js';
+
 const $ = (id) => document.getElementById(id);
 const MIN = 5;
 const MAX = 600;
@@ -10,7 +12,6 @@ let seconds = DEFAULT;
 let account = null; // { name, save(seconds) }: l'ultimo tempo usato è salvato per ogni account
 let deadline = null; // ms epoch di fine, null se fermo
 let frame = null;
-let wakeLock = null;
 let goAt = 0; // fine del conto alla rovescia iniziale
 let runMs = 0; // durata del giro in corso: l'anello si calcola su questa, anche se nel frattempo cambia "seconds"
 let touched = false; // tempo cambiato (o timer avviato) prima che si sapesse di chi è l'account
@@ -130,20 +131,9 @@ function render() {
   document.querySelector('.timer-set').classList.toggle('dim', running);
 }
 
-// Tiene lo schermo acceso mentre il timer corre (dove Safari lo permette).
-async function keepAwake() {
-  try {
-    if ('wakeLock' in navigator && !wakeLock) {
-      wakeLock = await navigator.wakeLock.request('screen');
-      wakeLock.addEventListener('release', () => (wakeLock = null));
-    }
-  } catch { /* non supportato o negato: pazienza */ }
-}
-
-function releaseAwake() {
-  if (wakeLock) wakeLock.release().catch(() => {});
-  wakeLock = null;
-}
+// Schermo acceso mentre il timer corre (awake.js); il lampeggio di fine ha il suo (initTimer).
+const keepAwake = () => setAwake('addominali', true);
+const releaseAwake = () => setAwake('addominali', false);
 
 function start() {
   askMotion();
@@ -187,6 +177,7 @@ function cancel() {
 function finish() {
   cancelAnimationFrame(frame);
   deadline = null;
+  releaseAwake();
   render();
   $('timer-alarm').hidden = false;
   shakeToStop($('timer-alarm'));
@@ -194,7 +185,6 @@ function finish() {
 
 function stopAlarm() {
   $('timer-alarm').hidden = true;
-  releaseAwake();
 }
 
 export function initTimer() {
@@ -212,12 +202,10 @@ export function initTimer() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState !== 'visible') return;
     if (deadline !== null) {
-      keepAwake();
       cancelAnimationFrame(frame);
       tick();
-    } else if (!$('timer-alarm').hidden) {
-      keepAwake();
     }
   });
+  awakeWhileShown('fine', $('timer-alarm')); // anche il lampeggio di fine (pure quello dei timer della scheda)
   render();
 }
