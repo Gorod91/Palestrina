@@ -552,50 +552,9 @@ function interact(u) {
   sec.addEventListener('pointercancel', up);
 }
 
-// ---------- Medaglie piccole (Classifica) ----------
-// Un solo renderer disegna ogni medaglia e la copia nel canvas 2D della sua chip; l'inclinazione dipende da dove
-// si trova la chip sullo schermo, così scorrendo la pagina cambiano i riflessi.
+// ---------- Medaglie piccole (Classifica): icone 2D, toccandole si aprono in 3D ----------
 
-const MINI = { r: null, env: null, scenes: {}, raf: 0, dirty: true, lastY: null, scroller: null };
-function miniScene(m) {
-  const T = window.THREE;
-  const id = `${m.key}|${m.name}|${m.when}`;
-  if (!MINI.scenes[id]) {
-    if (!MINI.r) {
-      MINI.r = new T.WebGLRenderer({ antialias: true, alpha: true }); setupRenderer(T, MINI.r);
-      MINI.env = makeEnv(T, MINI.r);
-    }
-    const md = buildMedal(T, MINI.r, m, true, MINI.env);
-    md.ready.then(() => { MINI.dirty = true; });
-    MINI.scenes[id] = md;
-  }
-  return MINI.scenes[id];
-}
-function miniLoop() {
-  cancelAnimationFrame(MINI.raf);
-  const chips = [...document.querySelectorAll('.md-chip.g3 canvas')].filter((c) => c.offsetParent);
-  if (!chips.length || !MINI.r) return;
-  const sc = MINI.scroller ? MINI.scroller.getBoundingClientRect() : { top: 0, bottom: innerHeight, height: innerHeight };
-  const y = MINI.scroller ? MINI.scroller.scrollTop : scrollY;
-  if (ui && ui.el.isConnected && !ui.el.classList.contains('leaving')) { MINI.raf = requestAnimationFrame(miniLoop); return; } // in pausa sotto la medaglia grande
-  if (MINI.dirty || y !== MINI.lastY) {
-    MINI.dirty = false; MINI.lastY = y;
-    const pr = Math.min(3, devicePixelRatio || 1);
-    chips.forEach((c) => {
-      const b = c.getBoundingClientRect(); if (b.bottom < sc.top || b.top > sc.bottom) return;
-      const S = Math.round(c.offsetWidth * pr); if (S < 4) return;
-      if (c.width !== S) c.width = c.height = S;
-      const k = Math.max(-1, Math.min(1, (b.top + b.height / 2 - (sc.top + sc.height / 2)) / (sc.height / 2)));
-      const md = c._md; if (!md) return;
-      md.group.rotation.x = -k * 0.75; md.group.rotation.y = k * 0.25;
-      MINI.r.setPixelRatio(1); MINI.r.setSize(S, S, false); MINI.r.render(md.scene, md.cam);
-      const g = c.getContext('2d'); g.clearRect(0, 0, S, S); g.drawImage(MINI.r.domElement, 0, 0, S, S);
-    });
-  }
-  MINI.raf = requestAnimationFrame(miniLoop);
-}
-
-/** HTML di una medaglia piccola (bottone); poi mountChips() la rende 3D. */
+/** HTML di una medaglia piccola (bottone). */
 function chipHTML(m, i) {
   const [c, c2] = METAL[m.key];
   return `<button type="button" class="md-chip" data-i="${i}" style="--c:${c};--c2:${c2}" aria-label="${esc(m.label)}"><i>${ICON[m.key]}</i></button>`;
@@ -603,8 +562,7 @@ function chipHTML(m, i) {
 
 // ---------- Controllo: medaglie nuove o strappate ----------
 
-export function createMedals({ getState, store, isBlocked, mode, scroller }) {
-  MINI.scroller = scroller || null;
+export function createMedals({ getState, store, isBlocked, mode }) {
   let pending = null; // timer di riprova finché qualcosa copre lo schermo
   let showing = false;
   let chipList = []; // medaglie delle chip in pagina, per indice
@@ -678,7 +636,7 @@ export function createMedals({ getState, store, isBlocked, mode, scroller }) {
   }
   function resetChips() { chipList = []; }
 
-  /** Dopo aver messo le chip nella pagina: le rende 3D (se si può) e le collega al tocco. */
+  /** Dopo aver messo le chip nella pagina: le collega al tocco. */
   function mountChips(root) {
     root.querySelectorAll('.md-chip').forEach((b) => {
       const m = chipList[Number(b.dataset.i)];
@@ -689,23 +647,7 @@ export function createMedals({ getState, store, isBlocked, mode, scroller }) {
         openOverlay(m, { all: allMedals(getState()), eyebrow: `Vinta da ${m.who}`, target: b });
       };
     });
-    if (!webglOk()) return;
-    loadThree().then(() => {
-      root.querySelectorAll('.md-chip:not(.g3)').forEach((b) => {
-        const m = chipList[Number(b.dataset.i)];
-        if (!m) return;
-        b.classList.add('g3');
-        const c = document.createElement('canvas');
-        c._md = miniScene(m);
-        b.prepend(c);
-      });
-      MINI.dirty = true;
-      miniLoop();
-    }).catch(() => {});
   }
-
-  /** Riavvia le medaglie piccole (es. quando si apre la Classifica). */
-  function wake() { MINI.dirty = true; if (MINI.r) miniLoop(); }
 
   /** Prova: le mie medaglie del mese tornano da vedere. */
   function replay() {
@@ -718,5 +660,5 @@ export function createMedals({ getState, store, isBlocked, mode, scroller }) {
     check();
   }
 
-  return { check, chipsFor, resetChips, mountChips, wake, replay, isOpen: () => !!ui };
+  return { check, chipsFor, resetChips, mountChips, replay, isOpen: () => !!ui };
 }

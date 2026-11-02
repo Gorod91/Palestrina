@@ -10,6 +10,7 @@ import { initSheetDrag } from './sheetdrag.js';
 import { showSudoReveal } from './sudoreveal.js';
 import { releaseNotesHtml } from './note.js';
 import { createMedals } from './medaglie.js';
+import { openCoronation } from './corona.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -38,7 +39,6 @@ const medals = createMedals({
   store,
   isBlocked: () => medalsBlocked(),
   mode: () => (fakeOn() ? 'finto' : testOn() ? 'prova' : ''),
-  scroller: document.getElementById('scroller'),
 });
 
 // ---------- Diagnostica (accesa dal server per un singolo account) ----------
@@ -507,6 +507,13 @@ function isKing(name) {
 /** Chi ha "f" nella colonna Sesso di Utenti: i testi che parlano di lei sono al femminile. */
 const isF = (name) => !!(state && state.fem && state.fem.includes(name));
 const crownFor = (name) => `<svg class="crown" aria-label="${isF(name) ? 'Regina' : 'Re'} del mese"><use href="#i-crown"/></svg>`;
+/** Incoronazione a tutto schermo, dalla corona accanto al nome in Classifica. */
+function openCrown(r, btn) {
+  const albo = state.albo[state.albo.length - 1];
+  const re = isF(r.name) ? 'Regina' : 'Re';
+  const mese = albo.label.split(' ')[0];
+  openCoronation({ name: r.display || r.name, eyebrow: `${re} di ${mese}`, sub: `<b>${re}</b> di ${mese}`, total: albo.total, from: btn });
+}
 /** Testi del Sudometro rivolti a me: "da sudato" o "da sudata". */
 const sudato = () => (state && state.me && isF(state.me.name) ? 'sudata' : 'sudato');
 const riposato = () => (state && state.me && isF(state.me.name) ? 'riposata' : 'riposato');
@@ -528,15 +535,21 @@ function renderPoints() {
   medals.resetChips();
   pts.ranking.forEach((r, i) => {
     const li = document.createElement('li');
-    li.className = `${r.name === state.me.name ? 'me ' : ''}${openPoints.has(r.name) ? 'open' : ''}`;
+    const king = isKing(r.name);
+    li.className = `${r.name === state.me.name ? 'me ' : ''}${openPoints.has(r.name) ? 'open ' : ''}${king ? 'king' : ''}`;
     li.innerHTML = `
       <span class="pos">${i + 1}</span>
       <div><div class="name"></div><div class="sub"></div></div>
       <span class="total">${r.total}<small> pt</small></span>
       <div class="detail"></div>`;
     li.querySelector('.name').textContent = r.display || r.name;
-    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(r.name));
-    // Medaglie piccole in 3D accanto al nome: toccandole si rivedono in grande
+    if (king) { // corona del Re: toccandola si apre l'incoronazione in 3D
+      const nm = li.querySelector('.name');
+      nm.insertAdjacentHTML('beforeend', `<button type="button" class="crown-btn">${crownFor(r.name)}</button>`);
+      const btn = nm.querySelector('.crown-btn');
+      btn.onclick = (e) => { e.stopPropagation(); openCrown(r, btn); };
+    }
+    // Medaglie piccole accanto al nome: toccandole si rivedono in grande
     const chips = medals.chipsFor(r.name);
     const sub = li.querySelector('.sub');
     sub.className = 'medals';
@@ -1373,7 +1386,6 @@ function selectTab(name) {
   $('scroller').scrollTop = 0;
   document.body.classList.toggle('chat-mode', name === 'chat');
   chat.setActive(name === 'chat' && !!session);
-  if (name === 'classifica') medals.wake();
   if (name === 'classifica' && galleryMode !== 'week' && state) {
     galleryMode = 'week'; // ogni volta che si apre la Classifica si riparte dalla settimana
     renderGallery();
