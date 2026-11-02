@@ -385,7 +385,7 @@ function summary(sets, t = 'kg') {
   return `${reps} · ${kg}`;
 }
 
-export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }) {
+export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, crown = () => '' }) {
   let x = null; // { fs, db } dopo l'accesso
   let me = null;
   let pfx = '';
@@ -786,7 +786,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
 
   /** Bollino con la persona da cui viene una scheda copiata: resta anche se la scheda cambia nome. */
   // Se l'ho modificata, nel bollino resta la persona e compare "modificata".
-  const diBadge = (sc) => (sc.di ? `<span class="wo-di${sc.mod ? ' mod' : ''}"><i>${esc(sc.di[0])}</i>${esc(sc.di)}${sc.mod ? '<em>modificata</em>' : ''}</span>` : '');
+  const diBadge = (sc) => (sc.di ? `<span class="wo-di${sc.mod ? ' mod' : ''}"><i>${esc(sc.di[0])}</i>${esc(sc.di)}${crown(sc.di)}${sc.mod ? '<em>modificata</em>' : ''}</span>` : '');
 
   /** Riquadro grande della scheda da fare. */
   function heroHtml(p) {
@@ -2204,10 +2204,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
   /** "Schede degli altri": l'elenco per persona; un tocco apre l'anteprima. */
   function copyView() {
     const { by, names } = altri();
-    const row = ({ sc, key, chi }) => `<button class="wo-row" data-a="prev:${key}"><span><b>${esc(sc.name)}</b><small>${sc.ex.length} ${sc.ex.length === 1 ? 'esercizio' : 'esercizi'}${key.startsWith('o:') && sc.di ? ` · da ${esc(sc.di)}, modificata` : ''}${giaMia(sc, chi) ? ' · già tra le tue' : ''}</small></span><span class="wo-chev">›</span></button>`;
+    const row = ({ sc, key, chi }) => `<button class="wo-row" data-a="prev:${key}"><span><b>${esc(sc.name)}</b><small>${sc.ex.length} ${sc.ex.length === 1 ? 'esercizio' : 'esercizi'}${key.startsWith('o:') && sc.di ? ` · da ${esc(sc.di)}${crown(sc.di)}, modificata` : ''}${giaMia(sc, chi) ? ' · già tra le tue' : ''}</small></span><span class="wo-chev">›</span></button>`;
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Allenamento</button></div>
       <h2 class="wo-ed-title">Schede degli altri</h2>
-      ${names.map((n) => `<div class="wo-who"><span class="wo-av">${esc(n[0])}</span><b>${esc(n)}</b></div><section class="card wo-list">${by[n].map(row).join('')}</section>`).join('') || '<p class="wo-empty">Nessuna scheda</p>'}`;
+      ${names.map((n) => `<div class="wo-who"><span class="wo-av">${esc(n[0])}</span><b>${esc(n)}${crown(n)}</b></div><section class="card wo-list">${by[n].map(row).join('')}</section>`).join('') || '<p class="wo-empty">Nessuna scheda</p>'}`;
   }
 
   /** Anteprima di una scheda degli altri: per usarla si copia tra le mie. */
@@ -2221,7 +2221,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds }
       return `<div class="wo-prev-r${c ? ' circ' : ''}"><span>${esc(nameOf(id, sc))}${c ? `<small>${esc(c.ex.map((e) => nameOf(e, sc)).join(', '))}</small>` : ''}</span><em>${esc(v)}</em></div>`;
     }).join('');
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Schede degli altri</button></div>
-      <div class="wo-prev-t"><h2 class="wo-ed-title">${esc(sc.name)}</h2><span class="wo-prev-di">di ${esc(chi)}</span></div>
+      <div class="wo-prev-t"><h2 class="wo-ed-title">${esc(sc.name)}</h2><span class="wo-prev-di">di ${esc(chi)}${crown(chi)}</span></div>
       <section class="card wo-prev">${rows}</section>
       <button class="primary" data-a="cpsave">Copia tra le mie</button>
       <p class="wo-sub wo-center">${giaMia(sc, chi) ? 'Ne hai già una con questo nome: la copia avrà il bollino con la persona.' : 'Per usarla la copi tra le tue; poi la puoi anche modificare.'}</p>`;
