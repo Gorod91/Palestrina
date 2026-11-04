@@ -729,8 +729,9 @@ function monthWeeks(month) {
 function renderPresenceMonth(pm, me) {
   const weeks = monthWeeks(pm.month);
   const inMonth = (d) => d.slice(0, 7) === pm.month;
-  $('presence-head').innerHTML = `<span></span><div class="strip">${weeks
-    .map(([a, b]) => `<div class="wk${pm.today >= a && pm.today <= b ? ' now' : ''}" style="--n:${Number(b.slice(8)) - Number(a.slice(8)) + 1}"><span>${a.endsWith('-01') ? `1 ${MONTH_SHORT[Number(pm.month.slice(5)) - 1]}` : Number(a.slice(8))}</span></div>`)
+  // il mese va nella colonna delle posizioni: se la prima settimana ha un giorno solo, "1 nov" finirebbe sopra la data dopo
+  $('presence-head').innerHTML = `<span class="mon">${MONTH_SHORT[Number(pm.month.slice(5)) - 1]}</span><div class="strip">${weeks
+    .map(([a, b]) => `<div class="wk${pm.today >= a && pm.today <= b ? ' now' : ''}" style="--n:${Number(b.slice(8)) - Number(a.slice(8)) + 1}"><span>${Number(a.slice(8))}</span></div>`)
     .join('')}</div>`;
   const people = pm.people
     .map((p) => ({ ...p, total: p.days.filter(inMonth).length }))
