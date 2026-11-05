@@ -49,7 +49,8 @@ function allMedals(state) {
   const out = {};
   const pts = state && state.points;
   const now = new Date();
-  const month = MESI[now.getMonth()], year = now.getFullYear();
+  // mese della classifica (anche un mese passato rivisto in Classifica)
+  const month = (pts && pts.month) || MESI[now.getMonth()], year = (pts && pts.year) || now.getFullYear();
   ((pts && pts.ranking) || []).forEach((r) => {
     r.detail.filter((g) => g.achievement && METAL[g.key]).forEach((g) => {
       const it = (g.items || [])[0] || {};
@@ -626,8 +627,8 @@ export function createMedals({ getState, store, isBlocked, mode }) {
   }
 
   /** Medaglie piccole accanto al nome nella classifica a punti (HTML) e lista per "Medaglie del mese". */
-  function chipsFor(name) {
-    const state = getState();
+  function chipsFor(name, st) {
+    const state = st || getState(); // st: un mese passato rivisto in Classifica
     const list = mine(allMedals(state), name);
     return {
       html: list.map((m) => { chipList.push(m); return chipHTML(m, chipList.length - 1); }).join(''),

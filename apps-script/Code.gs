@@ -723,6 +723,8 @@ function handle(req, user) {
         return json(getPhoto(req.id));
       case 'photos':
         return json(getPhotos(req.ids));
+      case 'mese':
+        return json(monthArchive(req.month));
       case 'chat':
         fbSyncSoon(); // messaggi scritti su Firebase anche per chi legge da qui (Firebase bloccato, versioni vecchie)
         return json(chatState(user, req.v));
@@ -1198,12 +1200,74 @@ function sharedState() {
         .sort((a, b) => b.score - a.score)
         .map((r) => ({ name: r.name, display: dn(r.name), day: r.day, score: r.score, title: r.title, photoId: r.photoId, refId: r.refId })),
     },
+    // Calendario della Classifica: quanti di voi in palestra ogni giorno (per i mesi passati) e record dei mesi chiusi
+    calendario: calendarCounts(presenze),
+    record: monthRecords(users, presenze, today, dn),
     // Presenze del mese (Classifica → Mese): i giorni in palestra di ognuno. Si parte dal lunedì della settimana del 1°,
     // così l'obiettivo della prima settimana conta anche i giorni del mese prima (come per i punti).
     presenzeMese: presenzeMese(users, presenze, today),
     // Lo stesso per tutto il mese (interruttore "Mese" sopra la galleria)
     sudometroMonth: rows('sudometro')
       .filter((r) => r.day.slice(0, 7) === today.slice(0, 7))
+      .sort((a, b) => b.score - a.score)
+      .map((r) => ({ name: r.name, display: dn(r.name), day: r.day, score: r.score, title: r.title, photoId: r.photoId, refId: r.refId })),
+  };
+}
+
+/** Giorno → quante persone diverse in palestra, per il calendario dei mesi in Classifica. */
+function calendarCounts(presenze) {
+  const seen = {};
+  const out = {};
+  presenze.forEach((r) => {
+    const k = r.name + '|' + r.day;
+    if (seen[k]) return;
+    seen[k] = 1;
+    out[r.day] = (out[r.day] || 0) + 1;
+  });
+  return out;
+}
+
+/** Record dei mesi già chiusi (punti, presenze e Sudometro in un solo mese), per l'Albo d'oro. */
+function monthRecords(users, presenze, today, dn) {
+  const cur = today.slice(0, 7);
+  const out = {};
+  getAlbo().forEach((a) => (a.ranking || []).forEach((r) => {
+    if (!out.punti || r.total > out.punti.v) out.punti = { name: r.name, v: r.total, month: a.key };
+  }));
+  const count = {};
+  const seen = {};
+  presenze.forEach((r) => {
+    const m = r.day.slice(0, 7);
+    const k = r.name + '|' + r.day;
+    if (m >= cur || seen[k]) return;
+    seen[k] = 1;
+    const c = (count[r.name + '|' + m] = (count[r.name + '|' + m] || 0) + 1);
+    if (!out.presenze || c > out.presenze.v) out.presenze = { name: r.name, v: c, month: m };
+  });
+  rows('sudometro').forEach((r) => {
+    if (r.day.slice(0, 7) >= cur) return;
+    if (!out.sudometro || r.score > out.sudometro.v) out.sudometro = { name: r.name, v: r.score, month: r.day.slice(0, 7) };
+  });
+  Object.keys(out).forEach((k) => (out[k].display = dn(out[k].name)));
+  return out;
+}
+
+/** Un mese già chiuso, per rivederlo in Classifica: punti, presenze e Sudometro come a fine mese. */
+function monthArchive(month) {
+  month = String(month || '');
+  const today = dayString(new Date());
+  if (!/^\d{4}-\d{2}$/.test(month) || month >= today.slice(0, 7)) return { error: 'Mese non valido' };
+  const users = allUsers();
+  const presenze = rows('presenze');
+  const dn = displayNames();
+  const [y, m] = month.split('-').map(Number);
+  const last = `${month}-${String(new Date(y, m, 0).getDate()).padStart(2, '0')}`;
+  return {
+    month,
+    points: { month: MONTHS_IT[m - 1], year: y, ranking: computePoints(month) },
+    presenzeMese: presenzeMese(users, presenze, last),
+    sudometro: rows('sudometro')
+      .filter((r) => r.day.slice(0, 7) === month)
       .sort((a, b) => b.score - a.score)
       .map((r) => ({ name: r.name, display: dn(r.name), day: r.day, score: r.score, title: r.title, photoId: r.photoId, refId: r.refId })),
   };

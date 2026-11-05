@@ -70,6 +70,9 @@
     <symbol id="i-down" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
       <path d="M6 9 L12 15 L18 9"/>
     </symbol>
+    <symbol id="i-calendar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/>
+    </symbol>
     <symbol id="i-crown" viewBox="0 0 24 20">
       <path d="M4 16 L3 7 L8.5 11 L12 4 L15.5 11 L21 7 L20 16 Z" fill="currentColor"/>
       <circle cx="3" cy="6" r="1.8" fill="currentColor"/><circle cx="12" cy="3" r="1.8" fill="currentColor"/><circle cx="21" cy="6" r="1.8" fill="currentColor"/>
@@ -96,6 +99,8 @@
         <p id="today-date" class="eyebrow" hidden></p>
         <h1 id="page-title">Palestrina</h1>
       </div>
+      <!-- Classifica: scelta del mese (apre il calendario dei mesi) -->
+      <button id="month-btn" class="month-btn" type="button" hidden aria-label="Scegli il mese"><svg><use href="#i-calendar"/></svg><span></span><i class="chev"></i></button>
       <button id="avatar" class="avatar" hidden aria-label="Altro"></button>
     </header>
 
@@ -160,14 +165,17 @@
       </div>
 
       <div class="tab-panel" data-tab="classifica" hidden>
+        <div id="month-cal" class="month-cal"><div id="month-cal-in"></div></div>
+        <div id="past-bar" class="past-bar" hidden><div><b id="past-title"></b><span id="past-king"></span></div><button id="past-back" type="button"></button></div>
         <h2 class="section with-info"><span id="points-title">Punti del mese</span><button id="btn-points-info" class="info-btn" aria-label="Come funzionano punti e medaglie">i</button></h2>
         <section class="card list">
           <ol id="points" class="ranking points"></ol>
         </section>
-        <p class="footnote">Tocca un nome per vedere da dove arrivano i punti, poi una voce per vedere quando. Tocca una medaglia o la corona per vederla in grande.</p>
+        <p id="points-foot" class="footnote">Tocca un nome per vedere da dove arrivano i punti, poi una voce per vedere quando. Tocca una medaglia o la corona per vederla in grande.</p>
 
         <div class="section section-row">
           <h2>Presenze</h2>
+          <span id="presence-count" class="muted section-note" hidden></span>
           <div id="presence-mode" class="seg" role="group" aria-label="Periodo">
             <button type="button" data-mode="week">Settimana</button>
             <button type="button" data-mode="month">Mese</button>
@@ -177,12 +185,13 @@
           <div id="presence-head" class="month-head" aria-hidden="true" hidden></div>
           <ol id="ranking" class="ranking"></ol>
         </section>
-        <div id="presence-key" class="month-key" hidden><span><i class="k-in"></i>In palestra</span><span><i class="k-ok"></i>Obiettivo della settimana centrato</span><span><i class="k-today"></i>Oggi</span></div>
+        <div id="presence-key" class="month-key" hidden><span><i class="k-in"></i>In palestra</span><span><i class="k-ok"></i>Obiettivo della settimana centrato</span><span id="key-today"><i class="k-today"></i>Oggi</span></div>
         <p id="pomodoro" class="footnote"></p>
 
         <div id="card-gallery" hidden>
           <div class="section section-row">
             <h2>Sudometro (beta)</h2>
+            <span id="gallery-count" class="muted section-note" hidden></span>
             <div id="gallery-mode" class="seg" role="group" aria-label="Periodo">
               <button type="button" data-mode="week">Settimana</button>
               <button type="button" data-mode="month">Mese</button>
@@ -193,8 +202,9 @@
           </section>
         </div>
 
-        <h2 class="section">Albo d'oro</h2>
-        <section class="card list"><ul id="albo" class="rules albo"></ul></section>
+        <div class="section section-row"><h2>Albo d'oro</h2><span id="albo-count" class="muted section-note"></span></div>
+        <section class="card list"><ol id="albo" class="ranking albo2"></ol></section>
+        <p id="albo-foot" class="footnote" hidden>Record: il massimo in un solo mese. Tocca un nome per vedere i mesi in cui ha vinto, o un record per aprire il suo mese.</p>
       </div>
 
       <div class="tab-panel chat" data-tab="chat" hidden>
