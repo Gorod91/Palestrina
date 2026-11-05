@@ -1806,8 +1806,8 @@ function chatDelete(user, id) {
 }
 
 // ---------- Sfide (novità di novembre 2026) ----------
-// Quando almeno due persone fanno check-in a meno di un'ora l'una dall'altra si apre una sfida a caso.
-// Chi ha fatto check-in può dire "Ci sto" o "Passo" entro un'ora dall'apertura.
+// Quando almeno due persone fanno check-in a meno di 3 ore l'una dall'altra si apre una sfida a caso.
+// Chi ha fatto check-in può dire "Ci sto" o "Passo" entro 3 ore dall'apertura.
 // - Plank e Barchetta (a durata): un partecipante dichiara chi ha vinto, un altro conferma.
 // - Addominali, Burpees (a ripetizioni): ognuno scrive le sue, un altro conferma; vince chi supera di più
 //   il proprio record degli ultimi 60 giorni (la prima volta è calibrazione: solo partecipazione).
@@ -1823,9 +1823,9 @@ const SFIDE = {
   affondi: { label: 'Affondi', kind: 'ripetizioni', desc: 'Fino allo sfinimento, gambe alternate (conta ogni gamba): vince chi supera di più il proprio record', off: true },
   burpees: { label: 'Burpees', kind: 'ripetizioni', desc: 'Fino allo sfinimento: vince chi supera di più il proprio record' },
 };
-const SFIDA_WINDOW_MIN = 60; // per unirsi, e distanza minima tra due sfide
+const SFIDA_WINDOW_MIN = 180; // per unirsi, e distanza minima tra due sfide
 const SFIDA_RECORD_DAYS = 60;
-const SFIDA_REMIND_MIN = 120;
+const SFIDA_REMIND_MIN = 240; // dopo la chiusura delle adesioni
 
 const hhmmToMin = (t) => {
   const [h, m] = String(t).split(':').map(Number);
