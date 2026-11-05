@@ -423,6 +423,7 @@ function render() {
   setTimeout(medals.check, 1200); // medaglie vinte o strappate: dopo l'anello del check-in
   workoutTab();
   renderAlbo();
+  renderMonthNav();
   if (document.activeElement !== $('in-name')) $('in-name').value = me.alias || '';
   $('in-name').placeholder = me.name;
   $('name-hint').textContent = `È il nome che vedono gli altri in classifica e nelle notifiche. Lascia vuoto per usare il nome originale (${me.name}).`;
@@ -504,12 +505,32 @@ function isKing(name) {
   return albo.length > 0 && albo[albo.length - 1].names.includes(name);
 }
 
+// ---------- Classifica: mesi passati ----------
+const MESI_IT = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
+// Mese rivisto in Classifica (null = quello in corso), mesi chiusi già scaricati, calendario dei mesi aperto
+let viewMonth = null;
+const archive = {};
+let calOpen = false;
+let calYear = null;
+const pastView = () => (viewMonth && archive[viewMonth]) || null;
+const curMonthKey = () => (state && state.presenzeMese && state.presenzeMese.month) || new Date().toISOString().slice(0, 7);
+/** Voce dell'albo d'oro del mese mostrato in Classifica: per un mese passato il suo Re, altrimenti il Re in carica. */
+function alboHere() {
+  const albo = (state && state.albo) || [];
+  return viewMonth ? albo.find((a) => a.key === viewMonth) : albo[albo.length - 1];
+}
+/** Corona in Classifica: nei mesi passati va al Re di quel mese. */
+function kingHere(name) {
+  const a = alboHere();
+  return !!a && a.names.includes(name);
+}
+
 /** Chi ha "f" nella colonna Sesso di Utenti: i testi che parlano di lei sono al femminile. */
 const isF = (name) => !!(state && state.fem && state.fem.includes(name));
 const crownFor = (name) => `<svg class="crown" aria-label="${isF(name) ? 'Regina' : 'Re'} del mese"><use href="#i-crown"/></svg>`;
 /** Incoronazione a tutto schermo, dalla corona accanto al nome in Classifica. */
 function openCrown(r, btn) {
-  const albo = state.albo[state.albo.length - 1];
+  const albo = alboHere() || state.albo[state.albo.length - 1];
   const re = isF(r.name) ? 'Regina' : 'Re';
   const mese = albo.label.split(' ')[0];
   openCoronation({ name: r.display || r.name, eyebrow: `${re} di ${mese}`, sub: `<b>${re}</b> di ${mese}`, total: albo.total, from: btn });
@@ -528,14 +549,19 @@ function shortDay(day) {
 }
 
 function renderPoints() {
-  const pts = state.points;
+  const pv = pastView();
+  const pts = pv ? pv.points : state.points;
   if (!pts) return;
-  $('points-title').textContent = `Punti di ${pts.month}`;
+  $('points-title').textContent = pv ? `Classifica finale di ${pts.month}` : `Punti di ${pts.month}`;
+  $('btn-points-info').hidden = !!pv;
+  $('points-foot').textContent = pv
+    ? `Punti e medaglie di ${pts.month} ${pts.year || ''}. Tocca un nome per vedere da dove arrivano i punti.`
+    : 'Tocca un nome per vedere da dove arrivano i punti, poi una voce per vedere quando. Tocca una medaglia o la corona per vederla in grande.';
   $('points').innerHTML = '';
   medals.resetChips();
   pts.ranking.forEach((r, i) => {
     const li = document.createElement('li');
-    const king = isKing(r.name);
+    const king = kingHere(r.name);
     li.className = `${r.name === state.me.name ? 'me ' : ''}${openPoints.has(r.name) ? 'open ' : ''}${king ? 'king' : ''}`;
     li.innerHTML = `
       <span class="pos">${i + 1}</span>
@@ -550,7 +576,7 @@ function renderPoints() {
       btn.onclick = (e) => { e.stopPropagation(); openCrown(r, btn); };
     }
     // Medaglie piccole accanto al nome: toccandole si rivedono in grande
-    const chips = medals.chipsFor(r.name);
+    const chips = medals.chipsFor(r.name, pv ? { points: pts } : null);
     const sub = li.querySelector('.sub');
     sub.className = 'medals';
     sub.innerHTML = chips.html;
@@ -559,7 +585,7 @@ function renderPoints() {
     names.textContent = !chips.names.length ? 'Nessuna medaglia' : chips.names.length <= 2 ? chips.names.join(' · ') : ''; // con tante medaglie bastano quelle
     sub.append(names);
     const detail = li.querySelector('.detail');
-    if (!r.detail.length) detail.textContent = 'Ancora nessun punto questo mese.';
+    if (!r.detail.length) detail.textContent = pv ? `Nessun punto a ${pts.month}.` : 'Ancora nessun punto questo mese.';
     const sign = (n) => (n < 0 ? `${n}` : `+${n}`);
     r.detail.forEach((g) => {
       const row = document.createElement('div');
@@ -610,23 +636,170 @@ function renderPoints() {
   medals.mountChips($('points'));
 }
 
+/** Albo d'oro: le corone vinte da ognuno, con i record dei mesi chiusi nella riga di chi li detiene. */
+const openAlbo = new Set();
+const monthShort = (key) => `${MONTH_SHORT[Number(key.slice(5)) - 1]} ${key.slice(2, 4)}`;
 function renderAlbo() {
   const list = $('albo');
   list.innerHTML = '';
-  const albo = (state.albo || []).slice().reverse();
+  const albo = state.albo || [];
+  $('albo-count').textContent = albo.length ? `${albo.length} ${albo.length === 1 ? 'mese' : 'mesi'}` : '';
+  $('albo-foot').hidden = !albo.length;
   if (!albo.length) {
-    list.innerHTML = '<li><span>Ancora nessun Re: il primo sarà incoronato l\'ultimo giorno del mese alle 21.</span></li>';
+    list.innerHTML = '<li class="empty">Ancora nessun Re: il primo sarà incoronato l\'ultimo giorno del mese alle 21.</li>';
     return;
   }
-  albo.forEach((a) => {
+  const rec = state.record || {};
+  const RECORD = [['punti', 'Punti'], ['presenze', 'Presenze'], ['sudometro', 'Sudometro']];
+  const names = [...new Set([...state.week.ranking.map((r) => r.name), ...albo.flatMap((a) => a.names)])];
+  const display = (n) => (state.week.ranking.find((r) => r.name === n) || {}).display || (albo.map((a) => a.displays[a.names.indexOf(n)]).find(Boolean)) || n;
+  const people = names
+    .map((n) => ({ n, won: albo.filter((a) => a.names.includes(n)) }))
+    .sort((a, b) => b.won.length - a.won.length || (b.won.length ? (b.won[b.won.length - 1].key > a.won[a.won.length - 1].key ? 1 : -1) : 0) || display(a.n).localeCompare(display(b.n)));
+  const go = (key) => { selectMonth(key); $('scroller').scrollTo({ top: 0, behavior: 'smooth' }); };
+  people.forEach((p, i) => {
     const li = document.createElement('li');
-    li.innerHTML = '<div><b></b><span></span></div><em></em>';
-    li.querySelector('b').textContent = a.displays.join(', ');
-    li.querySelector('span').textContent = a.label.charAt(0).toUpperCase() + a.label.slice(1);
-    li.querySelector('em').textContent = `${a.total} pt`;
+    li.className = `${p.n === state.me.name ? 'me ' : ''}${openAlbo.has(p.n) ? 'open' : ''}`;
+    const last = p.won[p.won.length - 1];
+    li.innerHTML = `<span class="pos">${i + 1}</span><div><div class="name"></div><div class="al-crowns"></div><div class="sub"></div><div class="al-recs"></div></div><span class="al-n">${p.won.length}</span><div class="al-months"></div>`;
+    li.querySelector('.name').textContent = display(p.n);
+    li.querySelector('.al-crowns').innerHTML = p.won.slice(0, 12).map(() => '<svg class="crown"><use href="#i-crown"/></svg>').join('') + (p.won.length > 12 ? `<small>+${p.won.length - 12}</small>` : '');
+    li.querySelector('.sub').textContent = last ? `Ultima: ${last.label}` : 'Ancora nessuna corona';
+    if (!p.won.length) li.classList.add('none');
+    RECORD.forEach(([k, label]) => {
+      const r = rec[k];
+      if (!r || r.name !== p.n) return;
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'al-rec';
+      b.innerHTML = `<span>Record</span><em>${label}: <b>${r.v}</b> · ${monthShort(r.month)}</em>`;
+      b.onclick = (e) => { e.stopPropagation(); go(r.month); };
+      li.querySelector('.al-recs').append(b);
+    });
+    p.won.slice().reverse().forEach((a) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.innerHTML = `${monthShort(a.key)}<b>${a.total}</b>`;
+      b.onclick = (e) => { e.stopPropagation(); go(a.key); };
+      li.querySelector('.al-months').append(b);
+    });
+    li.onclick = () => {
+      if (!p.won.length) return;
+      if (openAlbo.has(p.n)) openAlbo.delete(p.n);
+      else openAlbo.add(p.n);
+      li.classList.toggle('open');
+    };
     list.append(li);
   });
 }
+
+/** Tasto del mese accanto al titolo, calendario dei mesi e barra del mese passato. */
+function renderMonthNav() {
+  if (!state) return;
+  const cur = curMonthKey();
+  const shown = viewMonth || cur;
+  const btn = $('month-btn');
+  btn.hidden = document.querySelector('.tab-panel[data-tab="classifica"]').hidden;
+  btn.querySelector('span').textContent = MESI_IT[Number(shown.slice(5)) - 1].replace(/^./, (c) => c.toUpperCase());
+  btn.classList.toggle('open', calOpen);
+  btn.classList.toggle('past', !!viewMonth);
+  btn.setAttribute('aria-expanded', calOpen ? 'true' : 'false');
+  $('month-cal').classList.toggle('open', calOpen);
+  if (calOpen) $('month-cal-in').innerHTML = calendarHtml(cur, shown);
+  $('month-cal-in').querySelectorAll('[data-m]').forEach((b) => (b.onclick = () => selectMonth(b.dataset.m)));
+  const yp = $('cal-prev'), yn = $('cal-next');
+  const yr = calYear || Number(shown.slice(0, 4));
+  if (yp) yp.onclick = () => { calYear = yr - 1; renderMonthNav(); };
+  if (yn) yn.onclick = () => { calYear = yr + 1; renderMonthNav(); };
+  // barra del mese passato
+  const a = viewMonth && alboHere();
+  $('past-bar').hidden = !viewMonth || !pastView();
+  if (viewMonth) {
+    const [y, m] = viewMonth.split('-').map(Number);
+    $('past-title').textContent = `${MESI_IT[m - 1].replace(/^./, (c) => c.toUpperCase())} ${y}`;
+    $('past-king').innerHTML = a ? `<svg class="crown"><use href="#i-crown"/></svg>${a.displays.map(escHtml).join(', ')} ${a.names.length === 1 && isF(a.names[0]) ? 'Regina' : 'Re'} con ${a.total} pt` : '';
+    $('past-back').textContent = `Torna a ${MESI_IT[Number(cur.slice(5)) - 1]}`;
+  }
+}
+
+/** Calendario dei mesi, un anno alla volta: i giorni più rossi quando più di voi sono andati in palestra. */
+function calendarHtml(cur, shown) {
+  const cal = state.calendario || {};
+  const albo = state.albo || [];
+  const days = Object.keys(cal).sort();
+  const first = [days[0] ? days[0].slice(0, 7) : cur, albo[0] ? albo[0].key : cur].sort()[0];
+  const yr = calYear || Number(shown.slice(0, 4));
+  const pad = (n) => String(n).padStart(2, '0');
+  // solo le file di mesi con dati: le altre compaiono man mano
+  const inRange = (i) => { const k = `${yr}-${pad(i + 1)}`; return k >= first && k <= cur; };
+  const cells = MESI_IT.map((name, i) => {
+    const row = Math.floor(i / 4) * 4;
+    if (![0, 1, 2, 3].some((j) => inRange(row + j))) return '';
+    const key = `${yr}-${pad(i + 1)}`;
+    const ok = key >= first && key <= cur;
+    const a = albo.find((x) => x.key === key);
+    const last = new Date(yr, i + 1, 0).getDate();
+    let g = '<i class="x"></i>'.repeat((new Date(yr, i, 1).getDay() + 6) % 7);
+    for (let d = 1; d <= last; d++) {
+      const day = `${key}-${pad(d)}`;
+      const n = cal[day] || 0;
+      g += `<i class="${n ? 'in' + Math.min(3, n) : ''}${key === cur && day === (state.presenzeMese || {}).today ? ' today' : ''}"></i>`;
+    }
+    const k = key === cur ? '<div class="k live">in corso</div>' : a ? `<div class="k">${a.displays.map(escHtml).join(', ')}</div>` : '<div class="k">&nbsp;</div>';
+    return `<button type="button" class="ym${key === shown ? ' on' : ''}${key === cur ? ' now' : ''}" ${ok ? `data-m="${key}"` : 'disabled'}>
+      <div class="n">${name.slice(0, 3).replace(/^./, (c) => c.toUpperCase())}${a ? '<svg class="crown"><use href="#i-crown"/></svg>' : ''}</div><div class="g">${g}</div>${k}</button>`;
+  }).join('');
+  const arrow = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round"><path d="${d}"/></svg>`;
+  return `<section class="card year"><div class="year-head"><div class="ynav">
+      <button type="button" id="cal-prev" ${yr <= Number(first.slice(0, 4)) ? 'disabled' : ''} aria-label="Anno prima">${arrow('M15 5l-7 7 7 7')}</button><b>${yr}</b>
+      <button type="button" id="cal-next" ${yr >= Number(cur.slice(0, 4)) ? 'disabled' : ''} aria-label="Anno dopo">${arrow('M9 5l7 7-7 7')}</button></div>
+    <span class="year-key">Meno <i class="in1"></i><i class="in2"></i><i class="in3"></i> più gente</span></div><div class="ygrid">${cells}</div></section>`;
+}
+
+/** Sceglie il mese da vedere in Classifica: quello in corso subito, un mese passato appena arrivato dal server. */
+async function selectMonth(key) {
+  calOpen = false;
+  calYear = null;
+  if (!key || key === curMonthKey()) {
+    viewMonth = null;
+    return renderClassifica();
+  }
+  viewMonth = key;
+  if (!archive[key]) {
+    const saved = store.get('mese|' + key);
+    if (saved && saved.month === key) archive[key] = saved;
+  }
+  renderMonthNav();
+  if (archive[key]) renderClassifica();
+  else $('month-btn').querySelector('span').textContent = '…';
+  try {
+    const r = await api('mese', { month: key });
+    if (!r || r.error) throw new Error((r && r.error) || 'Mese non disponibile');
+    archive[key] = r;
+    try { store.set('mese|' + key, r); } catch { /* telefono pieno: pazienza */ }
+  } catch (err) {
+    if (!archive[key]) {
+      if (viewMonth === key) viewMonth = null;
+      toast('Non riesco a caricare il mese: ' + err.message);
+    }
+  }
+  if (viewMonth === key || !viewMonth) renderClassifica();
+}
+function renderClassifica() {
+  renderMonthNav();
+  renderPoints();
+  renderPresence();
+  renderGallery();
+}
+$('month-btn').addEventListener('click', () => {
+  calOpen = !calOpen;
+  calYear = null;
+  renderMonthNav();
+});
+$('past-back').addEventListener('click', () => {
+  selectMonth(null);
+  $('scroller').scrollTo({ top: 0, behavior: 'smooth' });
+});
 
 
 const photoCache = new Map(); // id → Promise<url>
@@ -689,14 +862,22 @@ $('presence-mode').querySelectorAll('button').forEach((b) => {
 
 function renderPresence() {
   const { me, week } = state;
-  const pm = state.presenzeMese;
-  const month = presenceMode === 'month' && !!pm;
+  const pv = pastView();
+  const pm = pv ? pv.presenzeMese : state.presenzeMese;
+  const month = (!!pv || presenceMode === 'month') && !!pm;
+  $('presence-mode').hidden = !!pv;
   $('presence-mode').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.mode === (month ? 'month' : 'week')));
   $('presence-head').hidden = !month;
   $('presence-key').hidden = !month;
+  $('key-today').hidden = !!pv;
   $('pomodoro').hidden = month;
   $('ranking').innerHTML = '';
-  if (month) return renderPresenceMonth(pm, me);
+  if (pv) {
+    const n = pm.people.reduce((s, p) => s + p.days.filter((d) => d.slice(0, 7) === pm.month).length, 0);
+    $('presence-count').textContent = `${n} in tutto`;
+  }
+  $('presence-count').hidden = !pv;
+  if (month) return renderPresenceMonth(pm, me, !!pv);
   week.ranking.forEach((r, i) => {
     const li = document.createElement('li');
     if (r.name === me.name) li.className = 'me';
@@ -706,7 +887,7 @@ function renderPresence() {
       <div><div class="name"></div><div class="sub">${r.streak ? `${r.streak} ${r.streak === 1 ? 'settimana' : 'settimane'} di fila` : 'Obiettivo ' + r.goal}</div></div>
       <span class="count">${r.count}<small>/${r.goal}</small></span>`;
     li.querySelector('.name').textContent = r.display || r.name;
-    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(r.name));
+    if (kingHere(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(r.name));
     $('ranking').append(li);
   });
 }
@@ -726,12 +907,12 @@ function monthWeeks(month) {
   return weeks;
 }
 
-function renderPresenceMonth(pm, me) {
+function renderPresenceMonth(pm, me, closed = false) {
   const weeks = monthWeeks(pm.month);
   const inMonth = (d) => d.slice(0, 7) === pm.month;
   // il mese va nella colonna delle posizioni: se la prima settimana ha un giorno solo, "1 nov" finirebbe sopra la data dopo
   $('presence-head').innerHTML = `<span class="mon">${MONTH_SHORT[Number(pm.month.slice(5)) - 1]}</span><div class="strip">${weeks
-    .map(([a, b]) => `<div class="wk${pm.today >= a && pm.today <= b ? ' now' : ''}" style="--n:${Number(b.slice(8)) - Number(a.slice(8)) + 1}"><span>${Number(a.slice(8))}</span></div>`)
+    .map(([a, b]) => `<div class="wk${!closed && pm.today >= a && pm.today <= b ? ' now' : ''}" style="--n:${Number(b.slice(8)) - Number(a.slice(8)) + 1}"><span>${Number(a.slice(8))}</span></div>`)
     .join('')}</div>`;
   const people = pm.people
     .map((p) => ({ ...p, total: p.days.filter(inMonth).length }))
@@ -741,7 +922,7 @@ function renderPresenceMonth(pm, me) {
     const strip = weeks
       .map(([a, b], w) => {
         let cells = '';
-        for (let d = a; d <= b; d = nextDay(d)) cells += `<span class="d${days.has(d) ? ' in' : ''}${d > pm.today ? ' fut' : ''}${d === pm.today ? ' today' : ''}"></span>`;
+        for (let d = a; d <= b; d = nextDay(d)) cells += `<span class="d${days.has(d) ? ' in' : ''}${d > pm.today ? ' fut' : ''}${!closed && d === pm.today ? ' today' : ''}"></span>`;
         // obiettivo della settimana intera: per la prima contano anche i giorni del mese prima
         const n = p.days.filter((d) => d <= b && (w === 0 ? !inMonth(d) || d >= a : d >= a)).length;
         const bar = a > pm.today ? ' fut' : n >= ((p.goals && p.goals[w]) || p.goal) ? ' ok' : '';
@@ -752,7 +933,7 @@ function renderPresenceMonth(pm, me) {
     li.className = 'month' + (p.name === me.name ? ' me' : '');
     li.innerHTML = `<span class="pos">${i + 1}</span><div class="name"></div><span class="count">${p.total}</span><div class="strip">${strip}</div>`;
     li.querySelector('.name').textContent = p.display || p.name;
-    if (isKing(p.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(p.name));
+    if (kingHere(p.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(p.name));
     $('ranking').append(li);
   });
 }
@@ -774,10 +955,14 @@ $('gallery-mode').querySelectorAll('button').forEach((b) => {
 });
 
 function renderGallery() {
-  const month = galleryMode === 'month';
-  const list = (month ? state.sudometroMonth || state.week.sudometro : state.week.sudometro) || [];
+  const pv = pastView();
+  const month = !!pv || galleryMode === 'month';
+  const list = (pv ? pv.sudometro : month ? state.sudometroMonth || state.week.sudometro : state.week.sudometro) || [];
   // la sezione c'è se c'è almeno un Sudometro nel mese (la settimana può essere vuota)
-  $('card-gallery').hidden = !((state.sudometroMonth || state.week.sudometro || []).length);
+  $('card-gallery').hidden = !(pv ? list.length : (state.sudometroMonth || state.week.sudometro || []).length);
+  $('gallery-mode').hidden = !!pv;
+  $('gallery-count').hidden = !pv;
+  $('gallery-count').textContent = `${list.length} selfie`;
   $('gallery-mode').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.mode === galleryMode));
   const el = $('gallery');
   el.innerHTML = list.length ? '' : `<li class="empty">Nessun Sudometro ${month ? 'questo mese' : 'questa settimana'}</li>`;
@@ -792,7 +977,7 @@ function renderGallery() {
       <div class="pts">${r.score}</div>`;
     const who = r.display || r.name;
     li.querySelector('.name').textContent = who;
-    if (isKing(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(r.name));
+    if (kingHere(r.name)) li.querySelector('.name').insertAdjacentHTML('beforeend', crownFor(r.name));
     li.querySelector('.sub').textContent = `${title} · ${day}`;
     el.append(li);
     li.querySelector('.photo').replaceWith(photoPair(r.photoId, r.refId || (state.refPhotos || {})[r.name], `${who} · ${r.score} · ${title}`, false, isF(r.name)));
@@ -1388,6 +1573,12 @@ function selectTab(name) {
   $('scroller').scrollTop = 0;
   document.body.classList.toggle('chat-mode', name === 'chat');
   chat.setActive(name === 'chat' && !!session);
+  $('month-btn').hidden = name !== 'classifica' || !state;
+  if (name === 'classifica' && (viewMonth || calOpen) && state) {
+    viewMonth = null; // ogni volta che si apre la Classifica si riparte dal mese in corso
+    calOpen = false;
+    renderClassifica();
+  }
   if (name === 'classifica' && galleryMode !== 'week' && state) {
     galleryMode = 'week'; // ogni volta che si apre la Classifica si riparte dalla settimana
     renderGallery();
