@@ -30,20 +30,39 @@ const FACE_LEFT = 234;
 const FACE_RIGHT = 454;
 
 let landmarkerPromise;
+let loadAttempt = 0;
+
+// Safari ricorda un import() fallito (es. rete che cade un attimo sul 5G) e lo fa fallire
+// di nuovo per lo stesso indirizzo finché l'app resta aperta: ogni nuovo tentativo usa
+// un indirizzo diverso (?r=N), e si riprova da soli un paio di volte prima di arrendersi.
+async function createLandmarker() {
+  const n = loadAttempt++;
+  const q = n ? `?r=${n}` : '';
+  const { FaceLandmarker, FilesetResolver } = await import(`${cfg.mediapipeBase}/vision_bundle.mjs${q}`);
+  const fileset = await FilesetResolver.forVisionTasks(`${cfg.mediapipeBase}/wasm`);
+  return FaceLandmarker.createFromOptions(fileset, {
+    baseOptions: { modelAssetPath: cfg.faceModelUrl, delegate: 'CPU' },
+    runningMode: 'IMAGE',
+    numFaces: 1,
+    outputFaceBlendshapes: false,
+  });
+}
 
 function loadLandmarker() {
   landmarkerPromise ||= (async () => {
-    const { FaceLandmarker, FilesetResolver } = await import(`${cfg.mediapipeBase}/vision_bundle.mjs`);
-    const fileset = await FilesetResolver.forVisionTasks(`${cfg.mediapipeBase}/wasm`);
-    return FaceLandmarker.createFromOptions(fileset, {
-      baseOptions: { modelAssetPath: cfg.faceModelUrl, delegate: 'CPU' },
-      runningMode: 'IMAGE',
-      numFaces: 1,
-      outputFaceBlendshapes: false,
-    });
+    for (let i = 0; ; i++) {
+      try {
+        return await createLandmarker();
+      } catch (err) {
+        if (i >= 2) throw err;
+        await new Promise((r) => setTimeout(r, 800 * (i + 1)));
+      }
+    }
   })().catch((err) => {
     landmarkerPromise = null;
-    throw err;
+    const e = new Error('Non riesco a scaricare il Sudometro: controlla la connessione e riprova');
+    e.cause = err;
+    throw e;
   });
   return landmarkerPromise;
 }
