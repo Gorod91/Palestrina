@@ -19,6 +19,7 @@ const VERSIONS = [
       'Avatar in alto solo in Home, testi di spiegazione più brevi, frecce sulle righe che aprono qualcosa e barra in basso più leggera',
       'Effetto al tocco su tutti i tasti: si schiacciano e rimbalzano, le righe si illuminano, le icone in basso saltano, gli interruttori si allungano',
       'Animazioni anche per i fogli dell\'Allenamento, gli avvisi in basso, il timer a tutto schermo, il circuito, le foto e il dettaglio dei punti',
+      'Tutti i fogli sfocano lo sfondo e, chiudendoli (tocco fuori, × o trascinamento), scendono invece di sparire di colpo',
     ],
   },
   {

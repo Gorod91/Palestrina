@@ -8,6 +8,7 @@ import { figSvg } from './figure.js';
 import { bodySvg, ICONE } from './corpo.js';
 import { popCount, askMotion, shakeToStop } from './timer.js';
 import { setAwake, awakeWhileShown } from './awake.js';
+import { hideSheet, dropOldSheet } from './sheetdrag.js';
 
 // Tasto indietro: cerchio grigio con la freccia (come la × dei fogli) e il nome della pagina
 const BK = '<span class="bk"><svg viewBox="0 0 9 15"><path d="M7.5 1.5 1.5 7.5l6 6"/></svg></span>';
@@ -699,7 +700,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   const scrollMem = {};
   function draw() {
     if (!me) return;
-    const hadSheet = !!root.querySelector('.wo-edsheet'); // il foglio sale dal basso solo quando si apre
+    const oldSheet = root.querySelector('.wo-edsheet:not(.closing)'); // il foglio sale dal basso solo quando si apre, e scende quando si chiude
+    const hadSheet = !!oldSheet;
     if (!ready || !schede) {
       root.innerHTML = '<p class="wo-empty">Carico l\'allenamento…</p>';
       return;
@@ -726,6 +728,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
     } else root.innerHTML = viewHtml(ui.view) + (ui.view === 'list' ? '' : '<div class="wo-edge" aria-hidden="true"></div>');
     const edSheet = root.querySelector('.wo-edsheet');
     if (edSheet && !hadSheet) edSheet.classList.add('in');
+    if (!edSheet && oldSheet) dropOldSheet(oldSheet, root);
     const pager = root.querySelector('#wo-pager');
     if (pager) {
       pager.scrollLeft = ui.i * pageStep(pager);
@@ -1209,11 +1212,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       if (over >= 0) {
         openEx(over); // dalla griglia si salta direttamente, senza far scorrere le pagine
         draw();
-      } else if (Date.now() - t0 > 400) sheet.hidden = true; // tenuto premuto ma lasciato fuori dalle tessere
+      } else if (Date.now() - t0 > 400) hideSheet(sheet); // tenuto premuto ma lasciato fuori dalle tessere
     });
     btn.addEventListener('contextmenu', (e) => e.preventDefault());
     btn.addEventListener('click', (e) => e.stopPropagation()); // l'apertura la fa già pointerdown
-    sheet.addEventListener('click', (e) => { if (e.target === sheet) sheet.hidden = true; });
+    sheet.addEventListener('click', (e) => { if (e.target === sheet) hideSheet(sheet); });
   }
 
   function pageHtml(k, sch) {
