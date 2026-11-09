@@ -13,6 +13,10 @@ const VERSIONS = [
       'Albo d\'oro rifatto: le corone vinte da ognuno, con i mesi vinti da toccare, e i record (punti, presenze e Sudometro in un solo mese) nella riga di chi li detiene',
       { feature: 'sfide', text: 'Sfide: si aprono con check-in a meno di 3 ore l\'uno dall\'altro (prima un\'ora) e ci si unisce entro 3 ore dall\'apertura' },
       'Allenamento: tasto "Termina qui la scheda" in fondo all\'esercizio, per chiudere la scheda anche senza tutti gli esercizi (restano salvati solo quelli fatti; rientrando si riprende)',
+      'Grafica più rifinita: fogli che salgono dal basso, anelli che si riempiono all\'apertura, passaggio morbido tra le pagine',
+      'Allenamento: nuovo tasto per tornare indietro, con la freccia in un cerchio e il nome della pagina',
+      'Classifica più pulita: righe senza medaglie più basse e riga del Re dentro la card',
+      'Avatar in alto solo in Home, testi di spiegazione più brevi, frecce sulle righe che aprono qualcosa e barra in basso più leggera',
     ],
   },
   {

@@ -383,7 +383,7 @@ function ring(value, color, color2, { size = 120, width = 16 } = {}) {
   return `<svg viewBox="0 0 ${size} ${size}">
     <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${color}"/><stop offset="1" stop-color="${color2}"/></linearGradient></defs>
     <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-opacity=".22" stroke-width="${width}"/>
-    ${v > 0 ? `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="url(#${id})" stroke-width="${width}" stroke-linecap="round"
+    ${v > 0 ? `<circle class="ring-fill" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="url(#${id})" stroke-width="${width}" stroke-linecap="round"
       stroke-dasharray="${c * v} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/>` : ''}
   </svg>`;
 }
@@ -426,7 +426,7 @@ function render() {
   renderMonthNav();
   if (document.activeElement !== $('in-name')) $('in-name').value = me.alias || '';
   $('in-name').placeholder = me.name;
-  $('name-hint').textContent = `È il nome che vedono gli altri in classifica e nelle notifiche. Lascia vuoto per usare il nome originale (${me.name}).`;
+  $('name-hint').textContent = `Come ti vedono gli altri. Vuoto: ${me.name}.`;
   if (!me.actingAs && session.display !== me.display) {
     session.display = me.display;
     store.set('session', session);
@@ -555,8 +555,8 @@ function renderPoints() {
   $('points-title').textContent = pv ? `Classifica finale di ${pts.month}` : `Punti di ${pts.month}`;
   $('btn-points-info').hidden = !!pv;
   $('points-foot').textContent = pv
-    ? `Punti e medaglie di ${pts.month} ${pts.year || ''}. Tocca un nome per vedere da dove arrivano i punti.`
-    : 'Tocca un nome per vedere da dove arrivano i punti, poi una voce per vedere quando. Tocca una medaglia o la corona per vederla in grande.';
+    ? `Punti e medaglie di ${pts.month} ${pts.year || ''}. Tocca un nome per il dettaglio.`
+    : 'Tocca un nome per il dettaglio dei punti, una medaglia per vederla in grande.';
   $('points').innerHTML = '';
   medals.resetChips();
   pts.ranking.forEach((r, i) => {
@@ -582,8 +582,9 @@ function renderPoints() {
     sub.innerHTML = chips.html;
     const names = document.createElement('span');
     names.className = 'mnames';
-    names.textContent = !chips.names.length ? 'Nessuna medaglia' : chips.names.length <= 2 ? chips.names.join(' · ') : ''; // con tante medaglie bastano quelle
+    names.textContent = chips.names.length <= 2 ? chips.names.join(' · ') : ''; // con tante medaglie bastano quelle
     sub.append(names);
+    sub.hidden = !chips.names.length; // senza medaglie la riga resta bassa
     const detail = li.querySelector('.detail');
     if (!r.detail.length) detail.textContent = pv ? `Nessun punto a ${pts.month}.` : 'Ancora nessun punto questo mese.';
     const sign = (n) => (n < 0 ? `${n}` : `+${n}`);
@@ -1561,6 +1562,14 @@ function workoutTab() {
 
 const TABS = ['oggi', 'classifica', 'chat', 'timer', 'allenamento', 'altro'];
 
+/** Anelli che si riempiono: solo appena si apre un tab, non a ogni aggiornamento dei dati. */
+let ringsTimer;
+function ringsIn() {
+  document.body.classList.add('rings-in');
+  clearTimeout(ringsTimer);
+  ringsTimer = setTimeout(() => document.body.classList.remove('rings-in'), 1300);
+}
+
 function selectTab(name) {
   if (!TABS.includes(name)) name = 'oggi';
   if (name === 'allenamento' && !workoutOn()) name = 'timer';
@@ -1569,6 +1578,8 @@ function selectTab(name) {
   const on = name === 'timer' && workoutOn() ? 'allenamento' : name;
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === on));
   store.set('tab', name);
+  document.body.dataset.tab = name; // l'avatar si vede solo in Home
+  ringsIn();
   $('page-title').textContent = TAB_TITLES[name];
   $('scroller').scrollTop = 0;
   document.body.classList.toggle('chat-mode', name === 'chat');
