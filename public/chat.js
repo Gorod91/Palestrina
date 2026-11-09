@@ -34,13 +34,9 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
   let loading = false;
   const pending = []; // messaggi inviati ma non ancora salvati in Apps Script
   let selDay = ''; // giorno scelto nella fila dei giorni del sondaggio
-  let weekOpen = (() => {
-    try {
-      return localStorage.getItem('palestrina.weekOpen') === '1';
-    } catch {
-      return false;
-    }
-  })(); // "Vedi la settimana": le presenze di tutti sotto ai giorni
+  // "Vedi la settimana": le presenze di tutti sotto ai giorni. Non si ricorda: a ogni apertura dell'app si riparte compatti
+  let weekOpen = false;
+  try { localStorage.removeItem('palestrina.weekOpen'); } catch { /* storage non disponibile */ }
   // Risposte al sondaggio: si vedono subito e partono in ordine in sottofondo (l'ultima vince)
   const outbox = [];
   let sending = false;
@@ -732,9 +728,6 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     if (tg) {
       tg.onclick = () => {
         weekOpen = !weekOpen;
-        try {
-          localStorage.setItem('palestrina.weekOpen', weekOpen ? '1' : '0');
-        } catch { /* storage non disponibile */ }
         toggleWeek(card);
       };
     }

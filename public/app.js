@@ -2309,9 +2309,27 @@ function afterRotate() {
 }
 window.addEventListener('orientationchange', () => [100, 400, 800].forEach((t) => setTimeout(afterRotate, t)));
 if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(afterRotate, 400));
-$('chat-input').addEventListener('focus', () => {
-  setTimeout(() => ($('scroller').scrollTop = $('scroller').scrollHeight), 350);
-});
+// Tastiera della chat: mentre si apre (e il sondaggio sopra si nasconde) la chat resta agganciata all'ultimo
+// messaggio, fotogramma per fotogramma, finché la tastiera non è ferma.
+let pinUntil = 0;
+function pinChatBottom(ms = 900) {
+  const go = !pinUntil;
+  pinUntil = Date.now() + ms;
+  if (!go) return;
+  const step = () => {
+    const sc = $('scroller');
+    sc.scrollTop = sc.scrollHeight;
+    if (Date.now() < pinUntil) requestAnimationFrame(step);
+    else pinUntil = 0;
+  };
+  requestAnimationFrame(step);
+}
+$('chat-input').addEventListener('focus', () => pinChatBottom());
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => { if (document.activeElement === $('chat-input')) pinChatBottom(400); });
+}
+// Un dito sulla chat mentre è agganciata: vince lo scorrimento di chi la tocca
+$('scroller').addEventListener('touchstart', () => { pinUntil = 0; }, { passive: true });
 
 /**
  * Link "Aggiorna l'icona" (?accesso=…): entra con il codice d'accesso di 15 minuti. In Safari si toglie il manifest,
