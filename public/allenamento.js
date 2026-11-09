@@ -543,10 +543,32 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   const lastDone = (sch) => serie.filter((s) => s.scheda === sch.id).reduce((m, s) => (s.day > m ? s.day : m), '');
   const doneToday = (sch) => sch.ex.filter((e) => (circIn(sch, e) ? isDone(e, sch) : serie.some((s) => s.ex === e && s.day === today() && s.scheda === sch.id))).length;
 
+  /** Schede chiuse oggi con "Termina qui" anche senza tutti gli esercizi (solo su questo telefono). */
+  const fineKey = () => `woFine|${key}`;
+  function finite() {
+    try {
+      const d = JSON.parse(localStorage.getItem(fineKey()) || 'null');
+      return d && d.day === today() ? d.ids || [] : [];
+    } catch (err) { return []; }
+  }
+  function chiudi(id) {
+    try { localStorage.setItem(fineKey(), JSON.stringify({ day: today(), ids: [...finite(), id] })); } catch (err) {}
+  }
+  /** Fatta oggi: tutti gli esercizi, oppure chiusa prima con "Termina qui" dopo averne fatto almeno uno. */
+  const fattaOggi = (sch) => { const n = doneToday(sch); return n === sch.ex.length || (n > 0 && finite().includes(sch.id)); };
+  /** Sotto "Fatta oggi ✓": quanti esercizi, se non tutti. */
+  const quanti = (sch) => { const n = doneToday(sch); return n < sch.ex.length ? ` · ${n} di ${sch.ex.length}` : ''; };
+
+  /** Sotto i tasti dell'esercizio: chiude la scheda anche se mancano esercizi (quelli non fatti restano non salvati). */
+  const fineBtn = () => {
+    const sch = curSch();
+    return ui.list.length > 1 && sch && doneToday(sch) > 0 && !fattaOggi(sch) ? '<button class="secondary wo-fine" data-a="fine">Termina qui la scheda</button>' : '';
+  };
+
   /** La scheda da fare: quella iniziata oggi, se non finita; altrimenti quella non fatta da più tempo. */
   function proposta() {
     const list = (schede || []).filter((s) => !s.di);
-    const started = list.find((s) => doneToday(s) > 0 && doneToday(s) < s.ex.length);
+    const started = list.find((s) => doneToday(s) > 0 && !fattaOggi(s));
     if (started) return started;
     return list.slice().sort((a, b) => (lastDone(a) < lastDone(b) ? -1 : lastDone(a) > lastDone(b) ? 1 : 0))[0];
   }
@@ -791,8 +813,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   /** Riquadro grande della scheda da fare. */
   function heroHtml(p) {
     const n = doneToday(p), d = lastDone(p);
-    const all = n === p.ex.length;
-    const sub = all ? 'Fatta oggi ✓' : n ? `${n} di ${p.ex.length} esercizi fatti` : `${p.ex.length} esercizi${d ? ` · l'hai fatta ${ago(d)}` : ' · mai fatta'}`;
+    const all = fattaOggi(p);
+    const sub = all ? `Fatta oggi ✓${quanti(p)}` : n ? `${n} di ${p.ex.length} esercizi fatti` : `${p.ex.length} esercizi${d ? ` · l'hai fatta ${ago(d)}` : ' · mai fatta'}`;
     return `<section class="wo-hero"><div class="wo-hero-name">${esc(p.name)}${diBadge(p)}</div><div class="wo-sub">${sub}</div><button class="primary" data-a="go:${esc(p.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'}</button></section>`;
   }
 
@@ -810,10 +832,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   }
 
   function rotHtml({ list, cur }) {
-    const sc = list[cur], n = doneToday(sc), all = n === sc.ex.length;
+    const sc = list[cur], n = doneToday(sc), all = fattaOggi(sc);
     const cards = list.map((y, i) => {
       const d = lastDone(y);
-      const sub = i === cur ? (all ? 'fatta oggi ✓' : n ? `${n} di ${y.ex.length}` : '') : i < cur ? (d ? `✓ ${ago(d)}` : 'mai fatta') : 'dopo';
+      const sub = i === cur ? (all ? `fatta oggi ✓${quanti(y)}` : n ? `${n} di ${y.ex.length}` : '') : i < cur ? (d ? `✓ ${ago(d)}` : 'mai fatta') : 'dopo';
       return `<button class="wo-rc${i === cur ? ' cur' : i < cur ? ' done' : ''}" data-a="sch:${esc(y.id)}">${i === cur ? '<span class="wo-rc-tag">oggi</span>' : ''}<span class="wo-rc-n">${i + 1}</span><b>${esc(y.name)}</b>${diBadge(y)}<small>${sub}</small></button>`;
     }).join('');
     return `<section class="wo-rot"><div class="wo-rot-h"><h2 class="section">Oggi</h2>${list.length > 1 ? '<button class="wo-rot-ord" data-a="rotord">Modifica ordine</button>' : ''}</div>
@@ -911,7 +933,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
         const d = todayDoc(e), pi = sch && sch.piano ? sch.piano[e] : null;
         return `<button class="wo-mob${d ? ' ok' : ''}" data-a="mob:${e}"><span class="wo-mob-ck">${d ? '✓' : ''}</span>${figSvg(e, 'sm')}<span class="wo-mob-n"><b>${esc(nameOf(e))}</b><small>${esc((EX[e] || {}).m || '')}</small></span><span class="wo-mob-r">${esc(pi ? pi.s : '')}</span></button>`;
       }).join('')}</div>
-      ${all ? (nextTodo(k) < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : '') : '<button class="primary" data-a="moball">✓ Fatto tutto</button>'}
+      ${all ? (nextTodo(k) < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : '') : '<button class="primary" data-a="moball">✓ Fatto tutto</button>'}${fineBtn()}
       <p class="wo-sub wo-center">Tocca un esercizio per spuntarlo</p>
     </section>`;
   }
@@ -932,7 +954,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       const nx = nextTodo(k);
       return `<section class="wo-page" data-k="${k}">${head}
         <section class="card wo-list">${c.ex.map((e) => `<div class="wo-row"><span><b>${esc(nameOf(e))}</b><small>Fatto oggi · ${summary(todayDoc(e).sets, tOf(e))}</small></span><span class="wo-chev">✓</span></div>`).join('')}</section>
-        ${nx < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : ''}<button class="link-button" data-a="crifai">Rifai il circuito</button></section>`;
+        ${nx < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : ''}${fineBtn()}<button class="link-button" data-a="crifai">Rifai il circuito</button></section>`;
     }
     const rounds = Array.from({ length: st.giri }, (_, g) => `<i class="${g < st.cur ? 'ok' : g === st.cur ? 'cur' : ''}">${g < st.cur ? '✓' : `Giro ${g + 1}`}</i>`).join('');
     // come negli esercizi: la volta scorsa in rosso, e sopra da quanto tempo
@@ -953,7 +975,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       <button class="primary" data-a="cgiro">✓ Giro ${st.cur + 1} fatto</button>
       <button class="secondary wo-crun" data-a="crun">▶ Avvia circuito guidato</button>
       ${st.cur ? `<button class="link-button" data-a="csave">Salva con ${st.cur} ${st.cur === 1 ? 'giro' : 'giri'}</button>` : ''}
-      <p class="wo-sub wo-center">Ogni esercizio salva un giro come una serie</p>
+      <p class="wo-sub wo-center">Ogni esercizio salva un giro come una serie</p>${fineBtn()}
     </section>`;
   }
 
@@ -1233,7 +1255,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       <div class="wo-sets">${rows}</div>
       ${btn}
       <div class="wo-rest" data-ex="${ex}">${restHtml(ex)}</div>
-      ${progCard(ex, t)}
+      ${progCard(ex, t)}${fineBtn()}
     </section>`;
   }
 
@@ -2394,6 +2416,11 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       ui.g = arg;
     } else if (cmd === 'back') {
       goBack();
+    } else if (cmd === 'fine') {
+      const sch = curSch();
+      if (!sch) return;
+      chiudi(sch.id); // senza conferma: rientrando nella scheda si riprende da dove si era
+      ui.view = 'list';
     } else if (cmd === 'end' || cmd === 'home') {
       ui.view = 'list';
     } else if (cmd === 'j') {
