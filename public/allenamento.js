@@ -2419,9 +2419,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
     } else if (cmd === 'fine') {
       const sch = curSch();
       if (!sch) return;
-      const n = doneToday(sch);
-      if (!confirm(`Terminare ${sch.name}? Restano salvati i ${n} esercizi fatti, gli altri ${sch.ex.length - n} no.`)) return;
-      chiudi(sch.id);
+      chiudi(sch.id); // senza conferma: rientrando nella scheda si riprende da dove si era
       ui.view = 'list';
     } else if (cmd === 'end' || cmd === 'home') {
       ui.view = 'list';
