@@ -6,7 +6,7 @@ import { createFbData } from './fbdata.js';
 import { makeZip } from './zip.js';
 import { createWorkout } from './allenamento.js';
 import { alF, kingTitle } from './genere.js';
-import { initSheetDrag, hideSheet } from './sheetdrag.js';
+import { initSheetDrag, hideSheet, showSheet } from './sheetdrag.js';
 import { initSegs } from './seg.js';
 import { showSudoReveal } from './sudoreveal.js';
 import { releaseNotesHtml } from './note.js';
@@ -1838,7 +1838,7 @@ function askGoal() {
   $('goal-sub').textContent = `Quante volte a settimana vieni in palestra? Vale per tutto ${name}, dal primo lunedì.`;
   $('goal-chips').innerHTML = Array.from({ length: GOAL_MAX }, (_, k) => `<button type="button" data-n="${k + 1}">${k + 1}${k + 1 === cur ? `<small>${curName}</small>` : ''}</button>`).join('');
   renderGoal();
-  $('goal-sheet').hidden = false;
+  showSheet($('goal-sheet'));
 }
 
 function renderGoal() {
@@ -1915,7 +1915,7 @@ const undoneWhen = (at) => {
 const dayTitle = (d) => new Date(d + 'T12:00:00').toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
 
 async function openAdmin() {
-  $('admin-sheet').hidden = false;
+  showSheet($('admin-sheet'));
   $('admin-list').innerHTML = `<div class="loading">${bicep()}<p>Carico il registro…</p></div>`;
   renderAdminFilters();
   await loadAdmin();
@@ -2274,13 +2274,13 @@ $('form-name').addEventListener('submit', (e) => {
   saveAlias($('in-name').value);
 });
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
-$('btn-points-info').addEventListener('click', () => ($('points-info').hidden = false));
+$('btn-points-info').addEventListener('click', () => showSheet($('points-info')));
 $('points-info').addEventListener('click', (e) => {
   if (e.target === $('points-info') || e.target.closest('.sheet-close')) hideSheet($('points-info'));
 });
 $('btn-notes').addEventListener('click', () => {
   $('release-notes-list').innerHTML = releaseNotesHtml(state);
-  $('release-notes').hidden = false;
+  showSheet($('release-notes'));
 });
 $('release-notes').addEventListener('click', (e) => {
   if (e.target === $('release-notes') || e.target.closest('.sheet-close')) hideSheet($('release-notes'));

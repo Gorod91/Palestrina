@@ -8,7 +8,7 @@ import { figSvg } from './figure.js';
 import { bodySvg, ICONE } from './corpo.js';
 import { popCount, askMotion, shakeToStop } from './timer.js';
 import { setAwake, awakeWhileShown } from './awake.js';
-import { hideSheet, dropOldSheet } from './sheetdrag.js';
+import { hideSheet, dropOldSheet, showSheet } from './sheetdrag.js';
 
 // Tasto indietro: cerchio grigio con la freccia (come la × dei fogli) e il nome della pagina
 const BK = '<span class="bk"><svg viewBox="0 0 9 15"><path d="M7.5 1.5 1.5 7.5l6 6"/></svg></span>';
@@ -1215,7 +1215,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       t0 = Date.now();
       over = -1;
       btn.setPointerCapture(e.pointerId);
-      sheet.hidden = false;
+      showSheet(sheet);
     });
     btn.addEventListener('pointermove', (e) => {
       if (!btn.hasPointerCapture(e.pointerId)) return;
