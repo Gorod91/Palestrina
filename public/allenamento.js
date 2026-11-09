@@ -543,10 +543,26 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   const lastDone = (sch) => serie.filter((s) => s.scheda === sch.id).reduce((m, s) => (s.day > m ? s.day : m), '');
   const doneToday = (sch) => sch.ex.filter((e) => (circIn(sch, e) ? isDone(e, sch) : serie.some((s) => s.ex === e && s.day === today() && s.scheda === sch.id))).length;
 
+  /** Schede chiuse oggi con "Termina qui" anche senza tutti gli esercizi (solo su questo telefono). */
+  const fineKey = () => `woFine|${key}`;
+  function finite() {
+    try {
+      const d = JSON.parse(localStorage.getItem(fineKey()) || 'null');
+      return d && d.day === today() ? d.ids || [] : [];
+    } catch (err) { return []; }
+  }
+  function chiudi(id) {
+    try { localStorage.setItem(fineKey(), JSON.stringify({ day: today(), ids: [...finite(), id] })); } catch (err) {}
+  }
+  /** Fatta oggi: tutti gli esercizi, oppure chiusa prima con "Termina qui" dopo averne fatto almeno uno. */
+  const fattaOggi = (sch) => { const n = doneToday(sch); return n === sch.ex.length || (n > 0 && finite().includes(sch.id)); };
+  /** Sotto "Fatta oggi ✓": quanti esercizi, se non tutti. */
+  const quanti = (sch) => { const n = doneToday(sch); return n < sch.ex.length ? ` · ${n} di ${sch.ex.length}` : ''; };
+
   /** La scheda da fare: quella iniziata oggi, se non finita; altrimenti quella non fatta da più tempo. */
   function proposta() {
     const list = (schede || []).filter((s) => !s.di);
-    const started = list.find((s) => doneToday(s) > 0 && doneToday(s) < s.ex.length);
+    const started = list.find((s) => doneToday(s) > 0 && !fattaOggi(s));
     if (started) return started;
     return list.slice().sort((a, b) => (lastDone(a) < lastDone(b) ? -1 : lastDone(a) > lastDone(b) ? 1 : 0))[0];
   }
@@ -791,8 +807,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   /** Riquadro grande della scheda da fare. */
   function heroHtml(p) {
     const n = doneToday(p), d = lastDone(p);
-    const all = n === p.ex.length;
-    const sub = all ? 'Fatta oggi ✓' : n ? `${n} di ${p.ex.length} esercizi fatti` : `${p.ex.length} esercizi${d ? ` · l'hai fatta ${ago(d)}` : ' · mai fatta'}`;
+    const all = fattaOggi(p);
+    const sub = all ? `Fatta oggi ✓${quanti(p)}` : n ? `${n} di ${p.ex.length} esercizi fatti` : `${p.ex.length} esercizi${d ? ` · l'hai fatta ${ago(d)}` : ' · mai fatta'}`;
     return `<section class="wo-hero"><div class="wo-hero-name">${esc(p.name)}${diBadge(p)}</div><div class="wo-sub">${sub}</div><button class="primary" data-a="go:${esc(p.id)}">${all ? 'Rivedi' : n ? 'Continua' : 'Inizia'}</button></section>`;
   }
 
@@ -810,10 +826,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   }
 
   function rotHtml({ list, cur }) {
-    const sc = list[cur], n = doneToday(sc), all = n === sc.ex.length;
+    const sc = list[cur], n = doneToday(sc), all = fattaOggi(sc);
     const cards = list.map((y, i) => {
       const d = lastDone(y);
-      const sub = i === cur ? (all ? 'fatta oggi ✓' : n ? `${n} di ${y.ex.length}` : '') : i < cur ? (d ? `✓ ${ago(d)}` : 'mai fatta') : 'dopo';
+      const sub = i === cur ? (all ? `fatta oggi ✓${quanti(y)}` : n ? `${n} di ${y.ex.length}` : '') : i < cur ? (d ? `✓ ${ago(d)}` : 'mai fatta') : 'dopo';
       return `<button class="wo-rc${i === cur ? ' cur' : i < cur ? ' done' : ''}" data-a="sch:${esc(y.id)}">${i === cur ? '<span class="wo-rc-tag">oggi</span>' : ''}<span class="wo-rc-n">${i + 1}</span><b>${esc(y.name)}</b>${diBadge(y)}<small>${sub}</small></button>`;
     }).join('');
     return `<section class="wo-rot"><div class="wo-rot-h"><h2 class="section">Oggi</h2>${list.length > 1 ? '<button class="wo-rot-ord" data-a="rotord">Modifica ordine</button>' : ''}</div>
@@ -873,10 +889,12 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
     const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : ''}${isDone(id) ? ' ok' : ''}" data-a="j:${k}" aria-label="${esc(nameOf(id))}"></button>`).join('');
     const title = sch ? `${esc(sch.name)}${diBadge(sch)} · <span id="wo-num">${ui.i + 1}</span>/${ui.list.length}` : 'Allenamento libero';
     const many = ui.list.length > 1;
+    // in basso a sinistra, poco in vista: chiude la scheda anche se mancano esercizi (quelli non fatti restano non salvati)
+    const fine = many && sch && doneToday(sch) > 0 && !fattaOggi(sch) ? `<button class="wo-fine" data-a="fine">Termina qui</button>` : '';
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button></div>
       ${many ? `<div class="wo-dots" id="wo-dots">${dots}</div>` : ''}
       <div class="wo-pager${many ? ' multi' : ''}" id="wo-pager">${ui.list.map((_, k) => pageHtml(k, sch)).join('')}</div>
-      ${many ? `<div class="wo-bar"><button class="wo-all" id="wo-all"><svg viewBox="0 0 24 24" aria-hidden="true">${[3, 10, 17].map((y) => [3, 10, 17].map((x) => `<rect x="${x}" y="${y}" width="5.5" height="5.5" rx="1.6"/>`).join('')).join('')}</svg>Tutti</button></div>
+      ${fine}${many ? `<div class="wo-bar"><button class="wo-all" id="wo-all"><svg viewBox="0 0 24 24" aria-hidden="true">${[3, 10, 17].map((y) => [3, 10, 17].map((x) => `<rect x="${x}" y="${y}" width="5.5" height="5.5" rx="1.6"/>`).join('')).join('')}</svg>Tutti</button></div>
       <div class="wo-sheet" id="wo-sheet" hidden><div class="wo-sheet-box"><div class="wo-grab"></div><p class="wo-sheet-hint">Tieni premuto "Tutti" e trascina il dito su un esercizio, poi lascia</p>
         <div class="wo-grid">${ui.list.map((id, k) => {
           const c = circIn(sch, id), e = EX[id] || { n: id }, d = isDone(id), pi = sch && sch.piano ? sch.piano[id] : null;
@@ -2394,6 +2412,13 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       ui.g = arg;
     } else if (cmd === 'back') {
       goBack();
+    } else if (cmd === 'fine') {
+      const sch = curSch();
+      if (!sch) return;
+      const n = doneToday(sch);
+      if (!confirm(`Terminare ${sch.name}? Restano salvati i ${n} esercizi fatti, gli altri ${sch.ex.length - n} no.`)) return;
+      chiudi(sch.id);
+      ui.view = 'list';
     } else if (cmd === 'end' || cmd === 'home') {
       ui.view = 'list';
     } else if (cmd === 'j') {
