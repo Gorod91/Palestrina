@@ -7,6 +7,7 @@ import { makeZip } from './zip.js';
 import { createWorkout } from './allenamento.js';
 import { alF, kingTitle } from './genere.js';
 import { initSheetDrag, hideSheet } from './sheetdrag.js';
+import { initSegs } from './seg.js';
 import { showSudoReveal } from './sudoreveal.js';
 import { releaseNotesHtml } from './note.js';
 import { createMedals } from './medaglie.js';
@@ -1458,6 +1459,7 @@ function cameraError(err) {
 // ---------- Chat ----------
 
 initSheetDrag(); // fogli dal basso: si chiudono trascinandoli giù
+initSegs(); // Settimana / Mese e simili: la selezione scorre
 const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: crownFor, isF, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => (testOn() ? 'prova' : state && state.features && state.features.firebase ? 'tutti' : ''), fbOnly: () => fbOk() });
 
 // ---------- Allenamento (fase 1, solo in prova) ----------

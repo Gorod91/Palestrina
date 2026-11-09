@@ -20,6 +20,7 @@ const VERSIONS = [
       'Effetto al tocco su tutti i tasti: si schiacciano e rimbalzano, le righe si illuminano, le icone in basso saltano, gli interruttori si allungano',
       'Animazioni anche per i fogli dell\'Allenamento, gli avvisi in basso, il timer a tutto schermo, il circuito, le foto e il dettaglio dei punti',
       'Tutti i fogli sfocano lo sfondo e, chiudendoli (tocco fuori, × o trascinamento), scendono invece di sparire di colpo',
+      'Selettori Settimana / Mese e Peso / Volume: la selezione scorre da un\'opzione all\'altra',
     ],
   },
   {
