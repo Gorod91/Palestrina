@@ -16,7 +16,21 @@ export function hideSheet(el, done) {
   };
   if (reduce()) return finish();
   el.classList.add('closing');
-  setTimeout(finish, 260);
+  el._hideT = setTimeout(finish, 260);
+}
+
+/** Apre un foglio; se si stava ancora chiudendo, annulla la chiusura e riparte l'animazione di apertura. */
+export function showSheet(el) {
+  if (!el) return;
+  if (el.classList.contains('closing')) {
+    clearTimeout(el._hideT);
+    el.classList.remove('closing');
+    el.style.opacity = '';
+    el.querySelectorAll(BOXES).forEach((b) => (b.style.transform = ''));
+    el.hidden = true;
+    void el.offsetWidth;
+  }
+  el.hidden = false;
 }
 
 /** Foglio dell'allenamento tolto da un ridisegno: la copia vecchia resta un attimo e scende. */
