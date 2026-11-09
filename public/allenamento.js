@@ -972,10 +972,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       <div class="wo-cexs">${rows}</div>
       <div class="wo-cex wo-crec"><svg class="wo-fig sm" viewBox="-7.25 -1 39 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13.5" r="8"/><path d="M12 13.5V9M9.5 2.5h5M19 6l1.5-1.5"/></svg><div class="wo-cname"><b>Recupero tra i giri</b><small>vale per questo circuito</small></div>
         <span class="wo-pm"><button data-a="crec-:${id}" aria-label="15 secondi in meno">−</button><label class="wo-in"><input data-f="crec:${id}" inputmode="numeric" value="${circRec(id, c)}" aria-label="Recupero tra i giri in secondi, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>s</em></label><button data-a="crec+:${id}" aria-label="15 secondi in più">+</button></span></div>
-      <button class="primary" data-a="cgiro">✓ Giro ${st.cur + 1} fatto</button>${fineBtn()}
+      <button class="primary" data-a="cgiro">✓ Giro ${st.cur + 1} fatto</button>
       <button class="secondary wo-crun" data-a="crun">▶ Avvia circuito guidato</button>
       ${st.cur ? `<button class="link-button" data-a="csave">Salva con ${st.cur} ${st.cur === 1 ? 'giro' : 'giri'}</button>` : ''}
-      <p class="wo-sub wo-center">Ogni esercizio salva un giro come una serie</p>
+      <p class="wo-sub wo-center">Ogni esercizio salva un giro come una serie</p>${fineBtn()}
     </section>`;
   }
 
@@ -1245,8 +1245,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
     const nx = nextTodo(k);
     const btn = saved
       ? `${nx < 0 ? `<button class="primary" data-a="end">${ui.list.length > 1 ? 'Fine scheda' : 'Fine'}</button>` : ''}
-         ${fineBtn()}<button class="link-button" data-a="edit">Modifica</button>${done.pending ? '<p class="wo-sub wo-center">Salvato sul telefono: parte appena c\'è rete</p>' : ''}`
-      : `<div class="wo-btns"><button class="secondary" data-a="add">+ Serie</button><button class="secondary" data-a="del">− Serie</button></div><button class="primary" data-a="ok">✓ Fatto</button>${fineBtn()}`;
+         <button class="link-button" data-a="edit">Modifica</button>${done.pending ? '<p class="wo-sub wo-center">Salvato sul telefono: parte appena c\'è rete</p>' : ''}`
+      : `<div class="wo-btns"><button class="secondary" data-a="add">+ Serie</button><button class="secondary" data-a="del">− Serie</button></div><button class="primary" data-a="ok">✓ Fatto</button>`;
     return `<section class="wo-page" data-k="${k}">
       <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(pianoTxt(ex, piano, sch))}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
       ${figSvg(ex, 'card')}
@@ -1254,7 +1254,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       ${t === 'sec' && !saved ? `<div class="wo-tmr" data-ex="${ex}">${tmrHtml(ex, sets)}</div>` : ''}
       <div class="wo-sets">${rows}</div>
       ${btn}
-      <div class="wo-rest" data-ex="${ex}">${restHtml(ex)}</div>
+      <div class="wo-rest" data-ex="${ex}">${restHtml(ex)}</div>${fineBtn()}
       ${progCard(ex, t)}
     </section>`;
   }
