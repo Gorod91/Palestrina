@@ -6,7 +6,7 @@ import { createFbData } from './fbdata.js';
 import { makeZip } from './zip.js';
 import { createWorkout } from './allenamento.js';
 import { alF, kingTitle } from './genere.js';
-import { initSheetDrag } from './sheetdrag.js';
+import { initSheetDrag, hideSheet } from './sheetdrag.js';
 import { showSudoReveal } from './sudoreveal.js';
 import { releaseNotesHtml } from './note.js';
 import { createMedals } from './medaglie.js';
@@ -1789,7 +1789,7 @@ $('goal-go').addEventListener('click', async () => {
     const r = await api('setGoal', { month, goal });
     if (r && r.error) throw new Error(r.error);
     store.set('goalSent', goalKey(month));
-    $('goal-sheet').hidden = true;
+    hideSheet($('goal-sheet'));
     state.me.goalAsk = '';
     toast(`Obiettivo di ${MONTHS_IT[Number(month.slice(5, 7)) - 1]}: ${(r && r.goal) || goal} a settimana`);
     refresh();
@@ -2006,7 +2006,7 @@ $('btn-test-news').addEventListener('click', () => testAction($('btn-test-news')
 $('btn-test-monthly').addEventListener('click', () => testAction($('btn-test-monthly'), 'Invio…', ['testRecap', { kind: 'monthly' }], 'Premiazioni del mese simulate'));
 $('admin-sheet').addEventListener('click', async (e) => {
   if (e.target === $('admin-sheet') || e.target.closest('.sheet-close')) {
-    $('admin-sheet').hidden = true;
+    hideSheet($('admin-sheet'));
     return;
   }
   const f = e.target.closest('[data-f]');
@@ -2184,14 +2184,14 @@ $('form-name').addEventListener('submit', (e) => {
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
 $('btn-points-info').addEventListener('click', () => ($('points-info').hidden = false));
 $('points-info').addEventListener('click', (e) => {
-  if (e.target === $('points-info') || e.target.closest('.sheet-close')) $('points-info').hidden = true;
+  if (e.target === $('points-info') || e.target.closest('.sheet-close')) hideSheet($('points-info'));
 });
 $('btn-notes').addEventListener('click', () => {
   $('release-notes-list').innerHTML = releaseNotesHtml(state);
   $('release-notes').hidden = false;
 });
 $('release-notes').addEventListener('click', (e) => {
-  if (e.target === $('release-notes') || e.target.closest('.sheet-close')) $('release-notes').hidden = true;
+  if (e.target === $('release-notes') || e.target.closest('.sheet-close')) hideSheet($('release-notes'));
 });
 $('btn-reref').addEventListener('click', () => {
   if (state.me.reference && !confirm('Rifare la foto di riferimento? Quella vecchia verrà sostituita.')) return;

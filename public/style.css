@@ -1365,7 +1365,7 @@ body[data-tab]:not([data-tab="oggi"]) .avatar { display: none; }
   .sheet:not([hidden]):not(.goal-sheet) > .sheet-card { animation: rf-up .38s var(--ease) both; }
   body.rings-in .ring-fill { animation: rf-ring 1s var(--ease) both; }
 }
-.sheet:not(.goal-sheet) { -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+.sheet, .wo-sheet, .wo-edsheet-dim { -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
 @keyframes rf-fade { from { opacity: 0; } }
 @keyframes rf-up { from { transform: translateY(100%); } }
 @keyframes rf-ring { from { stroke-dasharray: 0 999; } }
@@ -1413,3 +1413,10 @@ body[data-tab]:not([data-tab="oggi"]) .avatar { display: none; }
 @keyframes rf-zoom { from { opacity: 0; transform: scale(.96); } }
 @keyframes rf-drop { from { opacity: 0; transform: translateY(-6px); } }
 @media (prefers-reduced-motion: reduce) { .rp { display: none; } .tabbar button.active svg, .wo-star.on { animation: none; } }
+
+/* Chiusura dei fogli: il foglio scende e il fondo sfocato sfuma (hideSheet e dropOldSheet in sheetdrag.js) */
+.sheet.closing:not([hidden]), .wo-sheet.closing:not([hidden]), .wo-edsheet.closing > .wo-edsheet-dim { animation: rf-out .26s ease forwards; pointer-events: none; }
+.sheet.closing:not([hidden]) > .sheet-card, .wo-sheet.closing:not([hidden]) > .wo-sheet-box, .wo-edsheet.closing > .wo-edsheet-box { animation: rf-down .26s cubic-bezier(.4, 0, 1, 1) forwards; }
+.wo-edsheet.closing { pointer-events: none; }
+@keyframes rf-out { to { opacity: 0; } }
+@keyframes rf-down { to { transform: translateY(100%); } }

@@ -3,16 +3,36 @@
 // Chiudere = come toccare la × del foglio o fuori dal foglio.
 
 const BOXES = '.wo-edsheet-box, .wo-sheet-box, .sheet-card';
+const reduce = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/** Chiude un foglio (.sheet o .wo-sheet) facendolo scendere e sfumare il fondo; poi `done` (o hidden = true). */
+export function hideSheet(el, done) {
+  if (!el || el.hidden || el.classList.contains('closing')) return;
+  const finish = () => {
+    el.classList.remove('closing');
+    if (done) done(); else el.hidden = true;
+    el.style.opacity = '';
+    el.querySelectorAll(BOXES).forEach((b) => (b.style.transform = ''));
+  };
+  if (reduce()) return finish();
+  el.classList.add('closing');
+  setTimeout(finish, 260);
+}
+
+/** Foglio dell'allenamento tolto da un ridisegno: la copia vecchia resta un attimo e scende. */
+export function dropOldSheet(old, root) {
+  if (!old || reduce()) return;
+  old.classList.remove('in');
+  old.classList.add('closing');
+  root.append(old);
+  setTimeout(() => old.remove(), 260);
+}
 
 function closeSheet(box) {
   const x = box.querySelector('.sheet-close'); // Punti e medaglie, Registro admin
   if (x) return x.click();
   const grid = box.closest('.wo-sheet'); // griglia "Tutti" dell'allenamento
-  if (grid) {
-    grid.hidden = true;
-    box.style.transform = '';
-    return;
-  }
+  if (grid) return hideSheet(grid);
   const dim = box.previousElementSibling; // fogli dell'allenamento: il fondo scuro chiude
   if (dim) dim.click();
 }
@@ -55,10 +75,7 @@ export function initSheetDrag() {
     if (dim && !close) dim.style.opacity = '';
     setTimeout(() => {
       box.style.transition = '';
-      if (!close) return;
-      if (dim) dim.style.opacity = '';
-      box.style.transform = '';
-      closeSheet(box);
+      if (close) closeSheet(box); // resta giù: la chiusura riparte da dove l'ha lasciato il dito
     }, 200);
   };
   document.addEventListener('pointerup', end);
