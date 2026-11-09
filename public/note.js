@@ -17,6 +17,8 @@ const VERSIONS = [
       'Allenamento: nuovo tasto per tornare indietro, con la freccia in un cerchio e il nome della pagina',
       'Classifica più pulita: righe senza medaglie più basse e riga del Re dentro la card',
       'Avatar in alto solo in Home, testi di spiegazione più brevi, frecce sulle righe che aprono qualcosa e barra in basso più leggera',
+      'Effetto al tocco su tutti i tasti: si schiacciano e rimbalzano, le righe si illuminano, le icone in basso saltano, gli interruttori si allungano',
+      'Animazioni anche per i fogli dell\'Allenamento, gli avvisi in basso, il timer a tutto schermo, il circuito, le foto e il dettaglio dei punti',
     ],
   },
   {

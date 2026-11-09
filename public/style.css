@@ -1369,3 +1369,47 @@ body[data-tab]:not([data-tab="oggi"]) .avatar { display: none; }
 @keyframes rf-fade { from { opacity: 0; } }
 @keyframes rf-up { from { transform: translateY(100%); } }
 @keyframes rf-ring { from { stroke-dasharray: 0 999; } }
+
+/* ---------- Effetto al tocco ----------
+   a) tasti pieni: si schiacciano, rimbalzano al rilascio e un'onda di luce parte dal dito (.rp, in app.js)
+   b) pulsanti tondi e icone: piccolo salto   c) righe: si illuminano   d) link: si attenuano
+   Su iPhone :active funziona solo con un ascoltatore di touchstart (app.js). */
+:root { --spring: cubic-bezier(.34, 1.56, .64, 1); }
+:is(.primary, .secondary, .choice, .seg button, .month-btn, .wo-chip, .wo-tile, .wo-mob, .wo-tcard, .sfida-how, .poll-cancel) { position: relative; overflow: hidden; }
+:is(.primary, .secondary, .choice, .seg button, .month-btn, .wo-set, .wo-tile, .wo-chip, .wo-mob, .wo-tcard, .card.wo-pcard, .wo-rest, .pair, .ym, .timer-start, .timer-running, .wo-tmr-go, .wo-run-stop, .wo-run-reps, .wo-ed-plan, .wo-all, .wo-mt, .wo-ft, .sfida-how, .poll-cancel, .restore) { transition: transform .45s var(--spring), filter .3s, background-color .2s, color .2s; }
+:is(.primary, .secondary, .choice, .seg button, .month-btn, .wo-set, .wo-tile, .wo-chip, .ym, .timer-start, .timer-running, .wo-tmr-go, .wo-run-stop, .wo-run-reps, .wo-ed-plan, .wo-all, .wo-mt, .wo-ft, .sfida-how, .poll-cancel, .restore):active:not(:disabled) { transform: scale(.94); filter: brightness(.88); transition-duration: .1s, .1s; transition-timing-function: ease-out; }
+:is(.wo-mob, .wo-tcard, .card.wo-pcard, .wo-rest, .pair):active { transform: scale(.975); filter: brightness(.9); transition-duration: .1s, .1s; }
+.rp { position: absolute; border-radius: 50%; pointer-events: none; transform: translate(-50%, -50%) scale(0); background: currentColor; opacity: .22; animation: rp .6s var(--ease) forwards; }
+.primary .rp, .choice.selected .rp { background: #fff; opacity: .5; }
+@keyframes rp { to { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
+:is(.round, .shutter, .wo-dial, .wo-recb, .wo-tplay, .wo-rc, .wo-star, .wo-pen, .wo-ed-x, .wo-rot-ord, .md-chip, .crown-btn, .avatar, .info-btn, .sheet-close, .mdw-x, .crw-x, #chat-down, .del, .wo-back .bk, .wo-dots button) { transition: transform .5s var(--spring), filter .3s, background-color .2s; }
+:is(.round, .shutter, .wo-dial, .wo-recb, .wo-tplay, .wo-rc, .wo-star, .wo-pen, .wo-ed-x, .wo-rot-ord, .md-chip, .crown-btn, .avatar, .info-btn, .sheet-close, .mdw-x, .crw-x, #chat-down, .del, .wo-dots button):active, .wo-back:active .bk { transform: scale(.84); filter: brightness(1.25); transition-duration: .1s; }
+.wo-star.on { animation: rf-pop .5s var(--spring); }
+:is(.row, .wo-row, .wo-ed-row, .switch-row, .points li, .albo2 li, .fold summary, .wo-sh-exn) { transition: background-color .45s ease; }
+:is(.row, .wo-row, .wo-ed-row, .switch-row, .points li, .albo2 li, .fold summary, .wo-sh-exn):active { background-color: rgba(255, 255, 255, .09); transition-duration: 0s; }
+.card.list > .row { margin: 0 -16px; padding-left: 16px; padding-right: 16px; width: calc(100% + 32px); }
+:is(.link, .link-button, .week-toggle, .past-bar button, .ynav button, .al-months button) { transition: opacity .3s; }
+:is(.link, .link-button, .week-toggle, .past-bar button, .ynav button, .al-months button):active, .wo-back:active .bl { opacity: .4; transition-duration: .05s; }
+.tabbar button svg { transition: transform .45s var(--spring); }
+.tabbar button:active svg { transform: scale(.8); transition-duration: .1s; }
+.tabbar button.active svg { animation: rf-pop .55s var(--spring); }
+@keyframes rf-pop { 0% { transform: scale(.8); } 55% { transform: scale(1.18); } 100% { transform: scale(1); } }
+.switch::after { transition: transform .35s var(--spring), width .2s ease; }
+.switch:active::after { width: 33px; }
+.switch:checked:active::after { transform: translateX(14px); }
+
+/* ---------- Fogli e finestre che mancavano di animazione ---------- */
+@media (prefers-reduced-motion: no-preference) {
+  .wo-sheet:not([hidden]) { animation: rf-fade .2s ease both; }
+  .wo-sheet:not([hidden]) > .wo-sheet-box { animation: rf-up .3s var(--ease) both; }
+  .wo-edsheet.in > .wo-edsheet-dim { animation: rf-fade .25s ease both; }
+  .wo-edsheet.in > .wo-edsheet-box { animation: rf-up .38s var(--ease) both; }
+  .toast:not([hidden]) { animation: rf-toast .35s var(--spring) both; }
+  .viewer:not([hidden]), .news-viewer:not([hidden]), .camera:not([hidden]) { animation: rf-fade .25s ease both; }
+  .wo-big:not([hidden]), .wo-run:not([hidden]) { animation: rf-zoom .3s var(--ease) both; }
+  .points li.open .detail, .albo2 li.open .al-months { animation: rf-drop .3s var(--ease) both; }
+}
+@keyframes rf-toast { from { opacity: 0; transform: translateY(16px) scale(.96); } }
+@keyframes rf-zoom { from { opacity: 0; transform: scale(.96); } }
+@keyframes rf-drop { from { opacity: 0; transform: translateY(-6px); } }
+@media (prefers-reduced-motion: reduce) { .rp { display: none; } .tabbar button.active svg, .wo-star.on { animation: none; } }
