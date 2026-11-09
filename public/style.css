@@ -1486,3 +1486,12 @@ body[data-tab]:not([data-tab="oggi"]) .avatar { display: none; }
 .has-pill > button.on { background: none; }
 .has-pill > button .rp { display: none; }
 @media (prefers-reduced-motion: reduce) { .seg-pill { transition: none; } }
+
+/* Nota dell'esercizio nella scheda: una pillola come le altre, con la matita; un tocco e si scrive */
+.wo-nota { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; cursor: text; border: 1px solid transparent; transition: border-color .2s var(--ease), color .2s var(--ease); }
+.wo-nota svg { flex: none; width: 13px; height: 13px; fill: none; stroke: var(--gold); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.wo-nota [contenteditable] { min-width: 1ch; outline: 0; color: var(--fg); font-weight: 500; overflow-wrap: anywhere; -webkit-user-select: text; user-select: text; }
+.wo-nota [contenteditable]:empty::before { content: attr(data-ph); color: var(--muted); }
+.wo-nota:has([contenteditable]:empty) { background: none; border: 1px dashed var(--line); }
+.wo-nota:has([contenteditable]:empty) svg { stroke: var(--muted); }
+.wo-nota:focus-within { border-color: var(--gold); }

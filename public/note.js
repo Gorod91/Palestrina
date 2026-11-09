@@ -37,6 +37,7 @@ const VERSIONS = [
       'Tutti i fogli sfocano lo sfondo e, chiudendoli (tocco fuori, × o trascinamento), scendono invece di sparire di colpo',
       'Selettori Settimana / Mese e Peso / Volume: la selezione scorre da un\'opzione all\'altra',
       'Chat: aprendo la tastiera si vede l\'ultimo messaggio; la settimana del sondaggio riparte compatta a ogni apertura dell\'app',
+      'Allenamento: nota dell\'esercizio sempre a vista sotto il nome, con la matita: un tocco per scriverla o cambiarla (vale per quella scheda)',
     ],
   },
   {
