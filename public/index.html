@@ -174,10 +174,10 @@
         <div id="month-cal" class="month-cal"><div id="month-cal-in"></div></div>
         <div id="past-bar" class="past-bar" hidden><div><b id="past-title"></b><span id="past-king"></span></div><button id="past-back" type="button"></button></div>
         <h2 class="section with-info"><span id="points-title">Punti del mese</span><button id="btn-points-info" class="info-btn" aria-label="Come funzionano punti e medaglie">i</button></h2>
-        <section class="card list">
+        <section class="card list clip">
           <ol id="points" class="ranking points"></ol>
         </section>
-        <p id="points-foot" class="footnote">Tocca un nome per vedere da dove arrivano i punti, poi una voce per vedere quando. Tocca una medaglia o la corona per vederla in grande.</p>
+        <p id="points-foot" class="footnote">Tocca un nome per il dettaglio dei punti, una medaglia per vederla in grande.</p>
 
         <div class="section section-row">
           <h2>Presenze</h2>
@@ -210,7 +210,7 @@
 
         <div class="section section-row"><h2>Albo d'oro</h2><span id="albo-count" class="muted section-note"></span></div>
         <section class="card list"><ol id="albo" class="ranking albo2"></ol></section>
-        <p id="albo-foot" class="footnote" hidden>Record: il massimo in un solo mese. Tocca un nome per vedere i mesi in cui ha vinto, o un record per aprire il suo mese.</p>
+        <p id="albo-foot" class="footnote" hidden>Record: i punti migliori in un mese. Tocca un nome per i mesi vinti.</p>
       </div>
 
       <div class="tab-panel chat" data-tab="chat" hidden>
@@ -223,7 +223,7 @@
       </div>
 
       <div class="tab-panel timer" data-tab="timer" hidden>
-        <button id="timer-back" class="wo-back" type="button" hidden>‹ Allenamento</button>
+        <button id="timer-back" class="wo-back" type="button" hidden><span class="bk"><svg viewBox="0 0 9 15"><path d="M7.5 1.5 1.5 7.5l6 6"/></svg></span><span class="bl">Allenamento</span></button>
         <p class="label center">Addominali</p>
         <div class="timer-set">
           <button id="timer-minus" class="round" aria-label="Meno 5 secondi">−</button>
@@ -244,7 +244,7 @@
           <form id="form-name">
             <label class="label" for="in-name">Nome visualizzato</label>
             <input id="in-name" class="plain" maxlength="20" autocomplete="nickname" spellcheck="false">
-            <p id="name-hint" class="muted small-text">È il nome che vedono gli altri in classifica e nelle notifiche.</p>
+            <p id="name-hint" class="muted small-text">Come ti vedono gli altri.</p>
             <button type="submit" id="btn-name" class="primary">Salva</button>
           </form>
         </section>
@@ -255,7 +255,7 @@
             <div id="ref-photo" class="ref-ph"><svg><use href="#i-camera"/></svg></div>
             <div><b>Foto di riferimento</b><p id="ref-when" class="muted small-text"></p></div>
           </section>
-          <section class="card list"><button id="btn-reref" class="row">Rifai la foto di riferimento</button></section>
+          <section class="card list"><button id="btn-reref" class="row go">Rifai la foto di riferimento</button></section>
         </div>
 
         <h2 class="section">Check-in automatico</h2>
@@ -270,14 +270,14 @@
             <li><b>Nuovo comando vuoto</b>, <b>Aggiungi azione</b>, cerca <b>Ottieni contenuto dell'URL</b></li>
             <li>Tocca <b>URL</b>, incolla il link e tocca <b>Fine</b></li>
           </ol>
-          <p class="muted">Se il telefono si ricollega più volte conta lo stesso: vale al massimo un check-in al giorno.</p>
+          <p class="muted">Vale al massimo un check-in al giorno.</p>
         </details>
 
         <!-- Allenamento (solo per chi ce l'ha): rimette da fare gli esercizi segnati oggi -->
         <div id="workout-card" hidden>
           <h2 class="section">Allenamento</h2>
           <section class="card list"><button id="btn-workout-reset" class="row destructive">Segna l'allenamento di oggi come non fatto</button></section>
-          <p class="footnote">Cancella le serie salvate oggi: gli esercizi tornano da fare.</p>
+          <p class="footnote">Cancella le serie di oggi.</p>
         </div>
 
         <h2 class="section">Timer</h2>
@@ -287,7 +287,7 @@
             <input id="shake-stop" type="checkbox" class="switch">
           </label>
         </section>
-        <p class="footnote">Su iPhone serve il permesso al movimento, che iOS chiede di nuovo ogni volta che l'app riparte.</p>
+        <p class="footnote">iPhone chiede il permesso a ogni riavvio dell'app.</p>
 
         <h2 class="section">Notifiche</h2>
         <section class="card list">
@@ -296,7 +296,7 @@
             <input id="chat-notify" type="checkbox" class="switch">
           </label>
         </section>
-        <p class="footnote">La domanda "chi va in palestra oggi?" arriva comunque a tutti.</p>
+        <p class="footnote">La domanda del giorno arriva comunque.</p>
 
         <div id="admin-card" hidden>
           <h2 id="admin-card-title" class="section">Admin</h2>
@@ -352,14 +352,14 @@
         <div id="icon-card" hidden>
           <h2 class="section">Icona dell'app</h2>
           <section class="card">
-          <p class="muted">Apre Safari già collegato: lì scegli Condividi → Aggiungi alla schermata Home. La nuova icona si apre senza codice; poi cancella quella vecchia e riattiva le notifiche.</p>
+          <p class="muted">In Safari: Condividi → Aggiungi alla schermata Home. Poi cancella l'icona vecchia e riattiva le notifiche.</p>
           <button id="btn-icon" class="secondary">Apri in Safari</button>
           <p id="icon-link" class="muted small-text icon-link" hidden></p>
           </section>
         </div>
 
         <h2 class="section">Informazioni</h2>
-        <section class="card list"><button id="btn-notes" class="row">Note di rilascio</button></section>
+        <section class="card list"><button id="btn-notes" class="row go">Note di rilascio</button></section>
 
         <section class="card list" style="margin-top:20px">
           <button id="btn-logout" class="row destructive">Esci</button>

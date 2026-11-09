@@ -6,7 +6,8 @@ import { createFbData } from './fbdata.js';
 import { makeZip } from './zip.js';
 import { createWorkout } from './allenamento.js';
 import { alF, kingTitle } from './genere.js';
-import { initSheetDrag } from './sheetdrag.js';
+import { initSheetDrag, hideSheet } from './sheetdrag.js';
+import { initSegs } from './seg.js';
 import { showSudoReveal } from './sudoreveal.js';
 import { releaseNotesHtml } from './note.js';
 import { createMedals } from './medaglie.js';
@@ -395,7 +396,7 @@ function ring(value, color, color2, { size = 120, width = 16 } = {}) {
   return `<svg viewBox="0 0 ${size} ${size}">
     <defs><linearGradient id="${id}" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${color}"/><stop offset="1" stop-color="${color2}"/></linearGradient></defs>
     <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-opacity=".22" stroke-width="${width}"/>
-    ${v > 0 ? `<circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="url(#${id})" stroke-width="${width}" stroke-linecap="round"
+    ${v > 0 ? `<circle class="ring-fill" cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="url(#${id})" stroke-width="${width}" stroke-linecap="round"
       stroke-dasharray="${c * v} ${c}" transform="rotate(-90 ${size / 2} ${size / 2})"/>` : ''}
   </svg>`;
 }
@@ -440,7 +441,7 @@ function render() {
   renderMonthNav();
   if (document.activeElement !== $('in-name')) $('in-name').value = me.alias || '';
   $('in-name').placeholder = me.name;
-  $('name-hint').textContent = `È il nome che vedono gli altri in classifica e nelle notifiche. Lascia vuoto per usare il nome originale (${me.name}).`;
+  $('name-hint').textContent = `Come ti vedono gli altri. Vuoto: ${me.name}.`;
   if (!me.actingAs && session.display !== me.display) {
     session.display = me.display;
     store.set('session', session);
@@ -641,8 +642,8 @@ function renderPoints() {
   $('points-title').textContent = pv ? `Classifica finale di ${pts.month}` : `Punti di ${pts.month}`;
   $('btn-points-info').hidden = !!pv;
   $('points-foot').textContent = pv
-    ? `Punti e medaglie di ${pts.month} ${pts.year || ''}. Tocca un nome per vedere da dove arrivano i punti.`
-    : 'Tocca un nome per vedere da dove arrivano i punti, poi una voce per vedere quando. Tocca una medaglia o la corona per vederla in grande.';
+    ? `Punti e medaglie di ${pts.month} ${pts.year || ''}. Tocca un nome per il dettaglio.`
+    : 'Tocca un nome per il dettaglio dei punti, una medaglia per vederla in grande.';
   $('points').innerHTML = '';
   medals.resetChips();
   pts.ranking.forEach((r, i) => {
@@ -668,8 +669,9 @@ function renderPoints() {
     sub.innerHTML = chips.html;
     const names = document.createElement('span');
     names.className = 'mnames';
-    names.textContent = !chips.names.length ? 'Nessuna medaglia' : chips.names.length <= 2 ? chips.names.join(' · ') : ''; // con tante medaglie bastano quelle
+    names.textContent = chips.names.length <= 2 ? chips.names.join(' · ') : ''; // con tante medaglie bastano quelle
     sub.append(names);
+    sub.hidden = !chips.names.length; // senza medaglie la riga resta bassa
     const detail = li.querySelector('.detail');
     if (!r.detail.length) detail.textContent = pv ? `Nessun punto a ${pts.month}.` : 'Ancora nessun punto questo mese.';
     const sign = (n) => (n < 0 ? `${n}` : `+${n}`);
@@ -1547,6 +1549,7 @@ function cameraError(err) {
 // ---------- Chat ----------
 
 initSheetDrag(); // fogli dal basso: si chiudono trascinandoli giù
+initSegs(); // Settimana / Mese e simili: la selezione scorre
 const chat = createChat({ api, toast, photoPair, loadPhoto, clean, isDebug: () => debugOn(), isKing, crown: crownFor, isF, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => (testOn() ? 'prova' : state && state.features && state.features.firebase ? 'tutti' : ''), fbOnly: () => fbOk() });
 
 // ---------- Allenamento (fase 1, solo in prova) ----------
@@ -1651,6 +1654,30 @@ function workoutTab() {
 
 const TABS = ['oggi', 'classifica', 'chat', 'timer', 'allenamento', 'altro'];
 
+// Effetto al tocco: su iPhone :active parte solo se la pagina ascolta i tocchi
+document.addEventListener('touchstart', () => {}, { passive: true });
+// Onda di luce dal punto toccato, sui tasti pieni (stile .rp)
+const RIPPLE = '.primary, .secondary, .choice, .seg button, .month-btn, .wo-chip, .wo-tile, .wo-mob, .wo-tcard, .sfida-how, .poll-cancel';
+document.addEventListener('pointerdown', (e) => {
+  const b = e.target.closest && e.target.closest(RIPPLE);
+  if (!b || b.disabled || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const r = b.getBoundingClientRect();
+  const d = 2 * Math.hypot(Math.max(e.clientX - r.left, r.right - e.clientX), Math.max(e.clientY - r.top, r.bottom - e.clientY));
+  const s = document.createElement('span');
+  s.className = 'rp';
+  s.style.cssText = `left:${e.clientX - r.left}px;top:${e.clientY - r.top}px;width:${d}px;height:${d}px`;
+  b.append(s);
+  setTimeout(() => s.remove(), 650);
+}, { passive: true });
+
+/** Anelli che si riempiono: solo appena si apre un tab, non a ogni aggiornamento dei dati. */
+let ringsTimer;
+function ringsIn() {
+  document.body.classList.add('rings-in');
+  clearTimeout(ringsTimer);
+  ringsTimer = setTimeout(() => document.body.classList.remove('rings-in'), 1300);
+}
+
 function selectTab(name) {
   if (!TABS.includes(name)) name = 'oggi';
   if (name === 'allenamento' && !workoutOn()) name = 'timer';
@@ -1659,6 +1686,8 @@ function selectTab(name) {
   const on = name === 'timer' && workoutOn() ? 'allenamento' : name;
   document.querySelectorAll('.tabbar button').forEach((b) => b.classList.toggle('active', b.dataset.tab === on));
   store.set('tab', name);
+  document.body.dataset.tab = name; // l'avatar si vede solo in Home
+  ringsIn();
   $('page-title').textContent = TAB_TITLES[name];
   $('scroller').scrollTop = 0;
   document.body.classList.toggle('chat-mode', name === 'chat');
@@ -1852,7 +1881,7 @@ $('goal-go').addEventListener('click', async () => {
     const r = await api('setGoal', { month, goal });
     if (r && r.error) throw new Error(r.error);
     store.set('goalSent', goalKey(month));
-    $('goal-sheet').hidden = true;
+    hideSheet($('goal-sheet'));
     state.me.goalAsk = '';
     toast(`Obiettivo di ${MONTHS_IT[Number(month.slice(5, 7)) - 1]}: ${(r && r.goal) || goal} a settimana`);
     refresh();
@@ -2069,7 +2098,7 @@ $('btn-test-news').addEventListener('click', () => testAction($('btn-test-news')
 $('btn-test-monthly').addEventListener('click', () => testAction($('btn-test-monthly'), 'Invio…', ['testRecap', { kind: 'monthly' }], 'Premiazioni del mese simulate'));
 $('admin-sheet').addEventListener('click', async (e) => {
   if (e.target === $('admin-sheet') || e.target.closest('.sheet-close')) {
-    $('admin-sheet').hidden = true;
+    hideSheet($('admin-sheet'));
     return;
   }
   const f = e.target.closest('[data-f]');
@@ -2247,14 +2276,14 @@ $('form-name').addEventListener('submit', (e) => {
 $('viewer').addEventListener('click', () => ($('viewer').hidden = true));
 $('btn-points-info').addEventListener('click', () => ($('points-info').hidden = false));
 $('points-info').addEventListener('click', (e) => {
-  if (e.target === $('points-info') || e.target.closest('.sheet-close')) $('points-info').hidden = true;
+  if (e.target === $('points-info') || e.target.closest('.sheet-close')) hideSheet($('points-info'));
 });
 $('btn-notes').addEventListener('click', () => {
   $('release-notes-list').innerHTML = releaseNotesHtml(state);
   $('release-notes').hidden = false;
 });
 $('release-notes').addEventListener('click', (e) => {
-  if (e.target === $('release-notes') || e.target.closest('.sheet-close')) $('release-notes').hidden = true;
+  if (e.target === $('release-notes') || e.target.closest('.sheet-close')) hideSheet($('release-notes'));
 });
 $('btn-reref').addEventListener('click', () => {
   if (state.me.reference && !confirm('Rifare la foto di riferimento? Quella vecchia verrà sostituita.')) return;
@@ -2370,9 +2399,27 @@ function afterRotate() {
 }
 window.addEventListener('orientationchange', () => [100, 400, 800].forEach((t) => setTimeout(afterRotate, t)));
 if (screen.orientation) screen.orientation.addEventListener('change', () => setTimeout(afterRotate, 400));
-$('chat-input').addEventListener('focus', () => {
-  setTimeout(() => ($('scroller').scrollTop = $('scroller').scrollHeight), 350);
-});
+// Tastiera della chat: mentre si apre (e il sondaggio sopra si nasconde) la chat resta agganciata all'ultimo
+// messaggio, fotogramma per fotogramma, finché la tastiera non è ferma.
+let pinUntil = 0;
+function pinChatBottom(ms = 900) {
+  const go = !pinUntil;
+  pinUntil = Date.now() + ms;
+  if (!go) return;
+  const step = () => {
+    const sc = $('scroller');
+    sc.scrollTop = sc.scrollHeight;
+    if (Date.now() < pinUntil) requestAnimationFrame(step);
+    else pinUntil = 0;
+  };
+  requestAnimationFrame(step);
+}
+$('chat-input').addEventListener('focus', () => pinChatBottom());
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', () => { if (document.activeElement === $('chat-input')) pinChatBottom(400); });
+}
+// Un dito sulla chat mentre è agganciata: vince lo scorrimento di chi la tocca
+$('scroller').addEventListener('touchstart', () => { pinUntil = 0; }, { passive: true });
 
 /**
  * Link "Aggiorna l'icona" (?accesso=…): entra con il codice d'accesso di 15 minuti. In Safari si toglie il manifest,
