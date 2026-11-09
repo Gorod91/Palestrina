@@ -1254,8 +1254,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       ${t === 'sec' && !saved ? `<div class="wo-tmr" data-ex="${ex}">${tmrHtml(ex, sets)}</div>` : ''}
       <div class="wo-sets">${rows}</div>
       ${btn}
-      <div class="wo-rest" data-ex="${ex}">${restHtml(ex)}</div>${fineBtn()}
-      ${progCard(ex, t)}
+      <div class="wo-rest" data-ex="${ex}">${restHtml(ex)}</div>
+      ${progCard(ex, t)}${fineBtn()}
     </section>`;
   }
 
