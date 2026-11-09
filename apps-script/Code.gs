@@ -1464,8 +1464,8 @@ function buildNotifications(event, name) {
   }
 
   if (event === 'sorpasso') {
-    // Mai nomi nella notifica: chi ha superato chi si scopre in chat
-    return toAllBut(name, 'Sorpasso in classifica', 'Qualcuno ha cambiato posizione. Tocca per scoprire chi.').map((n) => ({ ...n, tab: 'chat' }));
+    // A tutti, anche a chi ha sorpassato (non sempre guarda la classifica). Mai nomi: chi ha superato chi si scopre in chat
+    return subs.map((x) => ({ subscription: x.sub, title: 'Sorpasso in classifica', body: 'Qualcuno ha cambiato posizione. Tocca per scoprire chi.', tab: 'chat' }));
   }
 
   if (event === 'medaglia') {

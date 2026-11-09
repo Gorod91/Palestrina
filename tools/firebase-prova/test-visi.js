@@ -215,7 +215,7 @@ const tab = (P, t) => P.page.$eval(`.tabbar button[data-tab="${t}"]`, (b) => b.c
   console.log('6. Notifica del sorpasso senza nomi');
   const n = await post('/eval', "(() => { TEST = false; const subs = [{ name: 'Francesco', sub: {} }, { name: 'Michy', sub: {} }]; rows('iscrizioni'); MEMO['iscrizioni:rows'] = subs; return buildNotifications('sorpasso', 'Michy'); })");
   const msgs = n.result || [];
-  ok(msgs.length === 1 && !/Michy|Francesco/.test(msgs[0].title + msgs[0].body), `solo a Francesco, senza nomi: ${JSON.stringify(msgs.map((m) => [m.title, m.body]))}`);
+  ok(msgs.length === 2 && !msgs.some((m) => /Michy|Francesco/.test(m.title + m.body)), `a tutti (anche a chi sorpassa), senza nomi: ${JSON.stringify(msgs.map((m) => [m.title, m.body]))}`);
 
   for (const [k, P] of [['F', F], ['M', M]]) ok(!P.logs.some((l) => l.startsWith('ERRORE')), `${k}: nessun errore della pagina`);
   if (fails) for (const [k, P] of [['F', F], ['M', M]]) console.log(k, P.logs.slice(-15).join('\n   '));
