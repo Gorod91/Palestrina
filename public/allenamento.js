@@ -589,7 +589,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
 
   /** Ridisegno per i dati arrivati da Firebase: non mentre si tocca o si scrive, ma subito dopo. */
   function softDraw() {
-    const typing = root.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
+    const typing = root.contains(document.activeElement) && (document.activeElement.tagName === 'INPUT' || document.activeElement.isContentEditable);
     if (pressed || typing || scrolling) later = true;
     else draw();
   }
@@ -597,14 +597,18 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
     if (!later || pressed || scrolling) return;
     later = false;
     setTimeout(() => {
-      if (!(root.contains(document.activeElement) && document.activeElement.tagName === 'INPUT')) draw();
+      if (!(root.contains(document.activeElement) && (document.activeElement.tagName === 'INPUT' || document.activeElement.isContentEditable))) draw();
       else later = true;
     }, 0);
   }
   root.addEventListener('pointerdown', () => (pressed = true));
   document.addEventListener('pointerup', () => { pressed = false; flush(); });
   document.addEventListener('pointercancel', () => { pressed = false; flush(); });
-  root.addEventListener('focusout', () => setTimeout(flush, 0));
+  root.addEventListener('focusout', (ev) => {
+    const n = ev.target.dataset && ev.target.dataset.nota;
+    if (n) saveNota(n, ev.target.textContent.replace(/\s+/g, ' ').trim().slice(0, 200));
+    setTimeout(flush, 0);
+  });
 
   // Indietro trascinando dal bordo sinistro, come in Safari (dalla Home iOS non lo fa da solo):
   // la pagina segue il dito e sotto compare quella prima; oltre metà schermo o con uno scatto si torna lì.
@@ -949,6 +953,19 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
 
   const listReps = (sch, e) => Number(String((sch && sch.piano && sch.piano[e] && sch.piano[e].s) || '1').match(/\d+/)?.[0] || 1);
 
+  /** Nota dell'esercizio in questa scheda: sempre a vista, un tocco e si scrive (si salva quando si chiude la tastiera). */
+  const notaHtml = (ex, pi) => `<span class="wo-pill wo-nota"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4L19 9l-4-4L4 16v4zM14 6l4 4"/></svg><span contenteditable="plaintext-only" data-nota="${ex}" role="textbox" enterkeyhint="done" data-ph="Nota" aria-label="Nota dell'esercizio, tocca per scrivere">${esc((pi && pi.nota) || '')}</span></span>`;
+  function saveNota(ex, v) {
+    const list = clone(schede || []), sc = list.find((y) => y.id === ui.scheda);
+    if (!sc) return;
+    const pi = ((sc.piano ||= {})[ex] ||= {}), old = pi.nota || '';
+    if (v === old) return;
+    if (v) pi.nota = v; else delete pi.nota;
+    if (!Object.keys(pi).length) delete sc.piano[ex];
+    writeDoc(list);
+    toast(v ? 'Nota salvata' : 'Nota tolta');
+  }
+
   function unsave(ex) {
     const { fs, db } = x;
     fs.deleteDoc(fs.doc(db, pfx + 'serie', `${today()}_${fbUid(me.name)}_${ex}`)).catch((err) => toast(`Non annullato: ${err.message}`));
@@ -1257,7 +1274,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
          <button class="link-button" data-a="edit">Modifica</button>${done.pending ? '<p class="wo-sub wo-center">Salvato sul telefono: parte appena c\'è rete</p>' : ''}`
       : `<div class="wo-btns"><button class="secondary" data-a="add">+ Serie</button><button class="secondary" data-a="del">− Serie</button></div><button class="primary" data-a="ok">✓ Fatto</button>`;
     return `<section class="wo-page" data-k="${k}">
-      <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(pianoTxt(ex, piano, sch))}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
+      <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(pianoTxt(ex, piano, sch))}</span>` : ''}${sch ? notaHtml(ex, piano) : ''}</div>
       ${figSvg(ex, 'card')}
       ${last ? `<p class="wo-last">In <b>rosso</b> la volta scorsa, ${ago}</p>` : ''}
       ${t === 'sec' && !saved ? `<div class="wo-tmr" data-ex="${ex}">${tmrHtml(ex, sets)}</div>` : ''}
@@ -2552,10 +2569,16 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
     draw();
   });
   // Invio sulla tastiera: conferma il numero e chiude la tastiera
+  // un tocco ovunque sulla pillola della nota (anche sulla matita) apre la scrittura
+  root.addEventListener('click', (ev) => {
+    const p = ev.target.closest('.wo-nota');
+    if (p && !ev.target.isContentEditable) p.querySelector('[data-nota]').focus();
+  });
   root.addEventListener('keydown', (ev) => {
-    if (ev.key === 'Enter' && ev.target.dataset.f) ev.target.blur();
+    if (ev.key === 'Enter' && (ev.target.dataset.f || ev.target.dataset.nota)) { ev.preventDefault(); ev.target.blur(); }
   });
   root.addEventListener('input', (ev) => {
+    if (ev.target.dataset.nota) { if (!ev.target.textContent.trim()) ev.target.textContent = ''; return; }
     if (editInput(ev.target)) return;
     if (ev.target.id !== 'wo-q') return;
     ui.q = ev.target.value;
