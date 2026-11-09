@@ -21,6 +21,7 @@ const VERSIONS = [
       'Animazioni anche per i fogli dell\'Allenamento, gli avvisi in basso, il timer a tutto schermo, il circuito, le foto e il dettaglio dei punti',
       'Tutti i fogli sfocano lo sfondo e, chiudendoli (tocco fuori, × o trascinamento), scendono invece di sparire di colpo',
       'Selettori Settimana / Mese e Peso / Volume: la selezione scorre da un\'opzione all\'altra',
+      'Chat: aprendo la tastiera si vede l\'ultimo messaggio; la settimana del sondaggio riparte compatta a ogni apertura dell\'app',
     ],
   },
   {
