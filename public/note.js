@@ -16,8 +16,9 @@ const VERSIONS = [
   },
   {
     v: '2.3',
-    date: '5 novembre 2026',
+    date: '5 – 9 novembre 2026',
     items: [
+      'Chat: nel sondaggio, i nomi di chi non ha ancora risposto al posto del numero',
       'Classifica: tasto del mese accanto al titolo, con il calendario dei mesi (giorni più rossi quando più persone sono andate in palestra)',
       'Mesi passati in Classifica: classifica finale con medaglie, presenze e Sudometro del mese scelto',
       'Albo d\'oro rifatto: le corone vinte da ognuno, con i mesi vinti da toccare, e i record (punti, presenze e Sudometro in un solo mese) nella riga di chi li detiene',

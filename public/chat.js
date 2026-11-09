@@ -790,8 +790,13 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       part.innerHTML = `<b>${label} </b>${list.join(', ')}`;
       names.append(part);
     });
-    const missing = plan.people.filter((p) => !p.choice).length;
-    if (missing) names.append(el('span', 'part none', `${missing} senza risposta`));
+    // Chi manca, per nome: la pressione del gruppo lavora da sola
+    const missing = plan.people.filter((p) => !p.choice).map((p) => kn(p.name, p.display));
+    if (missing.length) {
+      const part = el('span', 'part none');
+      part.innerHTML = `<b>Mancano </b>${missing.join(', ')}`;
+      names.append(part);
+    }
     // Chi ha fatto la domanda
     const side = elH('span', 'poll-side muted', `da ${kn(poll.by, poll.byDisplay)} · ${escH(poll.clock)}`);
     names.append(side);
