@@ -9,6 +9,9 @@ import { bodySvg, ICONE } from './corpo.js';
 import { popCount, askMotion, shakeToStop } from './timer.js';
 import { setAwake, awakeWhileShown } from './awake.js';
 
+// Tasto indietro: cerchio grigio con la freccia (come la × dei fogli) e il nome della pagina
+const BK = '<span class="bk"><svg viewBox="0 0 9 15"><path d="M7.5 1.5 1.5 7.5l6 6"/></svg></span>';
+
 // Catalogo: gli esercizi delle schede che abbiamo; gli esercizi nuovi si aggiungono dall'app ("Nuovo esercizio").
 // t: 'kg' (peso e ripetizioni, se manca), 'rip' (solo ripetizioni, a corpo libero), 'sec' (a tempo, in secondi), 'm' (metri)
 // old: non più nel catalogo (non si sceglie), resta solo per mostrare il nome delle serie già salvate
@@ -895,7 +898,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
     const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : ''}${isDone(id) ? ' ok' : ''}" data-a="j:${k}" aria-label="${esc(nameOf(id))}"></button>`).join('');
     const title = sch ? `${esc(sch.name)}${diBadge(sch)} · <span id="wo-num">${ui.i + 1}</span>/${ui.list.length}` : 'Allenamento libero';
     const many = ui.list.length > 1;
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button></div>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">${BK}<span class="bl">${title}</span></button></div>
       ${many ? `<div class="wo-dots" id="wo-dots">${dots}</div>` : ''}
       <div class="wo-pager${many ? ' multi' : ''}" id="wo-pager">${ui.list.map((_, k) => pageHtml(k, sch)).join('')}</div>
       ${many ? `<div class="wo-bar"><button class="wo-all" id="wo-all"><svg viewBox="0 0 24 24" aria-hidden="true">${[3, 10, 17].map((y) => [3, 10, 17].map((x) => `<rect x="${x}" y="${y}" width="5.5" height="5.5" rx="1.6"/>`).join('')).join('')}</svg>Tutti</button></div>
@@ -1341,7 +1344,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   function progView() {
     const p = ui.prog, t = p.t, e = EX[p.ex] || { n: p.ex };
     const all = storia(p.ex, t);
-    const back = `<button class="wo-back" data-a="back">‹ ${p.back === 'progall' ? 'I tuoi progressi' : p.back === 'list' ? 'Allenamento' : esc(e.n)}</button>`;
+    const back = `<button class="wo-back" data-a="back">${BK}<span class="bl">${p.back === 'progall' ? 'I tuoi progressi' : p.back === 'list' ? 'Allenamento' : esc(e.n)}</span></button>`;
     chart = null;
     if (!all.length) return `${back}<p class="wo-empty">Ancora nessuna serie salvata</p>`;
     const aiuto = t === 'kg' && all.some((q) => q.sets.some((z) => z.kg < 0)); // chili di aiuto: niente volume, e lo zero in vista
@@ -1472,7 +1475,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
         <span class="wo-delta${r.d > 0 ? ' up' : r.d < 0 ? ' down' : ''}">${r.d ? uDelta(r.t, r.d) : 'uguale'}</span></button>`;
     }).join('');
     const chips = mie.length > 1 ? `<div class="wo-chips wo-chips-s">${[['', 'Tutte'], ...mie.map((s) => [s.id, s.name])].map(([id, l]) => `<button class="${f === id ? 'on' : ''}" data-a="pfil:${esc(id)}">${esc(l)}</button>`).join('')}</div>` : '';
-    return `<button class="wo-back" data-a="back">‹ Allenamento</button>
+    return `<button class="wo-back" data-a="back">${BK}<span class="bl">Allenamento</span></button>
       <h1 class="wo-ptitle">I tuoi progressi</h1>
       <p class="wo-sub">Gli esercizi che sono cresciuti di più in alto</p>
       ${chips}
@@ -1702,14 +1705,14 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   function pickView() {
     if (ui.pickFor) return pickMultiView();
     const back = ui.pg && !ui.q.trim() ? 'Esercizi' : 'Allenamento libero';
-    return `<button class="wo-back" data-a="back">‹ ${back}</button>${pickBody(false)}
+    return `<button class="wo-back" data-a="back">${BK}<span class="bl">${back}</span></button>${pickBody(false)}
       <p class="footnote">Manca un esercizio? Aggiungilo da Esercizi, nella pagina dell'Allenamento.</p>`;
   }
 
   /** Esercizi (dalla pagina dell'Allenamento): l'elenco comune a tutti, da cui si aggiungono, modificano ed eliminano. */
   function catView() {
     const back = ui.pg && !ui.q.trim() ? 'Esercizi' : 'Allenamento';
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${back}</button></div>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">${BK}<span class="bl">${back}</span></button></div>
       ${ui.pg && !ui.q.trim() ? '' : '<h2 class="wo-ed-title">Esercizi</h2><p class="wo-sub">Uguali per tutti: quello che cambi o elimini qui vale anche per gli altri.</p>'}
       ${pickBody(false, [], true)}`;
   }
@@ -1719,7 +1722,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
     const e = EX[ui.ced.ex] || { n: ui.ced.ex };
     const gruppi = [...new Set([...GRUPPI, e.g].filter(Boolean))];
     const mie = (schede || []).filter((y) => JSON.stringify(y).includes(`"${ui.ced.ex}"`)).map((y) => y.name);
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Esercizi</button></div>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">${BK}<span class="bl">Esercizi</span></button></div>
       <h2 class="wo-ed-title">${esc(e.n)}</h2>
       <label class="wo-lbl" for="wo-ce-n">Nome</label>
       <input id="wo-ce-n" class="plain wo-sh-in" value="${esc(e.n)}" maxlength="60" autocomplete="off">
@@ -1781,7 +1784,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
         <button class="wo-ed-plan${pill === 'Imposta' ? ' empty' : ''}" data-a="edplan:${k}">${esc(pill)}</button>
         <button class="wo-ed-x" data-a="edrm:${k}" aria-label="Togli">×</button></div>`;
     }).join('');
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Annulla</button></div>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">${BK}<span class="bl">Annulla</span></button></div>
       <h2 class="wo-ed-title">${ed.isNew ? 'Nuova scheda' : 'Modifica la scheda'}${diBadge(ed)}</h2>
       <label class="wo-lbl" for="wo-ed-name">Nome</label>
       <input id="wo-ed-name" class="plain wo-ed-name" value="${esc(ed.name)}" placeholder="Per esempio Scheda B" maxlength="40" autocomplete="off">
@@ -1878,7 +1881,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
         <div class="wo-kgf"><input id="wo-pl-kg" class="plain wo-sh-in" inputmode="decimal" value="${pi.kg ? kgf(pi.kg) : ''}" placeholder="0" autocomplete="off"><span>kg</span></div>` : ''}
         <div class="wo-lbl">Nota (facoltativa)</div>
         <input id="wo-pl-nota" class="plain wo-sh-in" value="${esc(pi.nota || '')}" placeholder="Per esempio sedile al 4" maxlength="80" autocomplete="off">`}`;
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${pe.back ? esc(ed.circuiti[pe.back.cid].n) : esc(ed.name || 'Scheda')}</button></div>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">${BK}<span class="bl">${pe.back ? esc(ed.circuiti[pe.back.cid].n) : esc(ed.name || 'Scheda')}</span></button></div>
       <h2 class="wo-ed-title">${esc((EX[pe.ex] || { n: pe.ex }).n)}</h2>${body}
       <button class="primary wo-exed-ok" data-a="back">Fatto</button>
       <button class="link-button wo-danger" data-a="exdel">Elimina esercizio</button>`;
@@ -1887,7 +1890,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   /** Circuito o lista da spuntare, a pagina intera: nome, giri, recupero, pausa ed esercizi (un tocco apre la loro pagina). */
   function ciredView() {
     const ed = ui.ed, c = ed.circuiti[ui.cired.cid];
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${esc(ed.name || 'Scheda')}</button></div>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">${BK}<span class="bl">${esc(ed.name || 'Scheda')}</span></button></div>
       <h2 class="wo-ed-title">${c.lista ? 'Lista da spuntare' : 'Circuito'}</h2>
       <label class="wo-lbl" for="wo-cs-name">Nome</label>
       <input id="wo-cs-name" class="plain wo-ed-name" value="${esc(c.n)}" maxlength="40" autocomplete="off">
@@ -1911,7 +1914,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
     const had = ui.pickFor === 'edit' ? ed.ex : ui.pickFor.startsWith('circ:') ? ed.circuiti[ui.pickFor.slice(5)].ex : [];
     const n = ui.sel.length;
     const back = ui.pg && !ui.q.trim() ? 'Esercizi' : `${esc(ed.name || (ed.isNew ? 'Nuova scheda' : 'Scheda'))}${diBadge(ed)}`;
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${back}</button></div>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">${BK}<span class="bl">${back}</span></button></div>
       ${pickBody(true, had)}
       <div class="wo-pickpad"></div>
       <div class="wo-pickbar"><button class="primary" data-a="padd"${n ? '' : ' disabled'}>${n ? `Aggiungi ${n} ${n === 1 ? 'esercizio' : 'esercizi'}` : 'Scegli gli esercizi'}</button></div>`;
@@ -1938,7 +1941,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
 
   function newExView() {
     const nx = ui.nx;
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Aggiungi esercizi</button></div>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">${BK}<span class="bl">Aggiungi esercizi</span></button></div>
       <h2 class="wo-ed-title">Nuovo esercizio</h2>
       <label class="wo-lbl" for="wo-nx-n">Nome</label>
       <input id="wo-nx-n" class="plain wo-ed-name" value="${esc(nx.n)}" placeholder="Per esempio Hammer incline press" maxlength="50" autocomplete="off">
@@ -2227,7 +2230,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   function copyView() {
     const { by, names } = altri();
     const row = ({ sc, key, chi }) => `<button class="wo-row" data-a="prev:${key}"><span><b>${esc(sc.name)}</b><small>${sc.ex.length} ${sc.ex.length === 1 ? 'esercizio' : 'esercizi'}${key.startsWith('o:') && sc.di ? ` · da ${esc(sc.di)}${crown(sc.di)}, modificata` : ''}${giaMia(sc, chi) ? ' · già tra le tue' : ''}</small></span><span class="wo-chev">›</span></button>`;
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Allenamento</button></div>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">${BK}<span class="bl">Allenamento</span></button></div>
       <h2 class="wo-ed-title">Schede degli altri</h2>
       ${names.map((n) => `<div class="wo-who"><span class="wo-av">${esc(n[0])}</span><b>${esc(n)}${crown(n)}</b></div><section class="card wo-list">${by[n].map(row).join('')}</section>`).join('') || '<p class="wo-empty">Nessuna scheda</p>'}`;
   }
@@ -2242,7 +2245,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       const v = c ? (c.lista ? c.durata || '' : `${c.giri} giri`) : pi && pi.s ? pi.s : '';
       return `<div class="wo-prev-r${c ? ' circ' : ''}"><span>${esc(nameOf(id, sc))}${c ? `<small>${esc(c.ex.map((e) => nameOf(e, sc)).join(', '))}</small>` : ''}</span><em>${esc(v)}</em></div>`;
     }).join('');
-    return `<div class="wo-top"><button class="wo-back" data-a="back">‹ Schede degli altri</button></div>
+    return `<div class="wo-top"><button class="wo-back" data-a="back">${BK}<span class="bl">Schede degli altri</span></button></div>
       <div class="wo-prev-t"><h2 class="wo-ed-title">${esc(sc.name)}</h2><span class="wo-prev-di">di ${esc(chi)}${crown(chi)}</span></div>
       <section class="card wo-prev">${rows}</section>
       <button class="primary" data-a="cpsave">Copia tra le mie</button>
