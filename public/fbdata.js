@@ -115,11 +115,11 @@ export function createFbData({ getToken, ping, onState, onError }) {
    * Carica una mia foto (JPEG in base64) e restituisce subito l'id da mandare con l'azione: anche senza rete,
    * Firebase la invia prima dell'azione messa in coda dopo (le scritture partono in ordine).
    */
-  function putPhoto(base64, label) {
+  function putPhoto(base64, label, mime = 'image/jpeg') {
     if (!x) throw new Error('Firebase non collegato');
     const { fs, db } = x;
     const id = newId();
-    fs.setDoc(fs.doc(db, 'foto', id), { name: me.name, label: String(label || ''), mime: 'image/jpeg', data: fs.Bytes.fromBase64String(base64), at: fs.serverTimestamp() }).catch((err) => onError(err));
+    fs.setDoc(fs.doc(db, 'foto', id), { name: me.name, label: String(label || ''), mime, data: fs.Bytes.fromBase64String(base64), at: fs.serverTimestamp() }).catch((err) => onError(err));
     return id;
   }
 

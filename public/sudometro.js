@@ -48,6 +48,92 @@ function loadLandmarker() {
   return landmarkerPromise;
 }
 
+// Segmentazione persona/sfondo per il viso ritagliato (modello piccolo, circa 250 KB)
+const SEGMENTER_URL = 'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite';
+let segmenterPromise;
+
+function loadSegmenter() {
+  segmenterPromise ||= (async () => {
+    const { ImageSegmenter, FilesetResolver } = await import(`${cfg.mediapipeBase}/vision_bundle.mjs`);
+    const fileset = await FilesetResolver.forVisionTasks(`${cfg.mediapipeBase}/wasm`);
+    return ImageSegmenter.createFromOptions(fileset, {
+      baseOptions: { modelAssetPath: SEGMENTER_URL, delegate: 'CPU' },
+      runningMode: 'IMAGE',
+      outputConfidenceMasks: true,
+      outputCategoryMask: false,
+    });
+  })().catch((err) => {
+    segmenterPromise = null;
+    throw err;
+  });
+  return segmenterPromise;
+}
+
+/**
+ * Viso ritagliato senza sfondo, quadrato (PNG in base64, senza prefisso data:) per i pallini con le facce.
+ * Da uno scatto già analizzato (si usa il riquadro del viso trovato) o da una foto qualsiasi (lo cerca qui).
+ * null se non trova il viso o la segmentazione non va: il pallino resta con le iniziali.
+ */
+export async function faceCutout(source, size = 160) {
+  try {
+    let canvas = source;
+    if (!(source instanceof HTMLCanvasElement)) {
+      canvas = document.createElement('canvas');
+      canvas.width = source.naturalWidth || source.width;
+      canvas.height = source.naturalHeight || source.height;
+      canvas.getContext('2d').drawImage(source, 0, 0);
+    }
+    let b = faceBoxes.get(canvas);
+    if (!b) {
+      await analyzeDetailed(canvas);
+      b = faceBoxes.get(canvas);
+    }
+    if (!b) return null;
+    const seg = await loadSegmenter();
+    const res = seg.segment(canvas);
+    const masks = res.confidenceMasks || [];
+    // Il modello dà una sola maschera: quanto ogni punto è persona
+    const mask = masks[masks.length - 1];
+    const conf = mask.getAsFloat32Array();
+    const mw = mask.width;
+    const mh = mask.height;
+    // Quadrato attorno al viso con un po' di capelli sopra
+    const side = Math.max(b.w * 1.45, b.h * 1.25);
+    const cx = b.x + b.w / 2;
+    const cy = b.y + b.h * 0.45;
+    const sx = cx - side / 2;
+    const sy = cy - side / 2;
+    const out = document.createElement('canvas');
+    out.width = size;
+    out.height = size;
+    const ctx = out.getContext('2d', { willReadFrequently: true });
+    ctx.drawImage(canvas, sx, sy, side, side, 0, 0, size, size);
+    const img = ctx.getImageData(0, 0, size, size);
+    const k = side / size;
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        const px = sx + x * k;
+        const py = sy + y * k;
+        const i = (y * size + x) * 4 + 3;
+        if (px < 0 || py < 0 || px >= canvas.width || py >= canvas.height) {
+          img.data[i] = 0;
+          continue;
+        }
+        const mx = Math.min(mw - 1, Math.floor((px / canvas.width) * mw));
+        const my = Math.min(mh - 1, Math.floor((py / canvas.height) * mh));
+        const a = Math.min(1, Math.max(0, (conf[my * mw + mx] - 0.15) / 0.7));
+        img.data[i] = Math.round(img.data[i] * a);
+      }
+    }
+    masks.forEach((m) => m.close && m.close());
+    ctx.putImageData(img, 0, 0);
+    return out.toDataURL('image/png').split(',')[1];
+  } catch (err) {
+    console.warn('Viso non ritagliato', err);
+    return null;
+  }
+}
+
 /** Inizia a scaricare il modello in anticipo (circa 4 MB). */
 export function preload() {
   loadLandmarker().catch(() => {});

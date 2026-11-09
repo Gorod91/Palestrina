@@ -16,8 +16,12 @@ const VERSIONS = [
   },
   {
     v: '2.3',
-    date: '5 – 9 novembre 2026',
+    date: '5 – 10 novembre 2026',
     items: [
+      'Home: "In palestra adesso", con le facce di chi ha fatto check-in nelle ultime 2 ore e l\'orario entro cui andare per il bonus amici',
+      'Facce ritagliate in automatico, senza sfondo, dall\'ultimo Sudometro (o dalla foto di riferimento)',
+      'Chat: evento "Sorpasso!" quando qualcuno supera un altro in classifica; la notifica non dice chi',
+      'Chat: reazioni alle foto del Sudometro, tenendo premuta la foto o con il tasto +; il tocco la ingrandisce come prima',
       'Chat: nel sondaggio, i nomi di chi non ha ancora risposto al posto del numero',
       'Classifica: tasto del mese accanto al titolo, con il calendario dei mesi (giorni più rossi quando più persone sono andate in palestra)',
       'Mesi passati in Classifica: classifica finale con medaglie, presenze e Sudometro del mese scelto',

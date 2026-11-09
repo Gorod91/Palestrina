@@ -1339,3 +1339,55 @@ html.ios.standalone .sr { top: var(--ios-top, 0px); }
 .al-rec em { font-style: normal; min-width: 0; white-space: nowrap; }
 .al-rec b { color: #ffd60a; font-variant-numeric: tabular-nums; }
 .top .avatar { flex: none; }
+
+/* ---------- Pallini con le facce (In palestra adesso, sorpassi) ---------- */
+.fav { position: relative; display: inline-grid; place-items: center; width: var(--s); height: var(--s); border-radius: 50%; flex: none; box-shadow: 0 0 0 2px var(--card), 0 0 0 4px #ffffff22; }
+.fav b { font-size: calc(var(--s) * .36); font-weight: 800; color: #000; letter-spacing: -.02em; }
+.fav-face { position: absolute; inset: 0; border-radius: 50%; overflow: hidden; }
+.fav-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fav .crown { position: absolute; margin: 0; width: 28px; height: 23px; top: -21px; left: 42%; transform: translateX(-50%) rotate(-8deg); filter: drop-shadow(0 1px 2px #000c); }
+
+.now-h { display: flex; align-items: center; gap: 8px; }
+.now-live { width: 9px; height: 9px; border-radius: 50%; background: #30d158; animation: now-live 1.8s infinite; }
+@keyframes now-live { 0% { box-shadow: 0 0 0 0 #30d15899; } 70% { box-shadow: 0 0 0 9px #30d15800; } 100% { box-shadow: 0 0 0 0 #30d15800; } }
+.card.now { padding-top: 22px; }
+.now-row { display: flex; gap: 18px; overflow-x: auto; margin: -6px -16px 0; padding: 6px 16px 2px; scrollbar-width: none; }
+.now-row::-webkit-scrollbar { display: none; }
+.now-p { display: grid; justify-items: center; gap: 2px; min-width: 76px; }
+.now-p p { margin: 6px 0 0; font-size: 14px; font-weight: 600; }
+.now-p small { font-size: 12px; color: var(--muted); }
+.now-hint { margin: 14px 0 0; padding-top: 12px; border-top: .5px solid #ffffff1a; font-size: 13px; color: var(--muted); }
+.now-hint b { color: var(--exercise); font-weight: 700; }
+
+/* Sorpasso in chat */
+.event.sorp { border: 1px solid #a6ff0033; background: linear-gradient(160deg, #a6ff0014, transparent 60%), var(--card); }
+.event.sorp.gold { border-color: #ffd60a55; background: linear-gradient(160deg, #ffd60a1c, transparent 60%), var(--card); }
+.sorp-row { display: flex; align-items: center; gap: 12px; text-align: left; }
+.sorp-row p { margin: 0; }
+.sorp-faces { display: flex; flex: none; }
+.sorp-faces > span { position: relative; }
+.sorp-faces .up { z-index: 1; }
+.sorp-faces .down { margin-left: -10px; }
+.sorp-faces .down .fav { filter: grayscale(.7) brightness(.75); }
+.sorp-faces .fav { box-shadow: 0 0 0 2px var(--card); }
+.sorp-faces i { position: absolute; right: -3px; bottom: -3px; z-index: 2; display: grid; place-items: center; width: 17px; height: 17px; border-radius: 50%; font-style: normal; font-size: 8px; box-shadow: 0 0 0 2px var(--card); }
+.sorp-faces .up i { background: #30d158; color: #000; }
+.sorp-faces .down i { background: #ff453a; color: #fff; }
+.sorp-t { font-size: 17px; font-weight: 800; letter-spacing: -.02em; color: var(--exercise); }
+.sorp.gold .sorp-t, .sorp .gold-pos { color: #ffd60a; }
+.sorp .event-text { color: var(--fg); }
+
+/* Reazioni alle foto del Sudometro */
+.event.with-photo { position: relative; }
+.event-sudo .pair, .event-sudo .pair img { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; -webkit-user-drag: none; }
+.reacts { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.react-chip { display: inline-flex; align-items: center; gap: 4px; height: 28px; padding: 0 10px; border: 1px solid #ffffff1f; border-radius: 99px; background: var(--card-2); color: var(--fg); font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; }
+.react-chip b { font-size: 13px; }
+.react-chip.mine { background: #a6ff0022; border-color: #a6ff0088; color: var(--exercise); }
+.react-chip.pop { animation: react-pop .35s cubic-bezier(.2, 1.6, .4, 1); }
+.react-add { width: 28px; padding: 0; justify-content: center; color: var(--muted); font-size: 18px; font-weight: 400; }
+@keyframes react-pop { from { transform: scale(.6); } to { transform: scale(1); } }
+.react-picker { position: absolute; left: 6px; top: -50px; z-index: 5; display: flex; gap: 4px; padding: 6px; border-radius: 99px; background: #3a3a3c; box-shadow: 0 10px 30px #000c; animation: react-pop .3s cubic-bezier(.2, 1.6, .4, 1); }
+.react-picker button { width: 40px; height: 40px; border: 0; border-radius: 50%; background: none; font-size: 26px; cursor: pointer; }
+.react-picker button:active { background: #ffffff22; transform: scale(1.2); }
+.event.react-focus { z-index: 4; box-shadow: 0 0 0 2px #ffffff33; }

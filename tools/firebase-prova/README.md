@@ -17,3 +17,11 @@ node test-tutto.js      # tutto su Firebase in prova (VERO=1 per la configurazio
 ```
 
 `FIREBASE_CHAT=spento node fake-gas.js …` avvia il finto server con Firebase spento.
+
+Visi, "In palestra adesso", sorpassi e reazioni (dopo `test-tutto.js`, stesso emulatore e finto server avviato con
+`TABELLE=firebase FIREBASE_TUTTO=si`): serve un selfie vero e il pacchetto di MediaPipe (`npm pack @mediapipe/tasks-vision@0.10.21`):
+
+```sh
+MP=/percorso/package FOTO=/percorso/selfie.jpg node test-visi.js
+```
+

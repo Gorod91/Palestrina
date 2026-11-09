@@ -727,7 +727,9 @@ function handle(req, user) {
       case 'checkinUndo':
         return json(checkinUndo(user));
       case 'setReference':
-        return json(saveReference(user, req.features, req.photo, req.photoId));
+        return json(saveReference(user, req.features, req.photo, req.photoId, req.faceId));
+      case 'setFace':
+        return json(saveFace(user, req.faceId, req.from));
       case 'photo':
         return json(getPhoto(req.id));
       case 'photos':
@@ -991,13 +993,42 @@ function checkinUndo(user) {
 }
 
 /** Foto di riferimento ("riposato"): solo i valori calcolati, mai la foto. Si fa una volta. */
-function saveReference(user, features, photo, photoId) {
+function saveReference(user, features, photo, photoId, faceId) {
   if (!features || typeof features.redness !== 'number') return { error: 'Foto di riferimento non valida' };
   const saved = savePhoto(user, photo, 'riferimento', photoId);
   props.setProperty('ref_' + user.name, JSON.stringify({ features, at: Date.now(), photoId: saved.id || '' }));
   forget('refs');
+  if (faceId) saveFace(user, faceId, 'riferimento');
   bumpChat(); // la foto da fresco compare anche in chat
   return { ok: true, photoError: saved.error };
+}
+
+/**
+ * Viso ritagliato senza sfondo (PNG fatto dal telefono): quello dell'ultimo Sudometro, altrimenti quello della foto
+ * di riferimento. Si vede nei pallini di "In palestra adesso" e nei sorpassi in chat.
+ */
+function saveFace(user, faceId, from) {
+  const ok = fotoOwned(user, String(faceId || ''));
+  if (ok.error) return ok;
+  props.setProperty((from === 'riferimento' ? 'visoRif_' : 'viso_') + user.name, ok.id);
+  forget('visi');
+  bumpChat();
+  return { ok: true };
+}
+
+/** Nome → id del viso da mostrare. */
+function faceIds() {
+  return memo('visi', () => {
+    const all = props.getProperties();
+    const out = {};
+    Object.keys(all).forEach((k) => {
+      if (k.indexOf('visoRif_') === 0 && !out[k.slice(8)]) out[k.slice(8)] = all[k];
+    });
+    Object.keys(all).forEach((k) => {
+      if (k.indexOf('viso_') === 0) out[k.slice(5)] = all[k];
+    });
+    return out;
+  });
 }
 
 /** Foto di riferimento ("da fresco") di ciascuno, da mostrare accanto ai selfie da sudato: nome → id del file. */
@@ -1047,6 +1078,7 @@ function saveSudometro(user, req) {
     refId,
   ]);
   if (!debug) {
+    if (req.faceId) saveFace(user, req.faceId, 'sudato');
     addChatEvent(user.name, { kind: 'sudometro', score, title: String(req.title || '').slice(0, 60), photoId: saved.id || '', ref: refId });
     dispatch('sudometro', user.name);
     medalCheck(user.name, true);
@@ -1178,6 +1210,9 @@ function sharedState() {
     poll: pollSummary(today, presenze, dn),
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
+    faces: faceIds(),
+    // Check-in di oggi con l'ora, per "In palestra adesso" (il telefono tiene quelli delle ultime 2 ore)
+    checkinsToday: presenze.filter((r) => r.day === today).map((r) => ({ name: r.name, time: r.time })),
     fem: femmine(),
     features: { apripista: featureOn('apripista'), sfide: featureOn('sfide') && sfide().length > 0, regole: featureOn('regole'), sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn(), firebaseTutto: !TEST && fbAllOn(), provaTutto: TEST && fbAllOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
@@ -1428,6 +1463,11 @@ function buildNotifications(event, name) {
     return subs.map((s) => ({ subscription: s.sub, title: `Premiazioni di ${m.label}`, body: 'Il nuovo Re è stato incoronato. Tocca per scoprire chi è.', tab: 'chat' }));
   }
 
+  if (event === 'sorpasso') {
+    // Mai nomi nella notifica: chi ha superato chi si scopre in chat
+    return toAllBut(name, 'Sorpasso in classifica', 'Qualcuno ha cambiato posizione. Tocca per scoprire chi.').map((n) => ({ ...n, tab: 'chat' }));
+  }
+
   if (event === 'medaglia') {
     const [who] = String(name).split('|');
     return subs.filter((s) => s.name === who).map((s) => ({ subscription: s.sub, title: 'Novità per te', body: 'C\'è una sorpresa per te nell\'app. Tocca per scoprirla.', tab: 'classifica' }));
@@ -1605,6 +1645,7 @@ function buildChatState(version, today) {
     names: Object.fromEntries(allUsers().map((u) => [u.name, u.display])),
     fem: femmine(),
     refPhotos: refPhotoIds(),
+    faces: faceIds(),
     sfide: sfideForChat(today),
   };
 }
@@ -2846,6 +2887,43 @@ function medalCheck(actor, inApp) {
   } catch (err) {
     console.error('Controllo medaglie non riuscito', err);
   }
+  overtakeCheck(actor);
+}
+
+/**
+ * Sorpassi in classifica (dal 9/11/2026): dopo ogni azione che cambia i punti si confronta la classifica del mese con
+ * quella salvata. Chi ora ha più punti di qualcuno che prima gli stava davanti (pareggi esclusi, e mai chi ha ancora
+ * 0 punti) finisce in chat con un evento; la notifica agli altri non dice chi. Il primo controllo del mese salva solo.
+ */
+function overtakeCheck(actor) {
+  try {
+    const month = dayString(new Date()).slice(0, 7);
+    const key = `${TEST ? 'prova_' : ''}sorpassi_${month}`;
+    const saved = props.getProperty(key);
+    const before = safeJson(saved || '{}') || {};
+    const now = {};
+    computePoints(month).forEach((t) => (now[t.name] = t.total));
+    props.setProperty(key, JSON.stringify(now));
+    if (!saved) return;
+    const found = overtakes(before, now);
+    found.forEach((o) => addChatEvent(o.name, { kind: 'sorpasso', passed: o.passed, pos: o.pos, pts: o.pts }));
+    // Una notifica per azione basta: se i sorpassi sono più d'uno si scopre tutto in chat
+    if (found.length) dispatch('sorpasso', found.some((o) => o.name === actor) ? actor : found[0].name);
+  } catch (err) {
+    console.error('Controllo sorpassi non riuscito', err);
+  }
+}
+
+/** Da due classifiche (nome → punti): chi ha superato chi, la nuova posizione e i punti. Prima chi ora sta più in alto. */
+function overtakes(before, now) {
+  const names = Object.keys(now);
+  return names
+    .map((a) => {
+      const passed = names.filter((b) => b !== a && now[b] > 0 && a in before && b in before && before[a] < before[b] && now[a] > now[b]);
+      return { name: a, passed, pos: 1 + names.filter((b) => now[b] > now[a]).length, pts: now[a] };
+    })
+    .filter((o) => o.passed.length)
+    .sort((x, y) => x.pos - y.pos);
 }
 
 /** Annuncia in chat le medaglie appena vinte (una volta al mese per medaglia). */
@@ -3674,7 +3752,7 @@ const STALE_ACTION_MS = 5 * 60000;
 const SERVER_WAIT_MS = 60000;
 
 // Azioni che il telefono può mettere in coda (le altre passano dalla richiesta diretta)
-const QUEUE_ACTIONS = ['checkin', 'checkinUndo', 'sudometro', 'setReference', 'setAlias', 'setTimer', 'chatMute', 'subscribe', 'sfida', 'state'];
+const QUEUE_ACTIONS = ['checkin', 'checkinUndo', 'sudometro', 'setReference', 'setFace', 'setAlias', 'setTimer', 'chatMute', 'subscribe', 'sfida', 'state'];
 
 /** Esegue le azioni in coda (della prova se `test`). Restituisce quante. */
 function processQueue(test) {

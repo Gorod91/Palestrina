@@ -11,6 +11,7 @@ import { showSudoReveal } from './sudoreveal.js';
 import { releaseNotesHtml } from './note.js';
 import { createMedals } from './medaglie.js';
 import { openCoronation } from './corona.js';
+import { setPeople, faceHtml, paintFaces, esc as escFace } from './visi.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
@@ -108,7 +109,7 @@ function fakeOn() {
 // ---------- Tutto su Firebase ----------
 // Con la novità attiva (o in modalità prova, quando il server lo prevede) lo stato arriva da Firestore e le azioni
 // vanno in coda su Firestore: il telefono non aspetta Apps Script. Se Firebase non va, tutto torna come prima.
-const QUEUE_ACTIONS = new Set(['checkin', 'checkinUndo', 'sudometro', 'setReference', 'setAlias', 'setTimer', 'chatMute', 'subscribe', 'sfida']);
+const QUEUE_ACTIONS = new Set(['checkin', 'checkinUndo', 'sudometro', 'setReference', 'setFace', 'setAlias', 'setTimer', 'chatMute', 'subscribe', 'sfida']);
 let fbStarted = ''; // '', 'prova' o 'tutti': per chi è collegato
 let fbLiveState = false; // stato arrivato da Firebase (dal server, non solo dalla copia sul telefono)
 let fbRetryAt = 0;
@@ -220,6 +221,12 @@ function fbCall(action, data) {
     photoCache.set(d.photoId, Promise.resolve(`data:image/jpeg;base64,${d.photo}`)); // già sul telefono: non si riscarica
     delete d.photo;
   }
+  // Viso ritagliato (PNG): anche lui direttamente su Firebase, al server arriva solo l'id
+  if (d.face) {
+    d.faceId = fbdata.putPhoto(d.face, 'viso', 'image/png');
+    photoCache.set(d.faceId, Promise.resolve(`data:image/png;base64,${d.face}`));
+  }
+  delete d.face;
   if (!FAST_ACTIONS.has(action)) return fbdata.call(action, d);
   // Fatta quando Firebase conferma di averla salvata; se poi il server la rifiuta o non risponde, errore e si torna
   // all'ultimo stato del server
@@ -277,6 +284,11 @@ async function api(action, data = {}) {
       if (action === 'photo' && String(data.id).startsWith('fake-')) return fakePhoto(String(data.id));
       if (action !== 'photo' && action !== 'photos') throw new Error('Dati fittizi attivi: spegnili in Altro per usare l\'app davvero');
     }
+  }
+  if (data && data.face) {
+    // Senza Firebase il viso non si salva (Apps Script prende solo JPEG): resta il pallino con le iniziali
+    data = { ...data };
+    delete data.face;
   }
   return realApi(action, data);
 }
@@ -418,6 +430,8 @@ function render() {
   $('week-goal').textContent = `/${mine.goal}`;
   $('week-streak').textContent = mine.streak;
 
+  renderNow();
+  ensureFace();
   renderPresence();
   renderPoints();
   setTimeout(medals.check, 1200); // medaglie vinte o strappate: dopo l'anello del check-in
@@ -502,6 +516,76 @@ function renderViewportDebug() {
 }
 
 /** Re in carica: l'ultimo dell'albo d'oro, con la corona accanto al nome fino al prossimo. */
+// ---------- In palestra adesso ----------
+
+const NOW_MINUTES = 120; // chi ha fatto check-in nelle ultime 2 ore
+const romeClock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+const toMin = (t) => {
+  const [h, m] = String(t).split(':').map(Number);
+  return h * 60 + (m || 0);
+};
+
+function renderNow() {
+  const { me } = state;
+  const names = (state.week && state.week.ranking) || [];
+  setPeople(names.map((r) => r.name));
+  const display = Object.fromEntries(names.map((r) => [r.name, r.display]));
+  const nowMin = toMin(romeClock.format(new Date()));
+  const here = new Map(); // nome → ora del check-in
+  (state.checkinsToday || []).forEach((c) => {
+    const ago = nowMin - toMin(c.time);
+    if (ago >= 0 && ago <= NOW_MINUTES && !here.has(c.name)) here.set(c.name, c.time);
+  });
+  if (me.checkedInToday && !here.has(me.name) && !(state.checkinsToday || []).some((c) => c.name === me.name)) here.set(me.name, romeClock.format(new Date()));
+  const list = [...here.entries()].sort((a, b) => toMin(a[1]) - toMin(b[1]));
+  $('now-title').hidden = !list.length;
+  $('now-card').hidden = !list.length;
+  if (!list.length) return;
+  const faces = state.faces || {};
+  const since = (t) => {
+    const ago = nowMin - toMin(t);
+    return ago < 1 ? 'adesso' : ago < 60 ? `da ${ago} min` : `da ${Math.floor(ago / 60)} h${ago % 60 ? ` ${ago % 60} min` : ''}`;
+  };
+  $('now-row').innerHTML = list
+    .map(([name, t]) => {
+      const label = name === me.name ? 'Tu' : display[name] || name;
+      return `<div class="now-p">${faceHtml(name, display[name] || name, { size: 76, faceId: faces[name], crown: isKing(name) ? crownFor(name) : '' })}<p>${escFace(label)}</p><small>${since(t)}</small></div>`;
+    })
+    .join('');
+  paintFaces($('now-row'), loadPhoto);
+  // Bonus amici: check-in entro un'ora da quello di un altro
+  const others = list.filter(([n]) => n !== me.name);
+  const last = others.length ? Math.max(...others.map(([, t]) => toMin(t))) : -1;
+  const until = last + 60;
+  const hint = $('now-hint');
+  hint.hidden = me.checkedInToday || last < 0 || until <= nowMin;
+  if (!hint.hidden) hint.innerHTML = `Vai anche tu entro le ${String(Math.floor(until / 60)).padStart(2, '0')}:${String(until % 60).padStart(2, '0')}: <b>+3 bonus amici</b>`;
+}
+setInterval(() => state && !document.hidden && renderNow(), 60000);
+
+/**
+ * Chi non ha ancora un viso (prima del 9/11 non si ritagliava): il telefono lo ricava una volta dalla sua foto di
+ * riferimento; dal prossimo Sudometro si usa quello. Senza fretta, qualche secondo dopo l'apertura.
+ */
+let faceTried = false;
+function ensureFace() {
+  if (faceTried || !state || fakeOn() || !fbOk() || state.me.actingAs) return;
+  const ref = (state.refPhotos || {})[state.me.name];
+  if (!ref || (state.faces || {})[state.me.name]) return;
+  faceTried = true;
+  setTimeout(async () => {
+    try {
+      const img = new Image();
+      img.src = await loadPhoto(ref);
+      await img.decode();
+      const face = await sudometro.faceCutout(img);
+      if (face) await api('setFace', { face, from: 'riferimento' });
+    } catch (err) {
+      console.warn('Viso non creato', err);
+    }
+  }, 5000);
+}
+
 function isKing(name) {
   const albo = (state && state.albo) || [];
   return albo.length > 0 && albo[albo.length - 1].names.includes(name);
@@ -1211,7 +1295,8 @@ async function takeReference() {
     sudoBusy('Analizzo la foto…');
     const features = await sudometro.analyze(canvas);
     sudoBusy('Salvo la foto di riferimento…');
-    const r = await api('setReference', { features, photo: sudometro.toJpegBase64(canvas) });
+    const face = await sudometro.faceCutout(canvas);
+    const r = await api('setReference', { features, photo: sudometro.toJpegBase64(canvas), face });
     toast(photoWarning(r) || `Foto di riferimento salvata. Da ora basta il selfie da ${sudato()}.`, 5000);
     await refresh();
   } catch (err) {
@@ -1284,6 +1369,8 @@ async function takeSweat(debug, overwrite = false) {
         photo: `data:image/jpeg;base64,${photo}`,
       });
     } else sudoBusy('Pubblico la foto…');
+    // Il viso di questo selfie diventa quello nei pallini (In palestra adesso, sorpassi)
+    const face = debug ? null : await sudometro.faceCutout(canvas);
     const r = await api('sudometro', {
       score: shown.score,
       title: shown.title,
@@ -1291,6 +1378,7 @@ async function takeSweat(debug, overwrite = false) {
       debug,
       overwrite,
       photo,
+      face,
     }).catch((err) => {
       if (before) {
         state = before; // non è andato: torna com'era
@@ -1459,7 +1547,7 @@ function cameraError(err) {
 // ---------- Chat ----------
 
 initSheetDrag(); // fogli dal basso: si chiudono trascinandoli giù
-const chat = createChat({ api, toast, photoPair, clean, isDebug: () => debugOn(), isKing, crown: crownFor, isF, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => (testOn() ? 'prova' : state && state.features && state.features.firebase ? 'tutti' : ''), fbOnly: () => fbOk() });
+const chat = createChat({ api, toast, photoPair, loadPhoto, clean, isDebug: () => debugOn(), isKing, crown: crownFor, isF, openNews, trace: (ev, d) => trace.log(ev, d), useFirebase: () => (testOn() ? 'prova' : state && state.features && state.features.firebase ? 'tutti' : ''), fbOnly: () => fbOk() });
 
 // ---------- Allenamento (fase 1, solo in prova) ----------
 

@@ -3,6 +3,7 @@
 
 import { createFbChat } from './fbchat.js';
 import { alF, kingTitle } from './genere.js';
+import { faceHtml, paintFaces } from './visi.js';
 
 const $ = (id) => document.getElementById(id);
 const POLL_EVERY = 5000;
@@ -24,7 +25,7 @@ const CHOICES = [
   ['no', 'No'],
 ];
 
-export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crown, isF: isFApp, openNews, trace, useFirebase, fbOnly }) {
+export function createChat({ api, toast, photoPair, loadPhoto, clean, isDebug, isKing, crown, isF: isFApp, openNews, trace, useFirebase, fbOnly }) {
   const tlog = trace || (() => {});
   let me = null; // { name, display }
   let v = 0; // versione dei dati in Apps Script
@@ -134,6 +135,20 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       tlog('firebase', `stato v=${r.v}${fromCache ? ' (dal telefono)' : ''}`);
       apply(r);
       renderSync();
+    },
+    onReacts(list) {
+      if (!fbOn) return;
+      reacts = new Map();
+      list.forEach((r) => {
+        if (!reacts.has(r.msg)) reacts.set(r.msg, new Map());
+        reacts.get(r.msg).set(r.name, r.e);
+      });
+      // Le mie appena toccate valgono finché Firebase non le conferma
+      myReacts.forEach((e, msg) => {
+        if (!reacts.has(msg)) reacts.set(msg, new Map());
+        reacts.get(msg).set(me && me.name, e);
+      });
+      document.querySelectorAll('#chat-list .reacts[data-mid]').forEach((box) => drawReacts(box));
     },
     onPlans(asks, plans, fromCache) {
       if (!fbOn) return;
@@ -975,6 +990,115 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
     });
     if (!data.messages.length && !pending.length) list.append(el('p', 'empty', 'Ancora nessun messaggio. Scrivi tu il primo.'));
     showPending();
+    if (loadPhoto) paintFaces(list, loadPhoto);
+  }
+
+  // ---------- Reazioni alle foto del Sudometro ----------
+
+  const REACTIONS = ['😂', '🔥', '🍅', '🥶'];
+  let reacts = new Map(); // id evento → (nome → reazioni)
+  const myReacts = new Map(); // id evento → mie reazioni non ancora confermate da Firebase
+
+  /** Chip delle reazioni di un evento, più il + per aggiungerne. */
+  function drawReacts(box, popped) {
+    const id = box.dataset.mid;
+    const by = reacts.get(id) || new Map();
+    const count = {};
+    by.forEach((list, n) => list.forEach((e) => (count[e] = count[e] || []).push(n)));
+    box.innerHTML = '';
+    REACTIONS.filter((e) => count[e]).forEach((e) => {
+      const b = el('button', `react-chip${count[e].includes(me.name) ? ' mine' : ''}${e === popped ? ' pop' : ''}`);
+      b.type = 'button';
+      b.innerHTML = `${e} <b>${count[e].length}</b>`;
+      b.title = count[e].map(who).join(', ');
+      b.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        toggleReact(box, e);
+      });
+      box.append(b);
+    });
+    const add = el('button', 'react-chip react-add', '+');
+    add.type = 'button';
+    add.setAttribute('aria-label', 'Reagisci');
+    add.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      openPicker(box);
+    });
+    box.append(add);
+  }
+
+  function toggleReact(box, e) {
+    const id = box.dataset.mid;
+    if (!reacts.has(id)) reacts.set(id, new Map());
+    const mine = [...(reacts.get(id).get(me.name) || [])];
+    const i = mine.indexOf(e);
+    if (i >= 0) mine.splice(i, 1);
+    else mine.push(e);
+    reacts.get(id).set(me.name, mine);
+    myReacts.set(id, mine);
+    drawReacts(box, i >= 0 ? '' : e);
+    fb.react(id, mine)
+      .then(() => myReacts.get(id) === mine && myReacts.delete(id))
+      .catch((err) => {
+        myReacts.delete(id);
+        toast('Reazione non salvata: ' + (err.message || err));
+      });
+  }
+
+  function openPicker(box) {
+    closePicker();
+    const row = box.closest('.event');
+    const pk = el('div', 'react-picker');
+    REACTIONS.forEach((e) => {
+      const b = el('button', '', e);
+      b.type = 'button';
+      b.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        toggleReact(box, e);
+        closePicker();
+      });
+      pk.append(b);
+    });
+    row.append(pk);
+    row.classList.add('react-focus');
+  }
+
+  function closePicker() {
+    document.querySelectorAll('.react-picker').forEach((p) => {
+      p.parentNode.classList.remove('react-focus');
+      p.remove();
+    });
+  }
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest || !e.target.closest('.react-picker')) closePicker();
+  });
+
+  /** Tenendo premuta la foto si apre la scelta delle reazioni; il tocco normale la ingrandisce come sempre. */
+  function longPress(target, onLong) {
+    let timer = 0;
+    let long = false;
+    let start = null;
+    const cancel = () => clearTimeout(timer);
+    target.addEventListener('pointerdown', (e) => {
+      long = false;
+      start = [e.clientX, e.clientY];
+      cancel();
+      timer = setTimeout(() => {
+        long = true;
+        if (navigator.vibrate) navigator.vibrate(10);
+        onLong();
+      }, 450);
+    });
+    target.addEventListener('pointermove', (e) => start && Math.hypot(e.clientX - start[0], e.clientY - start[1]) > 10 && cancel());
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach((t) => target.addEventListener(t, cancel));
+    target.addEventListener('contextmenu', (e) => e.preventDefault());
+    // Prima del clic della foto: dopo una pressione lunga non si apre
+    target.parentNode.addEventListener('click', (e) => {
+      if (long && target.contains(e.target)) {
+        e.stopPropagation();
+        long = false;
+      }
+    }, true);
   }
 
   // ---------- Sfide (card in chat) ----------
@@ -1204,6 +1328,26 @@ export function createChat({ api, toast, photoPair, clean, isDebug, isKing, crow
       text.append(el('p', 'event-score', `${d.score} · ${title}`));
       if (d.photoId) box.append(photoPair(d.photoId, d.ref || (data.refPhotos || {})[m.name], `${name} · ${d.score} · ${title}`, false, isF(m.name)));
       box.append(text);
+      row.append(box);
+      // Reazioni (solo con la chat su Firebase, dove si salvano)
+      if (d.photoId && fbLive() && m.id) {
+        const rb = el('div', 'reacts');
+        rb.dataset.mid = m.id;
+        drawReacts(rb);
+        row.append(rb);
+        longPress(box.querySelector('.pair'), () => openPicker(rb));
+      }
+    } else if (d.kind === 'sorpasso' && (d.passed || []).length) {
+      // Sorpasso in classifica: chi sale davanti, chi scende dietro (se ne supera più d'uno, il primo)
+      row.classList.add('sorp');
+      if (d.pos === 1) row.classList.add('gold');
+      const faces = data.faces || {};
+      const passed = d.passed;
+      const face = (n, cls, arrow) => `<span class="${cls}">${faceHtml(n, who(n), { size: 46, faceId: faces[n] })}<i>${arrow}</i></span>`;
+      const pos = d.pos === 1 ? '<b class="gold-pos">1°</b>' : `<b>${escH(d.pos)}°</b>`;
+      const list = passed.map((n) => kn(n)).join(', ').replace(/, ([^,]*)$/, ' e $1');
+      const box = el('div', 'sorp-row');
+      box.innerHTML = `<span class="sorp-faces">${face(m.name, 'up', '▲')}${face(passed[0], 'down', '▼')}</span><div><p class="sorp-t">Sorpasso!</p><p class="event-text">${nameH} supera ${list}: ora è ${pos} con ${escH(d.pts)} punti</p></div>`;
       row.append(box);
     } else if (d.kind === 'achievement') {
       row.classList.add('award');
