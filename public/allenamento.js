@@ -559,6 +559,12 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   /** Sotto "Fatta oggi ✓": quanti esercizi, se non tutti. */
   const quanti = (sch) => { const n = doneToday(sch); return n < sch.ex.length ? ` · ${n} di ${sch.ex.length}` : ''; };
 
+  /** Sotto i tasti dell'esercizio: chiude la scheda anche se mancano esercizi (quelli non fatti restano non salvati). */
+  const fineBtn = () => {
+    const sch = curSch();
+    return ui.list.length > 1 && sch && doneToday(sch) > 0 && !fattaOggi(sch) ? '<button class="secondary wo-fine" data-a="fine">Termina qui la scheda</button>' : '';
+  };
+
   /** La scheda da fare: quella iniziata oggi, se non finita; altrimenti quella non fatta da più tempo. */
   function proposta() {
     const list = (schede || []).filter((s) => !s.di);
@@ -889,12 +895,10 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
     const dots = ui.list.map((id, k) => `<button class="${k === ui.i ? 'cur' : ''}${isDone(id) ? ' ok' : ''}" data-a="j:${k}" aria-label="${esc(nameOf(id))}"></button>`).join('');
     const title = sch ? `${esc(sch.name)}${diBadge(sch)} · <span id="wo-num">${ui.i + 1}</span>/${ui.list.length}` : 'Allenamento libero';
     const many = ui.list.length > 1;
-    // in basso a sinistra, poco in vista: chiude la scheda anche se mancano esercizi (quelli non fatti restano non salvati)
-    const fine = many && sch && doneToday(sch) > 0 && !fattaOggi(sch) ? `<button class="wo-fine" data-a="fine">Termina qui</button>` : '';
     return `<div class="wo-top"><button class="wo-back" data-a="back">‹ ${title}</button></div>
       ${many ? `<div class="wo-dots" id="wo-dots">${dots}</div>` : ''}
       <div class="wo-pager${many ? ' multi' : ''}" id="wo-pager">${ui.list.map((_, k) => pageHtml(k, sch)).join('')}</div>
-      ${fine}${many ? `<div class="wo-bar"><button class="wo-all" id="wo-all"><svg viewBox="0 0 24 24" aria-hidden="true">${[3, 10, 17].map((y) => [3, 10, 17].map((x) => `<rect x="${x}" y="${y}" width="5.5" height="5.5" rx="1.6"/>`).join('')).join('')}</svg>Tutti</button></div>
+      ${many ? `<div class="wo-bar"><button class="wo-all" id="wo-all"><svg viewBox="0 0 24 24" aria-hidden="true">${[3, 10, 17].map((y) => [3, 10, 17].map((x) => `<rect x="${x}" y="${y}" width="5.5" height="5.5" rx="1.6"/>`).join('')).join('')}</svg>Tutti</button></div>
       <div class="wo-sheet" id="wo-sheet" hidden><div class="wo-sheet-box"><div class="wo-grab"></div><p class="wo-sheet-hint">Tieni premuto "Tutti" e trascina il dito su un esercizio, poi lascia</p>
         <div class="wo-grid">${ui.list.map((id, k) => {
           const c = circIn(sch, id), e = EX[id] || { n: id }, d = isDone(id), pi = sch && sch.piano ? sch.piano[id] : null;
@@ -929,7 +933,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
         const d = todayDoc(e), pi = sch && sch.piano ? sch.piano[e] : null;
         return `<button class="wo-mob${d ? ' ok' : ''}" data-a="mob:${e}"><span class="wo-mob-ck">${d ? '✓' : ''}</span>${figSvg(e, 'sm')}<span class="wo-mob-n"><b>${esc(nameOf(e))}</b><small>${esc((EX[e] || {}).m || '')}</small></span><span class="wo-mob-r">${esc(pi ? pi.s : '')}</span></button>`;
       }).join('')}</div>
-      ${all ? (nextTodo(k) < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : '') : '<button class="primary" data-a="moball">✓ Fatto tutto</button>'}
+      ${all ? (nextTodo(k) < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : '') : '<button class="primary" data-a="moball">✓ Fatto tutto</button>'}${fineBtn()}
       <p class="wo-sub wo-center">Tocca un esercizio per spuntarlo</p>
     </section>`;
   }
@@ -950,7 +954,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       const nx = nextTodo(k);
       return `<section class="wo-page" data-k="${k}">${head}
         <section class="card wo-list">${c.ex.map((e) => `<div class="wo-row"><span><b>${esc(nameOf(e))}</b><small>Fatto oggi · ${summary(todayDoc(e).sets, tOf(e))}</small></span><span class="wo-chev">✓</span></div>`).join('')}</section>
-        ${nx < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : ''}<button class="link-button" data-a="crifai">Rifai il circuito</button></section>`;
+        ${nx < 0 ? '<button class="primary" data-a="end">Fine scheda</button>' : ''}${fineBtn()}<button class="link-button" data-a="crifai">Rifai il circuito</button></section>`;
     }
     const rounds = Array.from({ length: st.giri }, (_, g) => `<i class="${g < st.cur ? 'ok' : g === st.cur ? 'cur' : ''}">${g < st.cur ? '✓' : `Giro ${g + 1}`}</i>`).join('');
     // come negli esercizi: la volta scorsa in rosso, e sopra da quanto tempo
@@ -968,7 +972,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       <div class="wo-cexs">${rows}</div>
       <div class="wo-cex wo-crec"><svg class="wo-fig sm" viewBox="-7.25 -1 39 26" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="13.5" r="8"/><path d="M12 13.5V9M9.5 2.5h5M19 6l1.5-1.5"/></svg><div class="wo-cname"><b>Recupero tra i giri</b><small>vale per questo circuito</small></div>
         <span class="wo-pm"><button data-a="crec-:${id}" aria-label="15 secondi in meno">−</button><label class="wo-in"><input data-f="crec:${id}" inputmode="numeric" value="${circRec(id, c)}" aria-label="Recupero tra i giri in secondi, tocca per scrivere" onfocus="this.select()" autocomplete="off"><em>s</em></label><button data-a="crec+:${id}" aria-label="15 secondi in più">+</button></span></div>
-      <button class="primary" data-a="cgiro">✓ Giro ${st.cur + 1} fatto</button>
+      <button class="primary" data-a="cgiro">✓ Giro ${st.cur + 1} fatto</button>${fineBtn()}
       <button class="secondary wo-crun" data-a="crun">▶ Avvia circuito guidato</button>
       ${st.cur ? `<button class="link-button" data-a="csave">Salva con ${st.cur} ${st.cur === 1 ? 'giro' : 'giri'}</button>` : ''}
       <p class="wo-sub wo-center">Ogni esercizio salva un giro come una serie</p>
@@ -1241,8 +1245,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
     const nx = nextTodo(k);
     const btn = saved
       ? `${nx < 0 ? `<button class="primary" data-a="end">${ui.list.length > 1 ? 'Fine scheda' : 'Fine'}</button>` : ''}
-         <button class="link-button" data-a="edit">Modifica</button>${done.pending ? '<p class="wo-sub wo-center">Salvato sul telefono: parte appena c\'è rete</p>' : ''}`
-      : `<div class="wo-btns"><button class="secondary" data-a="add">+ Serie</button><button class="secondary" data-a="del">− Serie</button></div><button class="primary" data-a="ok">✓ Fatto</button>`;
+         ${fineBtn()}<button class="link-button" data-a="edit">Modifica</button>${done.pending ? '<p class="wo-sub wo-center">Salvato sul telefono: parte appena c\'è rete</p>' : ''}`
+      : `<div class="wo-btns"><button class="secondary" data-a="add">+ Serie</button><button class="secondary" data-a="del">− Serie</button></div><button class="primary" data-a="ok">✓ Fatto</button>${fineBtn()}`;
     return `<section class="wo-page" data-k="${k}">
       <div class="wo-ex"><div class="wo-ex-name">${esc(e.n)}</div>${e.m ? `<span class="wo-pill">${esc(e.m)}</span>` : ''}${piano ? `<span class="wo-pill wo-plan">${esc(pianoTxt(ex, piano, sch))}</span>` : ''}${piano && piano.nota ? `<span class="wo-pill">${esc(piano.nota)}</span>` : ''}</div>
       ${figSvg(ex, 'card')}
