@@ -11,7 +11,8 @@ const VERSIONS = [
       'Classifica: tasto del mese accanto al titolo, con il calendario dei mesi (giorni più rossi quando più persone sono andate in palestra)',
       'Mesi passati in Classifica: classifica finale con medaglie, presenze e Sudometro del mese scelto',
       'Albo d\'oro rifatto: le corone vinte da ognuno, con i mesi vinti da toccare, e i record (punti, presenze e Sudometro in un solo mese) nella riga di chi li detiene',
-      { feature: 'sfide', text: 'Sfide: si aprono con check-in a meno di 3 ore l\'uno dall\'altro (prima un\'ora) e ci si unisce entro 3 ore dall\'apertura' },      'Allenamento: tasto "Termina qui la scheda" in fondo all\'esercizio, per chiudere la scheda anche senza tutti gli esercizi (restano salvati solo quelli fatti; rientrando si riprende)',
+      { feature: 'sfide', text: 'Sfide: si aprono con check-in a meno di 3 ore l\'uno dall\'altro (prima un\'ora) e ci si unisce entro 3 ore dall\'apertura' },
+      'Allenamento: tasto "Termina qui la scheda" in fondo all\'esercizio, per chiudere la scheda anche senza tutti gli esercizi (restano salvati solo quelli fatti; rientrando si riprende)',
     ],
   },
   {
