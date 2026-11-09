@@ -1420,3 +1420,13 @@ body[data-tab]:not([data-tab="oggi"]) .avatar { display: none; }
 .wo-edsheet.closing { pointer-events: none; }
 @keyframes rf-out { to { opacity: 0; } }
 @keyframes rf-down { to { transform: translateY(100%); } }
+
+/* Selettori a segmenti: la selezione (.seg-pill, seg.js) scorre da un'opzione all'altra */
+.seg, .wo-seg { position: relative; }
+.seg-pill { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; border-radius: 7px; background: var(--card); box-shadow: 0 1px 4px rgba(0, 0, 0, .35);
+  transition: transform .42s var(--spring), width .42s var(--spring), height .3s, opacity .2s; }
+.wo-seg .seg-pill { border-radius: 9px; background: #3a3a3c; }
+.has-pill > button { position: relative; z-index: 1; transition: color .25s, transform .45s var(--spring), filter .3s; }
+.has-pill > button.on { background: none; }
+.has-pill > button .rp { display: none; }
+@media (prefers-reduced-motion: reduce) { .seg-pill { transition: none; } }
