@@ -1562,6 +1562,22 @@ function workoutTab() {
 
 const TABS = ['oggi', 'classifica', 'chat', 'timer', 'allenamento', 'altro'];
 
+// Effetto al tocco: su iPhone :active parte solo se la pagina ascolta i tocchi
+document.addEventListener('touchstart', () => {}, { passive: true });
+// Onda di luce dal punto toccato, sui tasti pieni (stile .rp)
+const RIPPLE = '.primary, .secondary, .choice, .seg button, .month-btn, .wo-chip, .wo-tile, .wo-mob, .wo-tcard, .sfida-how, .poll-cancel';
+document.addEventListener('pointerdown', (e) => {
+  const b = e.target.closest && e.target.closest(RIPPLE);
+  if (!b || b.disabled || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const r = b.getBoundingClientRect();
+  const d = 2 * Math.hypot(Math.max(e.clientX - r.left, r.right - e.clientX), Math.max(e.clientY - r.top, r.bottom - e.clientY));
+  const s = document.createElement('span');
+  s.className = 'rp';
+  s.style.cssText = `left:${e.clientX - r.left}px;top:${e.clientY - r.top}px;width:${d}px;height:${d}px`;
+  b.append(s);
+  setTimeout(() => s.remove(), 650);
+}, { passive: true });
+
 /** Anelli che si riempiono: solo appena si apre un tab, non a ogni aggiornamento dei dati. */
 let ringsTimer;
 function ringsIn() {

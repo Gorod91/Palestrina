@@ -699,6 +699,7 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
   const scrollMem = {};
   function draw() {
     if (!me) return;
+    const hadSheet = !!root.querySelector('.wo-edsheet'); // il foglio sale dal basso solo quando si apre
     if (!ready || !schede) {
       root.innerHTML = '<p class="wo-empty">Carico l\'allenamento…</p>';
       return;
@@ -723,6 +724,8 @@ export function createWorkout({ root, getToken, toast, openTimer, timerSeconds, 
       }
       navAnim = 'wo-push';
     } else root.innerHTML = viewHtml(ui.view) + (ui.view === 'list' ? '' : '<div class="wo-edge" aria-hidden="true"></div>');
+    const edSheet = root.querySelector('.wo-edsheet');
+    if (edSheet && !hadSheet) edSheet.classList.add('in');
     const pager = root.querySelector('#wo-pager');
     if (pager) {
       pager.scrollLeft = ui.i * pageStep(pager);
