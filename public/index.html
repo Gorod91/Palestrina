@@ -145,6 +145,12 @@
           </div>
         </section>
 
+        <h2 id="now-title" class="section now-h" hidden><i class="now-live"></i>In palestra adesso</h2>
+        <section id="now-card" class="card now" hidden>
+          <div id="now-row" class="now-row"></div>
+          <p id="now-hint" class="now-hint" hidden></p>
+        </section>
+
         <h2 class="section">Settimana</h2>
         <section class="card week">
           <div id="week-ring" class="week-ring"></div>
@@ -424,22 +430,22 @@
           <li><div><b>Bonus amici</b><span>Check-in a meno di un'ora da quello di un altro, una volta al giorno</span></div><em>3</em></li>
           <li id="rule-sfide" hidden><div><b>Sfide</b><span>Quando siete in palestra insieme: +5 a chi vince, +2 a chi partecipa (risultato confermato da un altro)</span></div><em>5 · 2</em></li>
           <li id="rule-apripista" hidden><div><b>Apripista</b><span>Primo a chiedere "chi va in palestra?" per un giorno, e quel giorno fai check-in</span></div><em>3</em></li>
-          <li><div><b>Settimane di fila</b><span>Per ogni settimana consecutiva con l'obiettivo raggiunto, oltre la prima</span></div><em>+5, max 20</em></li>
+          <li><div><b>Settimane di fila</b><span>Per ogni settimana consecutiva con l'obiettivo raggiunto, oltre la prima<i id="rule-serie-mese" hidden style="font-style:normal">; la serie riparte ogni mese</i></span></div><em>+5, max 20</em></li>
           <li><div><b>Rientro</b><span>Dopo più di 10 giorni senza palestra la presenza vale doppio</span></div><em>10</em></li>
       </ul>
       <h4>Penalità</h4>
       <ul class="rules minus">
           <li><div><b>Bidone</b><span>Hai detto "Ci sono" e quel giorno non fai check-in</span></div><em>−10</em></li>
           <li><div><b>Cambio all'ultimo</b><span>Da "Ci sono" a Forse o No (o tolto) a meno di 4 ore dall'orario; senza orario dalle 14 di quel giorno. Non conta se poi vieni</span></div><em>−5</em></li>
-          <li><div><b>Ritardo</b><span>Check-in più di mezz'ora dopo l'orario che avevi detto</span></div><em>−2</em></li>
-          <li><div><b>Check-in senza avvisare</b><span>Non avevi detto "Ci sono" o "Forse" almeno 1 ora prima del check-in</span></div><em>−3</em></li>
-          <li><div><b>Settimana a vuoto</b><span>Nessuna presenza in una settimana intera</span></div><em>−5</em></li>
+          <li id="rule-ritardo"><div><b>Ritardo</b><span>Check-in più di mezz'ora dopo l'orario che avevi detto</span></div><em>−2</em></li>
+          <li id="rule-avviso"><div><b>Check-in senza avvisare</b><span>Non avevi detto "Ci sono" o "Forse" almeno 1 ora prima del check-in</span></div><em>−3</em></li>
+          <li id="rule-vuota"><div><b>Settimana a vuoto</b><span>Nessuna presenza in una settimana intera</span></div><em>−5</em></li>
       </ul>
       <p class="muted">Con le penalità il totale del mese può andare anche sotto zero.</p>
       <h4>Medaglie del mese</h4>
       <ul class="rules medals">
-          <li><div><b>Mai saltato</b><span>Obiettivo raggiunto in ogni settimana che inizia nel mese</span></div><em>20</em></li>
-          <li><div><b>Mattiniero</b><span>4 check-in prima delle 9</span></div><em>10</em></li>
+          <li id="rule-maisaltato"><div><b>Mai saltato</b><span>Obiettivo raggiunto in ogni settimana che inizia nel mese</span></div><em>20</em></li>
+          <li id="rule-mattiniero"><div><b>Mattiniero</b><span>4 check-in prima delle 9</span></div><em>10</em></li>
           <li><div><b>Branco</b><span>5 bonus amici</span></div><em>10</em></li>
           <li><div><b>Pomodoro del mese</b><span>Il Sudometro più alto del mese, a chi lo fa per primo. Passa a chi lo supera (a pari punteggio resta a chi c'era prima)</span></div><em>10</em></li>
           <li id="rule-gladiatore" hidden><div><b>Gladiatore</b><span>Chi vince più sfide nel mese, almeno 3, a chi ci arriva per primo. Passa a chi lo supera (a pari sfide vinte resta a chi c'era prima)</span></div><em>5</em></li>

@@ -27,19 +27,20 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly(['name', 'action', 'data', 'stato', 'at'])
         && request.resource.data.name == request.auth.token.name
         && request.resource.data.stato == 'nuova'
-        && request.resource.data.action in ['checkin', 'checkinUndo', 'sudometro', 'setReference', 'setAlias', 'setTimer', 'chatMute', 'subscribe', 'sfida', 'state']
+        && request.resource.data.action in ['checkin', 'checkinUndo', 'sudometro', 'setReference', 'setFace', 'setAlias', 'setTimer', 'chatMute', 'subscribe', 'sfida', 'state']
         && request.resource.data.data is string
         && request.resource.data.data.size() <= 20000
         && request.resource.data.at == request.time;
     }
 
-    // Foto del Sudometro: le vede chi ha fatto l'accesso; ognuno carica solo le proprie, che poi non cambiano
+    // Foto del Sudometro: le vede chi ha fatto l'accesso; ognuno carica solo le proprie, che poi non cambiano.
+    // I visi ritagliati senza sfondo ("viso") sono PNG piccoli.
     match /foto/{id} {
       allow read: if pal();
       allow create: if pal()
         && request.resource.data.keys().hasOnly(['name', 'label', 'mime', 'data', 'at'])
         && request.resource.data.name == request.auth.token.name
-        && request.resource.data.mime == 'image/jpeg'
+        && (request.resource.data.mime == 'image/jpeg' || (request.resource.data.mime == 'image/png' && request.resource.data.label == 'viso'))
         && request.resource.data.label is string
         && request.resource.data.data is bytes
         && request.resource.data.data.size() < 900000
@@ -114,7 +115,20 @@ service cloud.firestore {
     // Si legge tutto; si scrive solo a proprio nome. Eventi, cancellazioni e stato li fa il server.
     match /{coll}/{id} {
       allow read: if pal()
-        && coll in ['chat', 'prova_chat', 'state', 'prova_state', 'domande', 'prova_domande', 'piani', 'prova_piani'];
+        && coll in ['chat', 'prova_chat', 'state', 'prova_state', 'domande', 'prova_domande', 'piani', 'prova_piani', 'reazioni', 'prova_reazioni'];
+
+      // Reazioni alle foto del Sudometro in chat: le mie su un evento (id = evento_uid), al massimo le 4 previste
+      allow create, update: if pal()
+        && coll in ['reazioni', 'prova_reazioni']
+        && request.resource.data.keys().hasOnly(['msg', 'name', 'e', 'at'])
+        && request.resource.data.msg is string
+        && request.resource.data.msg.matches('^[A-Za-z0-9_-]{6,40}$')
+        && id == request.resource.data.msg + '_' + request.auth.uid
+        && request.resource.data.name == request.auth.token.name
+        && request.resource.data.e is list
+        && request.resource.data.e.size() <= 4
+        && request.resource.data.e.hasOnly(['😂', '🔥', '🍅', '🥶'])
+        && request.resource.data.at == request.time;
 
       // Messaggi: solo nuovi
       allow create: if pal()

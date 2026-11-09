@@ -74,8 +74,10 @@ const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2
  * onChange(messaggi) a ogni novità, nel formato della chat di Apps Script ({ id, day, time, name, type, text })
  * più `pending` finché il messaggio non è arrivato a Firebase.
  */
-export function createFbChat({ getToken, onChange, onState, onPlans, onError, onPlansError, days = 7 }) {
+export function createFbChat({ getToken, onChange, onState, onPlans, onReacts, onError, onPlansError, days = 7 }) {
   let unsub = null;
+  let unsubReacts = null;
+  let reactColl = '';
   let unsubState = null;
   let unsubAsks = null;
   let unsubPlans = null;
@@ -94,6 +96,7 @@ export function createFbChat({ getToken, onChange, onState, onPlans, onError, on
     coll = test ? 'prova_chat' : 'chat';
     asksColl = test ? 'prova_domande' : 'domande';
     plansColl = test ? 'prova_piani' : 'piani';
+    reactColl = test ? 'prova_reazioni' : 'reazioni';
     name = me.name;
     uid = fbUid(me.name);
     const from = fs.Timestamp.fromMillis(Date.now() - days * 86400000);
@@ -166,11 +169,23 @@ export function createFbChat({ getToken, onChange, onState, onPlans, onError, on
       },
       (err) => onPlansError(err),
     );
+    // Reazioni alle foto del Sudometro (un documento per evento e persona). Se non va, la chat resta com'è.
+    if (onReacts) {
+      unsubReacts = fs.onSnapshot(
+        fs.query(fs.collection(db, reactColl), fs.where('at', '>=', from)),
+        (snap) => onReacts(snap.docs.map((d) => {
+          const x = d.data();
+          return { msg: String(x.msg || ''), name: String(x.name || ''), e: Array.isArray(x.e) ? x.e : [] };
+        })),
+        (err) => console.warn('Reazioni non disponibili', err),
+      );
+    }
   }
 
   function stop() {
     gen++;
-    [unsub, unsubState, unsubAsks, unsubPlans].forEach((u) => u && u());
+    [unsub, unsubState, unsubAsks, unsubPlans, unsubReacts].forEach((u) => u && u());
+    unsubReacts = null;
     unsub = null;
     unsubState = null;
     unsubAsks = null;
@@ -205,5 +220,12 @@ export function createFbChat({ getToken, onChange, onState, onPlans, onError, on
     return { msg, saved: fs.setDoc(fs.doc(db, coll, id), { name, text, at: fs.serverTimestamp() }) };
   }
 
-  return { start, stop, send, setPlan, ask };
+  /** Le mie reazioni a un evento (lista intera: [] le toglie tutte). */
+  async function react(msg, list) {
+    const { fs, db } = await sdk();
+    if (!reactColl) throw new Error('Chat non collegata');
+    return fs.setDoc(fs.doc(db, reactColl, `${msg}_${uid}`), { msg, name, e: list, at: fs.serverTimestamp() });
+  }
+
+  return { start, stop, send, setPlan, ask, react };
 }
