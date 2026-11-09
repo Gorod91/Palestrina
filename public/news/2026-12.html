@@ -39,6 +39,10 @@
   .slide.on .pens p.gone { animation: rise .8s cubic-bezier(.2, .8, .2, 1) calc(var(--d) * 1s) both, dim .6s ease calc(var(--s) * 1s + .4s) forwards; }
   @keyframes strike { to { transform: scaleX(1); } }
   @keyframes dim { to { opacity: .3; } }
+  .streak { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 30px 0 26px; }
+  .streak p { display: grid; justify-items: center; gap: 4px; padding: 16px 4px; border-radius: 18px; background: #1c1c1e; border: 1px solid #a6ff0044; }
+  .streak b { font-size: 26px; font-weight: 900; letter-spacing: -.03em; color: var(--lime); }
+  .streak span { font-size: 13px; color: var(--muted); }
   .sun { align-self: center; margin: 34px 0 30px; font-size: 150px; line-height: 1; color: #ffd60a; text-shadow: 0 0 60px #ffd60a66; }
   .slide.on .sun { animation: pop .8s cubic-bezier(.2, .8, .2, 1) .8s both, set 1.6s ease-in 2.2s forwards; }
   @keyframes set { to { opacity: .25; transform: translateY(40px) scale(.8); filter: grayscale(1); } }
@@ -52,7 +56,7 @@
     <div class="glow"></div>
     <p class="eyebrow" data-a style="--d:.2">Novità</p>
     <h1 data-a style="--d:.5;--anim:pop">Dicembre.</h1>
-    <p class="lead" data-a style="--d:1.1">Regole più semplici.<br>Meno penalità, più palestra.</p>
+    <p class="lead" data-a style="--d:1.1">Regole più semplici.<br>Meno penalità, più palestra.<br>E si riparte tutti da zero.</p>
     <p class="hint" data-a style="--d:2">Tocca per continuare</p>
   </section>
 
@@ -70,11 +74,23 @@
   </section>
 
   <section class="slide">
+    <p class="eyebrow" data-a style="--d:0">Settimane di fila</p>
+    <h2 data-a style="--d:.1">Ogni mese<br>si riparte da zero.</h2>
+    <div class="streak">
+      <p data-a style="--d:.6;--anim:pop"><b>+5</b><span>2ª</span></p>
+      <p data-a style="--d:.9;--anim:pop"><b>+10</b><span>3ª</span></p>
+      <p data-a style="--d:1.2;--anim:pop"><b>+15</b><span>4ª</span></p>
+      <p data-a style="--d:1.5;--anim:pop"><b>+20</b><span>5ª</span></p>
+    </div>
+    <p class="lead" data-a style="--d:2.1">Il bonus per le settimane di fila con l'obiettivo resta, ma la serie riparte ogni mese: chi è indietro può recuperare subito.</p>
+  </section>
+
+  <section class="slide">
     <div class="glow"></div>
     <p class="eyebrow" data-a style="--d:0">Medaglie</p>
-    <h2 data-a style="--d:.1">Il Mattiniero<br>va in pausa.</h2>
+    <h2 data-a style="--d:.1">Due medaglie<br>vanno in pausa.</h2>
     <p class="sun" data-a style="--d:.8;--anim:pop">☀</p>
-    <p class="lead" data-a style="--d:1.6">Da dicembre non c'è più la medaglia per i check-in prima delle 9. Potrebbe tornare, chissà quando.</p>
+    <p class="lead" data-a style="--d:1.6">Mattiniero e Mai saltato non ci sono più: Mai saltato premiava la stessa cosa delle settimane di fila. Potrebbero tornare, chissà quando.</p>
     <p class="hint" data-a style="--d:2.4">Tocca per chiudere</p>
   </section>
 

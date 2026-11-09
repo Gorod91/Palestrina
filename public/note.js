@@ -10,7 +10,8 @@ const VERSIONS = [
     news: '2026-12',
     items: [
       'Penalità più semplici da dicembre: restano Bidone e Cambio all\'ultimo; tolte Ritardo, Check-in senza avvisare e Settimana a vuoto',
-      'Tolta la medaglia Mattiniero',
+      'Settimane di fila: la serie riparte ogni mese',
+      'Tolte le medaglie Mattiniero e Mai saltato',
     ],
   },
   {

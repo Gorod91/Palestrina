@@ -356,7 +356,7 @@ const NEWS = [
     body: 'Apripista, le schede di allenamento… e una sorpresa. Tocca per vedere.',
   },
   {
-    // Regole più semplici da dicembre: penalità solo Bidone e Cambio all'ultimo (via Ritardo, Senza avvisare, Settimana a vuoto); niente Mattiniero
+    // Regole più semplici da dicembre: penalità solo Bidone e Cambio all'ultimo (via Ritardo, Senza avvisare, Settimana a vuoto); niente Mattiniero né Mai saltato; Settimane di fila ripartono ogni mese
     id: '2026-12',
     month: '2026-11',
     from: '2026-12-01',
@@ -2688,13 +2688,18 @@ function computePointsRaw(month) {
         if (q.name === u.name && inMonth(q.day) && q.day >= from && first[u.name + '|' + q.day]) add('apripista', 'Apripista', P.apripista, false, q.day, 'Primo a chiedere "chi va in palestra?"');
       });
     }
+    // Con la novità 'regole' (da dicembre) Ritardo, Check-in senza avvisare, Settimana a vuoto, Mattiniero e Mai saltato non contano più
+    const fewFrom = featureOn('regole') ? featureFrom('regole') : null;
+    const few = (day) => fewFrom !== null && day >= fewFrom;
     // Settimane di fila: il bonus arriva nel giorno in cui si raggiunge l'obiettivo
     for (let w = weekKey(monthStart); w <= addDays(monthStart, 31); w = addDays(w, 7)) {
       const days = mine.filter((r) => weekKey(r.day) === w).map((r) => r.day);
       const goal = goalAt(u, w);
       if (days.length < goal || !inMonth(days[goal - 1])) continue;
       let n = 1;
-      while (countInWeek(pres, u.name, addDays(w, -7 * n)) >= goalAt(u, addDays(w, -7 * n))) n++;
+      // Con la novità 'regole' (da dicembre) la serie riparte ogni mese: contano solo le settimane da quella del giorno 1
+      const resetFrom = few(monthStart) ? weekKey(monthStart) : '';
+      while (addDays(w, -7 * n) >= resetFrom && countInWeek(pres, u.name, addDays(w, -7 * n)) >= goalAt(u, addDays(w, -7 * n))) n++;
       if (n > 1) add('serie', 'Settimane di fila', Math.min(P.seriePerSettimana * (n - 1), P.serieMax), false, days[goal - 1], `${n}ª settimana di fila con l'obiettivo`);
     }
     // Sfide: +5 a chi vince, +2 agli altri partecipanti
@@ -2709,9 +2714,6 @@ function computePointsRaw(month) {
     // Penalità (da quando esistono)
     const today = dayString(new Date());
     const penFrom = penaltiesFrom();
-    // Con la novità 'regole' (da dicembre) Ritardo, Check-in senza avvisare, Settimana a vuoto e Mattiniero non contano più
-    const fewFrom = featureOn('regole') ? featureFrom('regole') : null;
-    const few = (day) => fewFrom !== null && day >= fewFrom;
     const penalties = [];
     const pen = (key, label, pts, day, note, shownDay) => {
       if (condoned[`${key}|${u.name}|${day}`]) return;
@@ -2749,7 +2751,7 @@ function computePointsRaw(month) {
     }
     if (early >= P.mattinieroVolte && !few(monthStart)) add('mattiniero', u.f ? 'Mattiniera' : 'Mattiniero', P.mattiniero, true, earlyDay, `${P.mattinieroVolte}° check-in prima delle ${Number(P.mattinieroPrima.slice(0, 2))}`);
     if (friends >= P.brancoVolte) add('branco', 'Branco', P.branco, true, friendsDay, `${P.brancoVolte}° bonus amici del mese`);
-    if (mondays.length && mondays.every((w) => countInWeek(pres, u.name, w) >= goalAt(u, w))) add('maiSaltato', 'Mai saltato', P.maiSaltato, true, '', 'Obiettivo raggiunto in ogni settimana del mese');
+    if (!few(monthStart) && mondays.length && mondays.every((w) => countInWeek(pres, u.name, w) >= goalAt(u, w))) add('maiSaltato', 'Mai saltato', P.maiSaltato, true, '', 'Obiettivo raggiunto in ogni settimana del mese');
     return { name: u.name, display: u.display, items, penalties };
   });
 
