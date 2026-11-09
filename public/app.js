@@ -468,6 +468,7 @@ function render() {
   sel.value = store.get('actAs') || '';
   $('rule-apripista').hidden = !(state.features && state.features.apripista);
   $('rule-sfide').hidden = !(state.features && state.features.sfide);
+  ['rule-ritardo', 'rule-avviso', 'rule-vuota'].forEach((id) => ($(id).hidden = !!(state.features && state.features.penalita))); // tolte da dicembre
   $('rule-gladiatore').hidden = !(state.features && state.features.sfide); // si scopre solo con le sfide svelate
   $('viewport-card').hidden = !debugOn();
   if (debugOn()) renderViewportDebug();

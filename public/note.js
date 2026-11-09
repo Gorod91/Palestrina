@@ -5,6 +5,14 @@
 
 const VERSIONS = [
   {
+    v: '2.4',
+    date: '30 novembre 2026',
+    news: '2026-12',
+    items: [
+      'Penalità più semplici da dicembre: restano Bidone e Cambio all\'ultimo; tolte Ritardo, Check-in senza avvisare e Settimana a vuoto',
+    ],
+  },
+  {
     v: '2.3',
     date: '5 novembre 2026',
     items: [

@@ -355,6 +355,15 @@ const NEWS = [
     title: 'Novità di novembre',
     body: 'Apripista, le schede di allenamento… e una sorpresa. Tocca per vedere.',
   },
+  {
+    // Penalità più semplici: da dicembre restano solo Bidone e Cambio all'ultimo (via Ritardo, Senza avvisare, Settimana a vuoto)
+    id: '2026-12',
+    month: '2026-11',
+    from: '2026-12-01',
+    features: ['penalita'],
+    title: 'Novità di dicembre',
+    body: 'Le regole cambiano un po\'. Tocca per vedere.',
+  },
 ];
 
 function releasedNews() {
@@ -1170,7 +1179,7 @@ function sharedState() {
     plans: plansSummary(presenze),
     refPhotos: refPhotoIds(),
     fem: femmine(),
-    features: { apripista: featureOn('apripista'), sfide: featureOn('sfide') && sfide().length > 0, sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn(), firebaseTutto: !TEST && fbAllOn(), provaTutto: TEST && fbAllOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
+    features: { apripista: featureOn('apripista'), sfide: featureOn('sfide') && sfide().length > 0, penalita: featureOn('penalita'), sudometro2: featureOn('sudometro2'), firebase: !TEST && fbChatOn(), firebaseTutto: !TEST && fbAllOn(), provaTutto: TEST && fbAllOn() }, // la prova usa Firebase a parte // sfide: sorpresa, si vedono dalla prima
     points: { month: MONTHS_IT[Number(today.slice(5, 7)) - 1], ranking: computePoints(today.slice(0, 7)) },
     // Divano d'oro delle ultime settimane (medaglia settimanale)
     divani: safeJson(props.getProperty(`${TEST ? 'prova_' : ''}DIVANI`) || '[]').map((d) => ({ ...d, displays: d.names.map(dn) })),
@@ -2700,6 +2709,9 @@ function computePointsRaw(month) {
     // Penalità (da quando esistono)
     const today = dayString(new Date());
     const penFrom = penaltiesFrom();
+    // Con la novità 'penalita' (da dicembre) Ritardo, Check-in senza avvisare e Settimana a vuoto non contano più
+    const fewFrom = featureOn('penalita') ? featureFrom('penalita') : null;
+    const few = (day) => fewFrom !== null && day >= fewFrom;
     const penalties = [];
     const pen = (key, label, pts, day, note, shownDay) => {
       if (condoned[`${key}|${u.name}|${day}`]) return;
@@ -2722,6 +2734,7 @@ function computePointsRaw(month) {
         }
         continue;
       }
+      if (few(day)) continue;
       if (plan && plan.choice === 'si' && plan.time && minutes(came.time) > minutes(plan.time) + P.ritardoMinuti) pen('ritardo', 'Ritardo', P.ritardo, day, `Avevi detto ${plan.time}, check-in alle ${came.time}`);
       const limit = `${day} ${hhmmMinus(came.time, P.avvisoMinuti)}`;
       const told = myCambi.filter((c) => c.day === day && (c.to === 'si' || c.to === 'forse')).map((c) => c.at).sort()[0];
@@ -2731,7 +2744,7 @@ function computePointsRaw(month) {
     const firstEver = mine.length ? mine[0].day : null;
     for (let w = weekKey(monthStart); w <= addDays(monthStart, 31); w = addDays(w, 7)) {
       const sunday = addDays(w, 6);
-      if (!inMonth(sunday) || sunday >= today || w < penFrom || !firstEver || firstEver >= w) continue;
+      if (!inMonth(sunday) || sunday >= today || w < penFrom || !firstEver || firstEver >= w || few(sunday)) continue;
       if (countInWeek(pres, u.name, w) === 0) pen('vuota', 'Settimana a vuoto', P.settimanaVuota, w, `Nessuna presenza da lunedì ${Number(w.slice(8))} a domenica ${Number(sunday.slice(8))}`, sunday);
     }
     if (early >= P.mattinieroVolte) add('mattiniero', u.f ? 'Mattiniera' : 'Mattiniero', P.mattiniero, true, earlyDay, `${P.mattinieroVolte}° check-in prima delle ${Number(P.mattinieroPrima.slice(0, 2))}`);
