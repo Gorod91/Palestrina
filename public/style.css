@@ -1501,3 +1501,7 @@ body[data-tab]:not([data-tab="oggi"]) .avatar { display: none; }
 .wo-chips > .seg-pill, .wo-groups > .seg-pill { border-radius: 999px; background: var(--fg); box-shadow: none; z-index: 1; }
 .wo-chips.has-pill > button, .wo-groups.has-pill > button { z-index: 0; }
 .wo-chips.has-pill > button.on, .wo-groups.has-pill > button.on { z-index: 2; background: none; color: #000; transition: color .2s .12s, transform .45s var(--spring); }
+
+/* Pagina corta: scorre comunque di 1px, così su iPhone c'è sempre il rimbalzo elastico come nelle app */
+#scroller { position: relative; }
+#scroller::before { content: ''; position: absolute; top: 0; left: 0; width: 1px; height: calc(100% + 1px); pointer-events: none; }

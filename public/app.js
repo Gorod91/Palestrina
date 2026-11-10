@@ -1096,7 +1096,7 @@ function renderRefCard(ref) {
       img.alt = 'Foto di riferimento';
       img.src = src;
       box.replaceChildren(img);
-      box.onclick = () => openPhoto(id, null, 'Foto di riferimento');
+      box.onclick = () => openPhoto(id, null, 'Foto di riferimento', false, box);
     })
     .catch(() => (box.innerHTML = '<svg><use href="#i-camera"/></svg>'));
 }
@@ -1124,11 +1124,43 @@ function photoPair(sweatyId, freshId, caption, big = false, f = false) {
   };
   if (freshId) box.append(slot(freshId, 'fresh', f ? 'Fresca' : 'Fresco'));
   box.append(slot(sweatyId, 'sweaty', f ? 'Sudata' : 'Sudato'));
-  if (sweatyId) box.onclick = () => openPhoto(sweatyId, freshId, caption, f);
+  if (sweatyId) box.onclick = () => openPhoto(sweatyId, freshId, caption, f, box);
   return box;
 }
 
-function openPhoto(sweatyId, freshId, caption, f = false) {
+// Foto a tutto schermo: si apre ingrandendosi dalla miniatura toccata e, chiudendo, ci torna dentro
+let viewerFrom = null, viewerTok = 0;
+const reduceMotion = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+function viewerFlip() {
+  const pair = document.querySelector('.viewer-pair');
+  if (!viewerFrom || !viewerFrom.isConnected) return 'scale(.85)';
+  const a = viewerFrom.getBoundingClientRect(), b = pair.getBoundingClientRect();
+  if (!a.width || !b.width || a.bottom < 0 || a.top > innerHeight) return 'scale(.85)';
+  return `translate(${a.left + a.width / 2 - (b.left + b.width / 2)}px, ${a.top + a.height / 2 - (b.top + b.height / 2)}px) scale(${Math.min(1, a.width / b.width)})`;
+}
+function closeViewer() {
+  const v = $('viewer');
+  if (v.hidden || v.dataset.closing) return;
+  if (reduceMotion() || !v.animate) { v.hidden = true; return; }
+  const tok = ++viewerTok;
+  v.dataset.closing = '1';
+  const pair = v.querySelector('.viewer-pair');
+  pair.animate([{ transform: 'none', opacity: 1 }, { transform: viewerFlip(), opacity: 0 }], { duration: 280, easing: 'cubic-bezier(.4, 0, .6, 1)', fill: 'forwards' });
+  v.animate([{ backgroundColor: 'rgba(0, 0, 0, .95)' }, { backgroundColor: 'rgba(0, 0, 0, 0)' }], { duration: 280, easing: 'ease', fill: 'forwards' });
+  $('viewer-caption').animate([{ opacity: 1 }, { opacity: 0 }], { duration: 150, fill: 'forwards' });
+  setTimeout(() => {
+    if (tok !== viewerTok) return;
+    delete v.dataset.closing;
+    v.hidden = true;
+    v.getAnimations({ subtree: true }).forEach((x) => x.cancel());
+  }, 280);
+}
+
+function openPhoto(sweatyId, freshId, caption, f = false, from = null) {
+  viewerFrom = from;
+  viewerTok++;
+  delete $('viewer').dataset.closing;
+  $('viewer').getAnimations && $('viewer').getAnimations({ subtree: true }).forEach((x) => x.cancel());
   document.querySelector('#viewer-fresh-fig figcaption').textContent = f ? 'Fresca' : 'Fresco';
   $('viewer-img').nextElementSibling.textContent = f ? 'Sudata' : 'Sudato';
   $('viewer-img').removeAttribute('src');
@@ -1139,6 +1171,7 @@ function openPhoto(sweatyId, freshId, caption, f = false) {
   $('viewer-fresh-fig').hidden = !freshId;
   $('viewer-caption').textContent = caption;
   $('viewer').hidden = false;
+  if (!reduceMotion() && $('viewer').animate) document.querySelector('.viewer-pair').animate([{ transform: viewerFlip(), opacity: .6 }, { transform: 'none', opacity: 1 }], { duration: 420, easing: 'cubic-bezier(.2, .9, .3, 1.04)' });
   loadPhoto(sweatyId).then((src) => ($('viewer-img').src = src)).catch(() => {});
   if (freshId) loadPhoto(freshId).then((src) => ($('viewer-fresh').src = src)).catch(() => {});
 }
@@ -2273,7 +2306,7 @@ $('form-name').addEventListener('submit', (e) => {
   e.preventDefault();
   saveAlias($('in-name').value);
 });
-$('viewer').addEventListener('click', () => ($('viewer').hidden = true));
+$('viewer').addEventListener('click', closeViewer);
 $('btn-points-info').addEventListener('click', () => showSheet($('points-info')));
 $('points-info').addEventListener('click', (e) => {
   if (e.target === $('points-info') || e.target.closest('.sheet-close')) hideSheet($('points-info'));
