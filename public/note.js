@@ -16,7 +16,7 @@ const VERSIONS = [
   },
   {
     v: '2.3.1',
-    date: '9 novembre 2026',
+    date: '9 – 10 novembre 2026',
     items: [
       'Grafica più rifinita: fogli che salgono dal basso, anelli che si riempiono all\'apertura, passaggio morbido tra le pagine',
       'Allenamento: nuovo tasto per tornare indietro, con la freccia in un cerchio e il nome della pagina',
@@ -26,6 +26,8 @@ const VERSIONS = [
       'Animazioni anche per i fogli dell\'Allenamento, gli avvisi in basso, il timer a tutto schermo, il circuito, le foto e il dettaglio dei punti',
       'Tutti i fogli sfocano lo sfondo e, chiudendoli (tocco fuori, × o trascinamento), scendono invece di sparire di colpo',
       'Selettori Settimana / Mese e Peso / Volume: la selezione scorre da un\'opzione all\'altra',
+      'Filtri a pillole dell\'Allenamento (schede, gruppi muscolari, periodo): anche qui la selezione scorre',
+      'Testi più uniformi: meno misure di carattere diverse in tutta l\'app',
       'Chat: aprendo la tastiera si vede l\'ultimo messaggio; la settimana del sondaggio riparte compatta a ogni apertura dell\'app',
       'Allenamento: nota dell\'esercizio sempre a vista sotto il nome, con la matita: un tocco per scriverla o cambiarla (vale per quella scheda)',
     ],
