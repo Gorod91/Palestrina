@@ -1250,7 +1250,9 @@ html.ios.standalone .sr { top: var(--ios-top, 0px); }
 
 /* ---------- Re del mese in Classifica e incoronazione in 3D (public/corona.js) ---------- */
 .points li.king { position: relative; }
-.points li.king::before { content: ''; position: absolute; inset: 2px -16px; background: linear-gradient(90deg, #ffd60a1f, #ffd60a08 60%, transparent); border-left: 3px solid var(--gold); pointer-events: none; }
+.points li.king::before { content: ''; position: absolute; inset: 0 -16px; background: linear-gradient(90deg, #ffd60a1f, #ffd60a08 60%, transparent); border-left: 3px solid var(--gold); pointer-events: none; }
+.points li.king:first-child::before { top: -4px; } /* fino al bordo della card (padding 4px) */
+.points li.king:last-child::before { bottom: -4px; }
 .points li.king .pos, .points li.king .total { color: var(--gold); }
 .points li.king .name { display: flex; align-items: center; color: var(--gold); font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
 .crown-btn { flex: none; display: inline-grid; place-items: center; margin: -8px 0 -8px 4px; padding: 8px 6px; border: 0; background: none; color: var(--gold); cursor: pointer; }
