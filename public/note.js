@@ -28,6 +28,8 @@ const VERSIONS = [
       'Selettori Settimana / Mese e Peso / Volume: la selezione scorre da un\'opzione all\'altra',
       'Filtri a pillole dell\'Allenamento (schede, gruppi muscolari, periodo): anche qui la selezione scorre',
       'Testi più uniformi: meno misure di carattere diverse in tutta l\'app',
+      'Foto del Sudometro: si aprono ingrandendosi dalla miniatura e, chiudendole, ci tornano dentro',
+      'Effetto elastico anche sulle pagine corte, che non hanno bisogno di scorrere',
       'Chat: aprendo la tastiera si vede l\'ultimo messaggio; la settimana del sondaggio riparte compatta a ogni apertura dell\'app',
       'Allenamento: nota dell\'esercizio sempre a vista sotto il nome, con la matita: un tocco per scriverla o cambiarla (vale per quella scheda)',
     ],
