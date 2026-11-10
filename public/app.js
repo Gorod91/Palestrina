@@ -587,6 +587,15 @@ function ensureFace() {
   }, 5000);
 }
 
+/** Ritaglia il viso e lo salva per conto suo, senza bloccare il Sudometro (il ritaglio può metterci un po'). */
+function saveFaceLater(canvas, from) {
+  if (!fbOk()) return; // senza Firebase il viso non si salva
+  sudometro
+    .faceCutout(canvas)
+    .then((face) => face && api('setFace', { face, from }))
+    .catch((err) => console.warn('Viso non salvato', err));
+}
+
 function isKing(name) {
   const albo = (state && state.albo) || [];
   return albo.length > 0 && albo[albo.length - 1].names.includes(name);
@@ -1330,8 +1339,8 @@ async function takeReference() {
     sudoBusy('Analizzo la foto…');
     const features = await sudometro.analyze(canvas);
     sudoBusy('Salvo la foto di riferimento…');
-    const face = await sudometro.faceCutout(canvas);
-    const r = await api('setReference', { features, photo: sudometro.toJpegBase64(canvas), face });
+    const r = await api('setReference', { features, photo: sudometro.toJpegBase64(canvas) });
+    saveFaceLater(canvas, 'riferimento');
     toast(photoWarning(r) || `Foto di riferimento salvata. Da ora basta il selfie da ${sudato()}.`, 5000);
     await refresh();
   } catch (err) {
@@ -1404,8 +1413,6 @@ async function takeSweat(debug, overwrite = false) {
         photo: `data:image/jpeg;base64,${photo}`,
       });
     } else sudoBusy('Pubblico la foto…');
-    // Il viso di questo selfie diventa quello nei pallini (In palestra adesso, sorpassi)
-    const face = debug ? null : await sudometro.faceCutout(canvas);
     const r = await api('sudometro', {
       score: shown.score,
       title: shown.title,
@@ -1413,7 +1420,6 @@ async function takeSweat(debug, overwrite = false) {
       debug,
       overwrite,
       photo,
-      face,
     }).catch((err) => {
       if (before) {
         state = before; // non è andato: torna com'era
@@ -1429,6 +1435,8 @@ async function takeSweat(debug, overwrite = false) {
       renderSudometro();
       return;
     }
+    // Il viso di questo selfie diventa quello nei pallini (In palestra adesso, sorpassi): dopo, senza far aspettare la foto
+    if (!debug) saveFaceLater(canvas, 'sudato');
     if (before) {
       optimistic--;
       // Con Firebase la foto si vede appena il server la accetta, senza aspettare il nuovo stato

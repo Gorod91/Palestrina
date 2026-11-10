@@ -1361,7 +1361,7 @@ html.ios.standalone .sr { top: var(--ios-top, 0px); }
 .now-live { width: 9px; height: 9px; border-radius: 50%; background: #30d158; animation: now-live 1.8s infinite; }
 @keyframes now-live { 0% { box-shadow: 0 0 0 0 #30d15899; } 70% { box-shadow: 0 0 0 9px #30d15800; } 100% { box-shadow: 0 0 0 0 #30d15800; } }
 .card.now { padding-top: 22px; }
-.now-row { display: flex; gap: 18px; overflow-x: auto; margin: -6px -16px 0; padding: 6px 16px 2px; scrollbar-width: none; }
+.now-row { display: flex; gap: 18px; overflow-x: auto; margin: -24px -16px 0; padding: 24px 16px 2px; scrollbar-width: none; }
 .now-row::-webkit-scrollbar { display: none; }
 .now-p { display: grid; justify-items: center; gap: 2px; min-width: 76px; }
 .now-p p { margin: 6px 0 0; font-size: 15px; font-weight: 600; }
