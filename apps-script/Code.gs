@@ -2453,7 +2453,7 @@ function savePhoto(user, base64, label, photoId) {
 /** Più foto in una sola chiamata (al massimo 12): una richiesta invece di tante. */
 function getPhotos(ids) {
   const list = (Array.isArray(ids) ? ids : []).map(String).slice(0, 12);
-  const allowed = new Set(rows('sudometro').flatMap((r) => [r.photoId, r.refId]).filter(Boolean).concat(Object.values(refPhotoIds())));
+  const allowed = new Set(rows('sudometro').flatMap((r) => [r.photoId, r.refId]).filter(Boolean).concat(Object.values(refPhotoIds()), Object.values(faceIds())));
   const photos = {};
   list.forEach((id) => {
     if (!allowed.has(id)) return;

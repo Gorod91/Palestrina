@@ -93,7 +93,14 @@ function loadSegmenter() {
  * Da uno scatto già analizzato (si usa il riquadro del viso trovato) o da una foto qualsiasi (lo cerca qui).
  * null se non trova il viso o la segmentazione non va: il pallino resta con le iniziali.
  */
-export async function faceCutout(source, size = 160) {
+export function faceCutout(source, size = 160) {
+  // Mai più di 20 secondi (modello che non arriva con poca rete): niente viso, restano le iniziali
+  let timer;
+  const late = new Promise((resolve) => (timer = setTimeout(() => resolve(null), 20000)));
+  return Promise.race([cutout(source, size), late]).finally(() => clearTimeout(timer));
+}
+
+async function cutout(source, size) {
   try {
     let canvas = source;
     if (!(source instanceof HTMLCanvasElement)) {
