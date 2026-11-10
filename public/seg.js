@@ -1,8 +1,8 @@
-// Selettori a segmenti (Settimana / Mese, Peso / Volume): la selezione è una "pillola" che scorre da
+// Selettori a segmenti (Settimana / Mese, Peso / Volume) e filtri a pillole: la selezione è una "pillola" che scorre da
 // un'opzione all'altra. Funziona anche quando la pagina ridisegna il selettore: ricorda dove era la pillola
 // (per selettore, dalle sue etichette) e la fa partire da lì.
 
-const SEGS = '.seg, .wo-seg';
+const SEGS = '.seg, .wo-seg, .wo-chips, .wo-groups';
 const last = new Map();
 const reduce = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
 const buttons = (seg) => [...seg.children].filter((b) => b.tagName === 'BUTTON');
