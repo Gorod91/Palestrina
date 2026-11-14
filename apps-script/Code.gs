@@ -2892,7 +2892,7 @@ function medalCheck(actor, inApp) {
 
 /**
  * Sorpassi in classifica (dal 9/11/2026): dopo ogni azione che cambia i punti si confronta la classifica del mese con
- * quella salvata. Chi ora ha più punti di qualcuno che prima gli stava davanti (pareggi esclusi, e mai chi ha ancora
+ * quella salvata. Chi ora ha più punti di qualcuno che prima gli stava davanti o era pari (finire pari non basta, e mai chi ha ancora
  * 0 punti) finisce in chat con un evento; la notifica agli altri non dice chi. Il primo controllo del mese salva solo.
  */
 function overtakeCheck(actor) {
@@ -2919,7 +2919,7 @@ function overtakes(before, now) {
   const names = Object.keys(now);
   return names
     .map((a) => {
-      const passed = names.filter((b) => b !== a && now[b] > 0 && a in before && b in before && before[a] < before[b] && now[a] > now[b]);
+      const passed = names.filter((b) => b !== a && now[b] > 0 && a in before && b in before && before[a] <= before[b] && now[a] > now[b]);
       return { name: a, passed, pos: 1 + names.filter((b) => now[b] > now[a]).length, pts: now[a] };
     })
     .filter((o) => o.passed.length)
