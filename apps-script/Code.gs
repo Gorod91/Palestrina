@@ -3386,14 +3386,14 @@ function togliPianiDoppi() {
   return removed;
 }
 
-const COPIA_TABELLE_RICHIESTA = '2026-10-31d'; // cambiarlo per rifare la copia al prossimo minuto
+const COPIA_TABELLE_RICHIESTA = '2026-11-14a'; // cambiarlo per rifare la copia al prossimo minuto
 
 function copiaTabelleNelFoglio() {
   TEST = false;
   MEMO = {};
   const ss = SpreadsheetApp.getActive();
   const done = [];
-  ['piani', 'cambi', 'presenze', 'chat'].forEach((key) => {
+  ['piani', 'cambi', 'presenze', 'chat', 'sudometro'].forEach((key) => {
     const doc = readTableDoc(tablePath(key, false));
     if (!doc) return;
     const name = 'FB ' + SHEETS[key].name;
@@ -3404,13 +3404,19 @@ function copiaTabelleNelFoglio() {
     sh.getRange(1, 1, values.length, w).setNumberFormat('@').setValues(values);
     done.push(`${key} (${values.length - 1})`);
   });
-  // Punti di ottobre voce per voce (con il giorno), per la classifica di fine mese
+  // Punti del mese in corso voce per voce (con il giorno)
   const pts = [['name', 'display', 'key', 'label', 'pts', 'day', 'note']];
-  computePoints('2026-10').forEach((r) => r.detail.forEach((g) => g.items.forEach((it) => pts.push([r.name, r.display, g.key, g.label, it.pts, it.day, it.note]))));
+  computePoints(dayString(new Date()).slice(0, 7)).forEach((r) => r.detail.forEach((g) => g.items.forEach((it) => pts.push([r.name, r.display, g.key, g.label, it.pts, it.day, it.note]))));
   const shp = ss.getSheetByName('FB Punti') || ss.insertSheet('FB Punti');
   shp.clearContents();
   shp.getRange(1, 1, pts.length, 7).setNumberFormat('@').setValues(pts.map((r) => r.map((v) => (v === undefined || v === null ? '' : String(v)))));
   done.push(`punti (${pts.length - 1})`);
+  // Classifiche salvate per sorpassi e medaglie (proprietà del mese), per capire cosa è stato annunciato
+  const all = scriptProps.getProperties();
+  const st = [['chiave', 'valore']].concat(Object.keys(all).filter((k) => /^(prova_)?(sorpassi|medaglie)_/.test(k)).sort().map((k) => [k, String(all[k]).slice(0, 40000)]));
+  const shs = ss.getSheetByName('FB Stato') || ss.insertSheet('FB Stato');
+  shs.clearContents();
+  shs.getRange(1, 1, st.length, 2).setNumberFormat('@').setValues(st);
   Logger.log('Tabelle copiate nel foglio: ' + done.join(', '));
   return done;
 }
