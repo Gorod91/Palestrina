@@ -3351,6 +3351,20 @@ function copiaFogliSuFirebase() {
  * Da lanciare dall'editor quando serve controllare i dati: copia le tabelle di Firestore nei fogli "FB <nome>"
  * (solo lettura, si possono cancellare). Le tabelle vere restano su Firebase.
  */
+/** Sorpasso della Michy su Ceppo del 14/11/2026, non annunciato per un difetto (passaggio dal pareggio): annuncio una volta. */
+const SORPASSO_RECUPERO = '2026-11-14-michy';
+function sorpassoRecupero() {
+  TEST = false;
+  MEMO = {};
+  TABLES = {};
+  const now = {};
+  computePoints('2026-11').forEach((t) => (now[t.name] = t.total));
+  if (!(now.Michy > now.Ceppo)) return; // nel frattempo Ceppo è tornato davanti: niente annuncio
+  const pos = 1 + Object.keys(now).filter((b) => now[b] > now.Michy).length;
+  addChatEvent('Michy', { kind: 'sorpasso', passed: ['Ceppo'], pos, pts: now.Michy });
+  dispatch('sorpasso', 'Michy');
+}
+
 const PIANI_DOPPI = '2026-10-31'; // cambiarlo per rifare la pulizia al prossimo minuto
 
 /**
@@ -4000,6 +4014,14 @@ function codaTick() {
     }
   } catch (err) {
     console.error('Copia delle tabelle non riuscita', err);
+  }
+  try {
+    if (realProps.getProperty('SORPASSO_RECUPERO_FATTO') !== SORPASSO_RECUPERO) {
+      realProps.setProperty('SORPASSO_RECUPERO_FATTO', SORPASSO_RECUPERO);
+      sorpassoRecupero();
+    }
+  } catch (err) {
+    console.error('Sorpasso recuperato non annunciato', err);
   }
   try {
     if (realProps.getProperty('PIANI_DOPPI_FATTO') !== PIANI_DOPPI) {
