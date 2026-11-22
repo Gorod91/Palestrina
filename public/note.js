@@ -15,6 +15,13 @@ const VERSIONS = [
     ],
   },
   {
+    v: '2.3.2',
+    date: '22 novembre 2026',
+    items: [
+      'Sudometro più preciso: oltre ai riflessi conta il rossore del viso, e i punteggi usano tutta la scala da 0 a 100',
+    ],
+  },
+  {
     v: '2.3.1',
     date: '9 – 10 novembre 2026',
     items: [
