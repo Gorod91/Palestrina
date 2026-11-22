@@ -1391,11 +1391,11 @@ async function takeSweat(debug, overwrite = false) {
         v2.retaken = true;
       }
     }
-    // Dal 22/10 il punteggio ufficiale è il Sudometro 4 (senza annunci; dal 19/10 era il 3): si calcola prima di
+    // Dal 22/11 il punteggio ufficiale è il Sudometro 5 (riflessi + rossore; dal 22/10 era il 4): si calcola prima di
     // mostrare il risultato. Se non riesce (riferimento non scaricabile, viso non trovato) resta la versione 1.
     if (!v2) v2 = await sudometroV2(photo);
-    const shown = v2.res4
-      ? { score: v2.res4.score, title: v2.res4.title, warnings: [] }
+    const shown = v2.res5
+      ? { score: v2.res5.score, title: v2.res5.title, warnings: [] }
       : v2live && v2.res ? { score: v2.res.score, title: v2.res.title, warnings: [] } : result;
     let before = null;
     if (!debug) {
@@ -1416,7 +1416,7 @@ async function takeSweat(debug, overwrite = false) {
     const r = await api('sudometro', {
       score: shown.score,
       title: shown.title,
-      details: { ...result.details, v2: compactV2(v2), v3: compactV3(v2), v4: v2.res4 ? { score: v2.res4.score, ...v2.res4.details } : { err: v2.error || 'non calcolato' } },
+      details: { ...result.details, v2: compactV2(v2), v3: compactV3(v2), v4: v2.res4 ? { score: v2.res4.score, ...v2.res4.details } : { err: v2.error || 'non calcolato' }, v5: v2.res5 ? { score: v2.res5.score, ...v2.res5.details } : { err: v2.error || 'non calcolato' } },
       debug,
       overwrite,
       photo,
@@ -1426,7 +1426,7 @@ async function takeSweat(debug, overwrite = false) {
         optimistic--;
         before = null;
         // Senza rete la foto resta sul telefono e parte da sola appena torna la connessione (entro un'ora)
-        if (netError(err) && keepSudo({ score: shown.score, title: shown.title, details: { ...result.details, v2: compactV2(v2), v3: compactV3(v2), v4: v2.res4 ? { score: v2.res4.score, ...v2.res4.details } : { err: v2.error || 'non calcolato' } }, photo })) return null;
+        if (netError(err) && keepSudo({ score: shown.score, title: shown.title, details: { ...result.details, v2: compactV2(v2), v3: compactV3(v2), v4: v2.res4 ? { score: v2.res4.score, ...v2.res4.details } : { err: v2.error || 'non calcolato' }, v5: v2.res5 ? { score: v2.res5.score, ...v2.res5.details } : { err: v2.error || 'non calcolato' } }, photo })) return null;
       }
       throw err;
     });
@@ -1448,6 +1448,7 @@ async function takeSweat(debug, overwrite = false) {
       lastDebug = [
         `${result.score}: ${alF(result.title, isF(state.me.name))}`,
         `rossore +${result.details.red} · lucidità +${result.details.shine} · luce ${result.details.light}`,
+        v2.res5 ? `Sudometro 5: ${v2.res5.score} (riflessi ${v2.res5.details.shine} · tinta ${v2.res5.details.hue} · luce ${v2.res5.details.light})` : '',
         v2.res4 ? `Sudometro 4: ${v2.res4.score} (riflessi ${v2.res4.details.shine} · luce ${v2.res4.details.light})` : '',
         v2.res3 ? `Sudometro 3: ${v2.res3.score} (riflessi ${v2.res3.details.shine} · bordo ${v2.res3.details.edge} · tinta ${v2.res3.details.red} · luce ×${v2.res3.details.lf})` : '',
         v2.res ? `Sudometro 2: ${v2.res.score} (tinta ${v2.res.details.red} · riflessi ${v2.res.details.shine} · luce ${v2.res.details.light} · nitidezza ×${v2.res.details.sharp}${v2.res.retake ? ` · da rifare: ${v2.res.retake}` : ''})` : `Sudometro 2: ${v2.error}`,
@@ -1558,7 +1559,7 @@ async function sudometroV2(photo, rest = null) {
   try {
     rest = rest || (await within(refV2(), 20000));
     const sweat = await within(imageFrom(`data:image/jpeg;base64,${photo}`).then((img) => sudometro.analyzeV2(img)), 15000);
-    return { rest, sweat, res: sudometro.scoreV2(rest, sweat), res3: rest.zones3 && sweat.zones3 ? sudometro.scoreV3(rest, sweat) : null, res4: rest.zones3 && sweat.zones3 ? sudometro.scoreV4(rest, sweat) : null };
+    return { rest, sweat, res: sudometro.scoreV2(rest, sweat), res3: rest.zones3 && sweat.zones3 ? sudometro.scoreV3(rest, sweat) : null, res4: rest.zones3 && sweat.zones3 ? sudometro.scoreV4(rest, sweat) : null, res5: rest.zones3 && sweat.zones3 ? sudometro.scoreV5(rest, sweat) : null };
   } catch (err) {
     return { error: String((err && err.message) || err) };
   }

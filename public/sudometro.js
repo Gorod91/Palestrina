@@ -746,6 +746,29 @@ export function scoreV4(rest, sweat) {
   return { score: total, title: TITLES.find(([min]) => total >= min)[1], details: { shine: round(hl), light: round(dL), lf: round(lf) } };
 }
 
+// Sudometro 5 (dal 22/11/2026): riflessi + rossore, tarato sui 59 selfie votati a mano da F (ott–nov).
+// I riflessi da soli seguivano soprattutto la luce (selfie più scuro = più "lucido": sei 91 sospetti a novembre);
+// con il rossore (tinta che scende verso il rosso) e i riflessi che pesano meno l'errore medio passa da 20 a 15.
+// Scala allargata per usare tutto 0–100.
+export const WEIGHTS5 = {
+  base: 36, // riflessi e tinta uguali al riferimento
+  perShine: 1.6, // punti per ogni punto di aumento medio dei riflessi (zone a ±20 come nel 4)
+  perHue: -2.8, // punti per ogni grado di tinta in meno (più rossa) rispetto al riferimento
+  hueCap: 15, // la tinta conta al massimo ±15 gradi
+  zoneCap: 20,
+};
+
+/** Sudometro 5: riflessi (come nel 4, senza correzione luce) + rossore. */
+export function scoreV5(rest, sweat) {
+  const W = WEIGHTS5;
+  const keys = Object.keys(sweat.zones3 || {});
+  const cap = (v) => Math.max(-W.zoneCap, Math.min(W.zoneCap, v));
+  const hl = keys.length ? keys.reduce((t, k) => t + cap(sweat.zones3[k] - ((rest.zones3 || {})[k] || 0)), 0) / keys.length : 0;
+  const dh = Math.max(-W.hueCap, Math.min(W.hueCap, (sweat.hue || 0) - (rest.hue || 0)));
+  const total = Math.max(0, Math.min(100, Math.round(W.base + W.perShine * hl + W.perHue * dh)));
+  return { score: total, title: TITLES.find(([min]) => total >= min)[1], details: { shine: round(hl), hue: round(dh), light: round(sweat.L - rest.L) } };
+}
+
 export const RETAKE_HINT = {
   'luce+': 'Troppo buio rispetto alla foto di riferimento: rifallo con più luce sul viso.',
   'luce-': 'Troppa luce rispetto alla foto di riferimento: rifallo con meno luce in faccia.',
