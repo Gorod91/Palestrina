@@ -15,6 +15,13 @@ const VERSIONS = [
     ],
   },
   {
+    v: '2.3.3',
+    date: '23 novembre 2026',
+    items: [
+      'Sfide: il proprio record non compare mentre si scrive il risultato, ma solo dopo l\'invio',
+    ],
+  },
+  {
     v: '2.3.2',
     date: '22 novembre 2026',
     items: [
