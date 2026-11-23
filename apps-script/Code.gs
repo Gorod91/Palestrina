@@ -3400,7 +3400,7 @@ function togliPianiDoppi() {
   return removed;
 }
 
-const COPIA_TABELLE_RICHIESTA = '2026-11-14b'; // cambiarlo per rifare la copia al prossimo minuto
+const COPIA_TABELLE_RICHIESTA = '2026-11-23a'; // cambiarlo per rifare la copia al prossimo minuto
 
 function copiaTabelleNelFoglio() {
   TEST = false;
@@ -3431,6 +3431,21 @@ function copiaTabelleNelFoglio() {
   const shs = ss.getSheetByName('FB Stato') || ss.insertSheet('FB Stato');
   shs.clearContents();
   shs.getRange(1, 1, st.length, 2).setNumberFormat('@').setValues(st);
+  // Catalogo comune degli esercizi e documenti delle schede (per controllare esercizi e schede salvate)
+  const fsPlain = (v) => (!v ? null : 'mapValue' in v ? Object.fromEntries(Object.entries(v.mapValue.fields || {}).map(([k, x]) => [k, fsPlain(x)]))
+    : 'arrayValue' in v ? (v.arrayValue.values || []).map(fsPlain) : 'integerValue' in v ? Number(v.integerValue)
+    : 'doubleValue' in v ? v.doubleValue : 'booleanValue' in v ? v.booleanValue : 'nullValue' in v ? null
+    : v.stringValue !== undefined ? v.stringValue : v.timestampValue || '');
+  const sk = [['raccolta', 'id', 'json']];
+  ['catalogo', 'schede'].forEach((coll) => {
+    (firestoreCall('get', `${coll}?pageSize=300`).documents || []).forEach((d) => {
+      sk.push([coll, d.name.split('/').pop(), JSON.stringify(fsPlain({ mapValue: { fields: d.fields || {} } })).slice(0, 45000)]);
+    });
+  });
+  const shk = ss.getSheetByName('FB Schede') || ss.insertSheet('FB Schede');
+  shk.clearContents();
+  shk.getRange(1, 1, sk.length, 3).setNumberFormat('@').setValues(sk);
+  done.push(`schede e catalogo (${sk.length - 1})`);
   Logger.log('Tabelle copiate nel foglio: ' + done.join(', '));
   return done;
 }
