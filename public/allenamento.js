@@ -94,6 +94,18 @@ export const CATALOGO = [
   { id: 'hyper-ext', n: 'Iperestensioni', g: 'Schiena', m: 'Panca hyper extension', t: 'rip' },
   { id: 'piegamenti', n: 'Piegamenti', g: 'Petto', m: 'Corpo libero', t: 'rip' },
   { id: 'vogatore', n: 'Vogatore', g: 'Cardio', m: 'Vogatore', t: 'm' },
+  // Rizzo, scheda nuova del 23/11 (istruttore Luca B)
+  { id: 'pull-down', n: 'Pull down in piedi', g: 'Schiena', m: 'Cavi' },
+  { id: 'spinte-panca-30', n: 'Spinte con manubri su panca a 30°', g: 'Petto', m: 'Manubri' },
+  { id: 'pendulum-squat', n: 'Pendulum squat', g: 'Gambe', m: 'Pendulum squat' },
+  { id: 'hip-ext-macchina', n: 'Hip extension alla macchina', g: 'Glutei', m: 'Macchina' },
+  { id: 'leg-ext-mono', n: 'Leg extension monopodalica', g: 'Gambe', m: 'Leg extension' },
+  { id: 'adductor', n: 'Adduzioni', g: 'Gambe', m: 'Adductor machine' },
+  { id: 'curl-panca-45', n: 'Curl con manubri su panca a 45°', g: 'Bicipiti', m: 'Manubri' },
+  { id: 'curl-cavi', n: 'Curl ai cavi', g: 'Bicipiti', m: 'Cavi' },
+  { id: 'lever-row', n: 'Lever row', g: 'Schiena', m: 'Lever row' },
+  { id: 'high-row', n: 'High row', g: 'Schiena', m: 'High row' },
+  { id: 'dip', n: 'Dip alle parallele', g: 'Tricipiti', m: 'Parallele', t: 'rip' },
 ];
 const EX = Object.fromEntries(CATALOGO.map((e) => [e.id, e]));
 // Doppioni uniti (lo stesso esercizio a tempo e a ripetizioni): il vecchio id resta solo per le serie già salvate,
@@ -149,48 +161,56 @@ const SCHEDE_ESEMPIO = [
   },
 ];
 
-// Schede di Rizzo (di: non vengono proposte come "da fare"): in fondo a tutte il circuito addome,
-// 30" di lavoro per esercizio, di fila, e recupero tra i giri (pausa: secondi tra un esercizio e l'altro, se servono).
-const ADDOME_R = { n: 'Circuito addome', ex: ['russian-twist', 'plank-laterale', 'situps', 'v-sit', 'barchetta'], giri: 2, rec: 60 };
-const PIANO_ADDOME_R = Object.fromEntries(ADDOME_R.ex.map((e) => [e, { s: '30"' }]));
-PIANO_ADDOME_R.situps.t = 'sec';
-const rizzo = (id, name, piano) => ({
-  id, name, di: 'Rizzo',
-  ex: [...Object.keys(piano), '@addome-r'],
-  circuiti: { 'addome-r': ADDOME_R },
-  piano: { ...piano, ...PIANO_ADDOME_R },
-});
-SCHEDE_ESEMPIO.push(
-  rizzo('r-upper', 'Upper', {
-    panca: { s: '5 × 5' },
-    'croci-alto': { s: '3 × 12' },
-    lat: { s: '3 × 8-10' },
-    pulley: { s: '3 × 8-10' },
-    alzate: { s: '3 × 10-12' },
-  }),
-  rizzo('r-lower', 'Lower', {
-    'leg-press-or': { s: '4 × 8-10' },
-    'leg-ext': { s: '3 × 8-10' },
-    'leg-curl': { s: '3 × 8-10' },
-    'polpacci-lp': { s: '3 × 10-12' },
-    'affondi-indietro': { s: '3 × 8-10' },
-    abductor: { s: '3 × 10-12' },
-  }),
-  rizzo('r-davanti', 'Davanti', {
-    panca: { s: '4 × 10' },
-    'spinte-multipower': { s: '3 × 8-10' },
-    'step-ups': { s: '3 × 8-10' },
-    'curl-ez': { s: '3 × 8-10' },
-    'hammer-curl': { s: '3 × 8-10' },
-  }),
-  rizzo('r-dietro', 'Dietro', {
-    'trazioni-elastico': { s: '4 × 6', nota: 'più diventi forte, più aumenti le ripetizioni' },
-    pulley: { s: '3 × 8-10' },
-    'pushdown-corda': { s: '3 × 10-12' },
-    'french-press': { s: '3 × 10-12' },
-    'leg-curl': { s: '3 × 8-10' },
-  }),
-);
+// Schede di Rizzo (di: non vengono proposte come "da fare"), dal 23/11 (istruttore Luca B)
+const SCHEDE_RIZZO = [
+  {
+    id: 'r-upper', name: 'Upper', di: 'Rizzo',
+    ex: ['pull-down', 'spinte-panca-30', 'lat', 'croci-alto', 'alzate'],
+    piano: {
+      'pull-down': { s: '4 × 6-8', nota: '3 o 4 serie' },
+      'spinte-panca-30': { s: '4 × 6-8', nota: '3 o 4 serie' },
+      lat: { s: '3 × 6-8' },
+      'croci-alto': { s: '3 × 12-15' },
+      alzate: { s: '3 × 8-10' },
+    },
+  },
+  {
+    id: 'r-lower', name: 'Lower', di: 'Rizzo',
+    ex: ['pendulum-squat', 'hip-ext-macchina', 'leg-ext-mono', 'leg-curl-sdraiato', 'adductor', 'abductor', 'polpacci-lp'],
+    piano: {
+      'pendulum-squat': { s: '4 × 6-8' },
+      'hip-ext-macchina': { s: '3 × 10-12' },
+      'leg-ext-mono': { s: '3 × 6-8', nota: '1" di isometria in alto' },
+      'leg-curl-sdraiato': { s: '3 × 10-12', nota: '1" di isometria in chiusura' },
+      adductor: { s: '3 × 12-15' },
+      abductor: { s: '3 × 12-15' },
+      'polpacci-lp': { s: '3 × 12-15' },
+    },
+  },
+  {
+    id: 'r-davanti', name: 'Davanti', di: 'Rizzo',
+    ex: ['panca', 'spinte-manubri', 'leg-press-mono', 'curl-panca-45', 'curl-cavi'],
+    piano: {
+      panca: { s: '4 × 6-8' },
+      'spinte-manubri': { s: '3 × 4-6', nota: 'military press, gambe tese' },
+      'leg-press-mono': { s: '3 × 10 per gamba' },
+      'curl-panca-45': { s: '3 × 8-10' },
+      'curl-cavi': { s: '3 × 10-12' },
+    },
+  },
+  {
+    id: 'r-dietro', name: 'Dietro', di: 'Rizzo',
+    ex: ['x-trazioni-corpo-libero-duv9', 'lever-row', 'high-row', 'dip', 'french-press'],
+    piano: {
+      'x-trazioni-corpo-libero-duv9': { s: '4 × 8', nota: 'poi 4 × 6, 4 × 4, 4 × 2' }, // "Trazioni corpo libero", aggiunto da Rizzo dall'app
+      'lever-row': { s: '3 × 8-10' },
+      'high-row': { s: '3 × 10-12' },
+      dip: { s: '4 × max' },
+      'french-press': { s: '3 × 6-8' },
+    },
+  },
+];
+SCHEDE_ESEMPIO.push(...SCHEDE_RIZZO);
 
 // Scheda di Ceppo (una sola, dell'istruttore Simone); kg: peso da cui partire, rec: recupero in secondi
 SCHEDE_ESEMPIO.push({
@@ -274,6 +294,7 @@ const esempi = (name) => (name === 'Francesco' ? SCHEDE_ESEMPIO : SCHEDE_ESEMPIO
 //   { id, op: 'nome', scheda, name }                                 rinomina una scheda
 //   { id, op: 'nome', di, da, name }                                 rinomina le copie "di" qualcuno che si chiamano ancora `da`
 //   { id, op: 'scheda', scheda: { id, name, ex, piano, circuiti } }  scheda intera nuova (se non c'è già)
+//   { id, op: 'rifai', scheda: { id, name, ex, piano, circuiti } }   scheda nuova al posto di quella con lo stesso id (o in fondo)
 const AGGIORNAMENTI = [
   // 23/10: via i nomi delle persone dai nomi delle schede (c'è il bollino con la persona)
   { id: 1, op: 'nome', di: 'Rizzo', da: 'Rizzo Upper', name: 'Upper' },
@@ -291,10 +312,18 @@ const AGGIORNAMENTI = [
   { id: 14, op: 'sostituisci', scheda: 'g-a', ex: 'v-sit-rip', con: 'v-sit', t: 'rip' },
   // 30/10: pesi sotto lo zero, l'EPS aiuta con 50 kg
   { id: 15, op: 'piano', scheda: 'c-ceppo', ex: 'eps-trazioni', set: { kg: -50 } },
+  // 23/11: Rizzo ha la scheda nuova (istruttore Luca B): Upper, Lower, Davanti e Dietro rifatte da capo
+  ...SCHEDE_RIZZO.map(({ di, ...sc }, i) => ({ id: 16 + i, op: 'rifai', scheda: sc, per: ['Rizzo'] })),
 ];
 
 /** Applica un aggiornamento all'elenco di schede (già copiato); quello che non trova lo salta. */
 function applyAgg(list, a) {
+  if (a.op === 'rifai') {
+    const k = list.findIndex((y) => y.id === a.scheda.id), sc = JSON.parse(JSON.stringify(a.scheda));
+    if (k >= 0) list[k] = sc;
+    else list.push(sc);
+    return;
+  }
   if (a.op === 'scheda') {
     if (!list.some((y) => y.id === a.scheda.id)) list.push(JSON.parse(JSON.stringify(a.scheda)));
     return;
@@ -337,8 +366,8 @@ const REST = 90; // secondi di recupero
 
 /** Serie della prima volta: dal piano della scheda ("4 × 6-8" → 4 serie da 6), altrimenti 3 × 10; kg e rip se indicati. */
 function primaVolta(piano) {
-  const m = String((piano && piano.s) || '').match(/^(?:(\d+)\s*×\s*)?(\d+)/);
-  const n = m ? Number(m[1] || 1) : 3, reps = (piano && piano.rip) || (m ? Number(m[2]) : 10);
+  const m = String((piano && piano.s) || '').match(/^(?:(\d+)\s*×\s*)?(\d+|max)/);
+  const n = m ? Number(m[1] || 1) : 3, reps = (piano && piano.rip) || (m && m[2] !== 'max' ? Number(m[2]) : 10);
   return Array.from({ length: n }, () => ({ kg: (piano && piano.kg) || 0, reps }));
 }
 const unit = (e) => (e && e.t) || 'kg';
