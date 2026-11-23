@@ -1273,7 +1273,8 @@ export function createChat({ api, toast, photoPair, loadPhoto, clean, isDebug, i
         input.blur();
         sfidaDo({ id: s.id, op: 'value', value: n });
       };
-      row.append(el('p', 'sfida-hint', meP.record ? `Il tuo record: ${meP.record}. Per vincere superalo più degli altri.` : 'Prima volta: questo numero sarà il tuo record (calibrazione, vale la partecipazione).'));
+      // Il record non si mostra mentre si scrive il proprio numero, per non farsi influenzare: si vede dopo l'invio
+      row.append(el('p', 'sfida-hint', meP.record ? 'Per vincere supera il tuo record più degli altri. Lo vedrai dopo l\'invio.' : 'Prima volta: questo numero sarà il tuo record (calibrazione, vale la partecipazione).'));
       row.append(f);
     }
     return row;
