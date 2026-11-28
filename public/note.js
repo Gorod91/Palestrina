@@ -15,6 +15,13 @@ const VERSIONS = [
     ],
   },
   {
+    v: '2.3.4',
+    date: '28 novembre 2026',
+    items: [
+      'Allenamento: alternative per gli esercizi della scheda, da usare se la macchina è occupata. Si scelgono sotto il nome dell\'esercizio e restano nella scheda; l\'esercizio fatto al suo posto ha i suoi progressi e la scheda lo conta come fatto',
+    ],
+  },
+  {
     v: '2.3.3',
     date: '23 novembre 2026',
     items: [
