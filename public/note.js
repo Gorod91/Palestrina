@@ -19,6 +19,7 @@ const VERSIONS = [
     date: '28 novembre 2026',
     items: [
       'Allenamento: alternative per gli esercizi della scheda, da usare se la macchina è occupata. Si scelgono sotto il nome dell\'esercizio e restano nella scheda; l\'esercizio fatto al suo posto ha i suoi progressi e la scheda lo conta come fatto',
+      'Scuotendo il telefono, per esempio per fermare il timer, non compare più «Annulla inserimento» dopo aver scritto un valore',
     ],
   },
   {
