@@ -1507,3 +1507,28 @@ body[data-tab]:not([data-tab="oggi"]) .avatar { display: none; }
 /* Pagina corta: scorre comunque di 1px, così su iPhone c'è sempre il rimbalzo elastico come nelle app */
 #scroller { position: relative; }
 #scroller::before { content: ''; position: absolute; top: 0; left: 0; width: 1px; height: calc(100% + 1px); pointer-events: none; }
+
+/* Alternative di un esercizio della scheda (macchina occupata): pillole sotto il nome e foglio per aggiungerle */
+.wo-alts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: -2px 0 12px; }
+.wo-alts-l { display: inline-flex; align-items: center; gap: 5px; width: 100%; margin-bottom: -2px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.wo-alts-l svg, .wo-swap svg { flex: none; width: 18px; height: 18px; fill: none; stroke: var(--stand); stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.wo-alts button { flex: none; padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--fg); font: inherit; font-size: 14px; font-weight: 600; transition: opacity .3s; }
+.wo-alts button:active { opacity: .5; transition-duration: .05s; }
+.wo-alts button.on { border-color: var(--stand); background: rgba(0, 217, 255, .16); color: var(--stand-2); }
+.wo-alts button.add { width: 34px; padding: 7px 0; color: var(--muted); font-size: 17px; line-height: 1; }
+.wo-swap { display: flex; align-items: center; gap: 10px; margin: -2px 0 12px; padding: 11px 14px; border-radius: 14px; background: rgba(0, 217, 255, .12); color: var(--stand-2); font-size: 14px; }
+.wo-swap b { font-weight: 600; }
+.wo-alt-q { display: flex; align-items: center; gap: 8px; margin: 10px 0 4px; padding: 9px 12px; border-radius: 12px; background: var(--card-2); }
+.wo-alt-q svg { flex: none; width: 17px; height: 17px; fill: none; stroke: var(--muted); stroke-width: 2.2; stroke-linecap: round; }
+.wo-alt-q input { flex: 1; min-width: 0; border: 0; outline: 0; background: none; color: var(--fg); font: inherit; font-size: 16px; text-transform: none; letter-spacing: 0; }
+.wo-alt-h { margin: 14px 4px 6px; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.wo-alt-list { border-radius: 14px; background: var(--card); overflow: hidden; }
+.wo-alt-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 11px 14px; border: 0; border-top: .5px solid var(--line); background: none; color: var(--fg); font: inherit; text-align: left; }
+.wo-alt-row:first-child { border-top: 0; }
+.wo-alt-row:active { background: var(--card-2); }
+.wo-alt-row span { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.wo-alt-row b { font-size: 16px; font-weight: 600; }
+.wo-alt-row small { color: var(--muted); font-size: 13px; }
+.wo-alt-row i { flex: none; font-style: normal; color: var(--muted); font-size: 20px; }
+.wo-alt-row i.on { color: var(--stand); font-size: 17px; font-weight: 700; }
+.wo-sub b { color: var(--fg); font-weight: 600; }
