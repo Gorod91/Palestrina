@@ -13,9 +13,11 @@ import { releaseNotesHtml } from './note.js';
 import { createMedals } from './medaglie.js';
 import { openCoronation } from './corona.js';
 import { setPeople, faceHtml, paintFaces, esc as escFace } from './visi.js';
+import { initNoUndo } from './noundo.js';
 
 const cfg = window.APP_CONFIG;
 const $ = (id) => document.getElementById(id);
+initNoUndo();
 
 const isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 const pushSupported = 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window;

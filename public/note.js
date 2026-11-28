@@ -15,6 +15,13 @@ const VERSIONS = [
     ],
   },
   {
+    v: '2.3.4',
+    date: '28 novembre 2026',
+    items: [
+      'Scuotendo il telefono, per esempio per fermare il timer, non compare più «Annulla inserimento» dopo aver scritto un valore',
+    ],
+  },
+  {
     v: '2.3.3',
     date: '23 novembre 2026',
     items: [
