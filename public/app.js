@@ -2300,7 +2300,9 @@ $('form-login').addEventListener('submit', (e) => {
 $('btn-checkin').addEventListener('click', checkin);
 $('btn-checkin-undo').addEventListener('click', checkinUndo);
 $('btn-notify').addEventListener('click', () => withBusy($('btn-notify'), 'Attivo…', enableNotifications));
-$('btn-logout').addEventListener('click', logout);
+$('btn-logout').addEventListener('click', () => {
+  if (confirm("Uscire dall'app? Per rientrare servirà di nuovo il tuo codice.")) logout();
+});
 // "Aggiorna l'icona": codice d'accesso di 15 minuti e Safari aperto sul link (x-safari-https apre proprio Safari, iOS 17+)
 $('btn-icon').addEventListener('click', () => withBusy($('btn-icon'), 'Preparo…', async () => {
   try {
